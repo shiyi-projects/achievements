@@ -129,6 +129,15 @@ _ENTITY_READ_SCHEMA: dict[MutationEntity, type[Any]] = {
     "tag": TagRead,
 }
 
+# Fields that MUST be present (not None) when creating a *new* entity.
+# Maps entity type → list of field names that are NOT NULL in the DB schema.
+_ENTITY_REQUIRED_ON_CREATE: dict[MutationEntity, list[str]] = {
+    "folder": ["name"],
+    "list": ["name"],
+    "task": ["list_id", "title"],
+    "tag": ["name"],
+}
+
 
 async def push(
     session: AsyncSession,
@@ -195,6 +204,19 @@ async def _apply_one(
             if existing is None:
                 if mut.op == "delete":
                     return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=1)
+
+                # Validate required fields before INSERT to avoid DB NOT-NULL violations
+                required = _ENTITY_REQUIRED_ON_CREATE.get(mut.entity, [])
+                payload_data = parsed.model_dump(exclude_unset=True)
+                missing = [f for f in required if payload_data.get(f) is None]
+                if missing:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "sync: mutation %s/%s rejected (missing required fields: %s)",
+                        mut.entity, mut.id, ", ".join(missing),
+                    )
+                    return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+
                 row = model(id=mut.id, user_id=user_id)
                 _assign(row, parsed)
                 session.add(row)

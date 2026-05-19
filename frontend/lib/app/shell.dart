@@ -1,4 +1,5 @@
 import 'package:achievements/core/constants.dart';
+import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/features/list_view/list_page.dart';
 import 'package:achievements/features/sidebar/sidebar.dart';
@@ -70,7 +71,7 @@ class AppShell extends ConsumerWidget {
       return Scaffold(
         body: Row(
           children: [
-            SizedBox(width: _kSidebarWidth, child: const Sidebar()),
+            const SizedBox(width: _kSidebarWidth, child: Sidebar()),
             VerticalDivider(
               width: 1,
               thickness: 1,
@@ -102,9 +103,10 @@ class AppShell extends ConsumerWidget {
         title: Text(title),
         elevation: 0,
         scrolledUnderElevation: 0,
+        actions: const [_SyncStatusIcon(), SizedBox(width: 8)],
       ),
-      drawer: Drawer(
-        child: SizedBox(width: _kSidebarWidth, child: const Sidebar()),
+      drawer: const Drawer(
+        child: SizedBox(width: _kSidebarWidth, child: Sidebar()),
       ),
       body: mainBody,
     );
@@ -130,13 +132,13 @@ class AppShell extends ConsumerWidget {
 // Modern AppBar (inline mode)
 // ─────────────────────────────────────────────────────────────────────
 
-class _ModernAppBar extends StatelessWidget {
+class _ModernAppBar extends ConsumerWidget {
   const _ModernAppBar({required this.title});
 
   final String title;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -162,6 +164,7 @@ class _ModernAppBar extends StatelessWidget {
               ),
             ),
           ),
+          const _SyncStatusIcon(),
           // ── Search button (placeholder) ──
           IconButton(
             icon: Icon(Icons.search_rounded, color: scheme.onSurfaceVariant),
@@ -173,5 +176,52 @@ class _ModernAppBar extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Sync status indicator
+// ─────────────────────────────────────────────────────────────────────
+
+/// 同步状态小图标。idle 时隐藏;syncing 时显示旋转圈;
+/// offline / error 时显示对应图标 + tooltip。
+class _SyncStatusIcon extends ConsumerWidget {
+  const _SyncStatusIcon();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(syncStatusControllerProvider);
+    final scheme = Theme.of(context).colorScheme;
+
+    return switch (status) {
+      SyncStatus.idle => const SizedBox.shrink(),
+      SyncStatus.syncing => Tooltip(
+        message: '正在同步…',
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.8,
+            color: scheme.primary.withValues(alpha: 0.6),
+          ),
+        ),
+      ),
+      SyncStatus.offline => Tooltip(
+        message: '已离线',
+        child: Icon(
+          Icons.cloud_off_outlined,
+          size: 20,
+          color: scheme.outline,
+        ),
+      ),
+      SyncStatus.error => Tooltip(
+        message: '同步失败,30 秒后重试',
+        child: Icon(
+          Icons.sync_problem_outlined,
+          size: 20,
+          color: scheme.error,
+        ),
+      ),
+    };
   }
 }

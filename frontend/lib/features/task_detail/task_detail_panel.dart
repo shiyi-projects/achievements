@@ -403,13 +403,15 @@ class _TopBar extends StatelessWidget {
     required this.onRestore,
     required this.onHardDelete,
   });
-  final bool starred, completed, isTrashed;
-  final VoidCallback onClose,
-      onToggleComplete,
-      onToggleStar,
-      onSoftDelete,
-      onRestore,
-      onHardDelete;
+  final bool starred;
+  final bool completed;
+  final bool isTrashed;
+  final VoidCallback onClose;
+  final VoidCallback onToggleComplete;
+  final VoidCallback onToggleStar;
+  final VoidCallback onSoftDelete;
+  final VoidCallback onRestore;
+  final VoidCallback onHardDelete;
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;

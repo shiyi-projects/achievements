@@ -55,23 +55,63 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Icon(Icons.account_tree_rounded, size: 18, color: scheme.outline),
-            const SizedBox(width: Spacing.sm),
-            Text('Subtasks', style: theme.textTheme.labelLarge),
-          ],
+        subtasksAsync.when(
+          loading: () => Row(
+            children: [
+              Icon(Icons.account_tree_rounded, size: 18, color: scheme.outline),
+              const SizedBox(width: Spacing.sm),
+              Text('子任务', style: theme.textTheme.labelLarge),
+            ],
+          ),
+          error: (e, st) => Text('Failed to load: $e'),
+          data: (subs) {
+            final total = subs.length;
+            final done = subs.where((s) => s.completedAt != null).length;
+            return Row(
+              children: [
+                Icon(Icons.account_tree_rounded,
+                    size: 18, color: scheme.outline),
+                const SizedBox(width: Spacing.sm),
+                Text('子任务', style: theme.textTheme.labelLarge),
+                if (total > 0) ...[
+                  const SizedBox(width: Spacing.sm),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Spacing.sm,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: done == total && total > 0
+                          ? scheme.primary.withValues(alpha: 0.15)
+                          : scheme.surfaceContainerHighest
+                              .withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(Radii.circle),
+                    ),
+                    child: Text(
+                      '$done/$total',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: done == total && total > 0
+                            ? scheme.primary
+                            : scheme.outline,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         ),
         const SizedBox(height: Spacing.sm),
         subtasksAsync.when(
           loading: () => const LinearProgressIndicator(minHeight: 2),
-          error: (e, st) => Text('Failed to load: $e'),
+          error: (_, __) => const SizedBox.shrink(),
           data: (subs) {
             if (subs.isEmpty) {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
                 child: Text(
-                  'No subtasks yet',
+                  '暂无子任务',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: scheme.outline,
                   ),
@@ -97,7 +137,7 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
                   onSubmitted: (_) => _submit(),
                   style: theme.textTheme.bodyMedium,
                   decoration: InputDecoration(
-                    hintText: 'Add subtask',
+                    hintText: '添加子任务',
                     hintStyle: theme.textTheme.bodyMedium?.copyWith(
                       color: scheme.outline,
                     ),
