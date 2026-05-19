@@ -3,8 +3,8 @@ import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/widgets/empty_state.dart';
-import 'package:achievements/shared/widgets/pending_completed_list.dart';
 import 'package:achievements/shared/widgets/quick_create_input.dart';
+import 'package:achievements/shared/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -60,7 +60,9 @@ class _TodayBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final completed = tasks.where((t) => t.completedAt != null).length;
+    final completedCount = tasks.where((t) => t.completedAt != null).length;
+    final pending = tasks.where((t) => t.completedAt == null).toList();
+    final completed = tasks.where((t) => t.completedAt != null).toList();
 
     return CustomScrollView(
       slivers: [
@@ -70,11 +72,11 @@ class _TodayBody extends StatelessWidget {
             hour: now.hour,
             date: now,
             total: tasks.length,
-            completed: completed,
+            completed: completedCount,
           ),
         ),
 
-        // ── Task List ──
+        // ── Task List (as native slivers — no nested scrollable) ──
         if (tasks.isEmpty)
           const SliverFillRemaining(
             hasScrollBody: false,
@@ -84,14 +86,94 @@ class _TodayBody extends StatelessWidget {
               subtitle: 'Create your first task from the input below.',
             ),
           )
-        else
-          SliverToBoxAdapter(
-            child: PendingCompletedList(
-              tasks: tasks,
-              emptyState: const SizedBox.shrink(),
+        else ...[
+          if (pending.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader('Pending (${pending.length})'),
+            ),
+            SliverList.builder(
+              itemCount: pending.length,
+              itemBuilder: (_, i) => TaskTile(task: pending[i]),
+            ),
+          ],
+          if (completed.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _CompletedSection(
+                tasks: completed,
+                initiallyExpanded: pending.isEmpty,
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: Spacing.sm)),
+        ],
+      ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.xl,
+        Spacing.sm,
+        Spacing.base,
+        Spacing.xs,
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.outline,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// Completed 折叠区。children 是普通 TaskTile(非 ListView),
+/// 可安全放在 SliverToBoxAdapter 里。
+class _CompletedSection extends StatelessWidget {
+  const _CompletedSection({
+    required this.tasks,
+    required this.initiallyExpanded,
+  });
+
+  final List<Task> tasks;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+        child: ExpansionTile(
+          key: const PageStorageKey<String>('today-completed-fold'),
+          initiallyExpanded: initiallyExpanded,
+          tilePadding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Radii.input),
+          ),
+          collapsedShape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Radii.input),
+          ),
+          title: Text(
+            'Completed (${tasks.length})',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+              letterSpacing: 0.5,
             ),
           ),
-      ],
+          childrenPadding: EdgeInsets.zero,
+          children: [for (final t in tasks) TaskTile(task: t)],
+        ),
+      ),
     );
   }
 }
