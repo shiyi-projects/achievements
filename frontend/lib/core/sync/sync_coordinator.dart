@@ -37,6 +37,7 @@ class SyncCoordinator {
   StreamSubscription<int>? _outboxSub;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _debounce;
+  Timer? _retryTimer;
   bool _inFlight = false;
   bool _wasOffline = false;
 
@@ -53,10 +54,13 @@ class SyncCoordinator {
     _outboxSub?.cancel();
     _connectivitySub?.cancel();
     _debounce?.cancel();
+    _retryTimer?.cancel();
   }
 
   /// 完整同步:pull 增量,再把 outbox 推完。bootstrap / 网络恢复时用。
   Future<void> runFullSync() async {
+    _retryTimer?.cancel();
+    _retryTimer = null;
     if (_inFlight) return;
     _inFlight = true;
     try {
@@ -64,10 +68,12 @@ class SyncCoordinator {
       final pullResult = await _engine.pullOnce();
       if (pullResult != SyncStatus.idle) {
         _status.set(pullResult);
+        _scheduleRetry(runFullSync);
         return;
       }
       final pushResult = await _engine.pushOnce();
       _status.set(pushResult);
+      _scheduleRetry(runFullSync, only: pushResult);
     } finally {
       _inFlight = false;
     }
@@ -75,15 +81,32 @@ class SyncCoordinator {
 
   /// 单独跑一次 push(本地写入 debounce 后调用)。
   Future<void> _runPush() async {
+    _retryTimer?.cancel();
+    _retryTimer = null;
     if (_inFlight) return;
     _inFlight = true;
     try {
       _status.set(SyncStatus.syncing);
       final result = await _engine.pushOnce();
       _status.set(result);
+      _scheduleRetry(_runPush, only: result);
     } finally {
       _inFlight = false;
     }
+  }
+
+  /// 若 [only] 是 error / offline,30s 后重跑 [callback]。
+  /// [only] 为 null 时无条件调度(用于 pull 失败路径)。
+  void _scheduleRetry(Future<void> Function() callback, {SyncStatus? only}) {
+    final shouldRetry =
+        only == null ||
+        only == SyncStatus.error ||
+        only == SyncStatus.offline;
+    if (!shouldRetry) return;
+    _retryTimer = Timer(
+      const Duration(seconds: 30),
+      () => unawaited(callback()),
+    );
   }
 
   void _onOutboxChanged(int count) {
