@@ -45,7 +45,7 @@ class TaskPicker extends ConsumerWidget {
     }
 
     // 无任何任务可关联 → 占位按钮
-    return _EmptyRow();
+    return const _EmptyRow();
   }
 }
 

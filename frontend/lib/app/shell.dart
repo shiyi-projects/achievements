@@ -2,7 +2,9 @@ import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/features/calendar/calendar_page.dart';
+import 'package:achievements/features/focus/focus_page.dart';
 import 'package:achievements/features/list_view/list_page.dart';
+import 'package:achievements/features/search/search_page.dart';
 import 'package:achievements/features/sidebar/sidebar.dart';
 import 'package:achievements/features/task_detail/task_detail_panel.dart';
 import 'package:achievements/features/today/today_page.dart';
@@ -48,29 +50,35 @@ class AppShell extends ConsumerWidget {
 
     final view = ref.watch(currentViewNotifierProvider);
 
-    final title = view == AppView.calendar
-        ? '日历'
-        : currentAsync.maybeWhen(
-            data: (list) => list?.name ?? 'Achievements',
-            orElse: () => 'Achievements',
-          );
+    final title = switch (view) {
+      AppView.calendar => '日历',
+      AppView.focus => '专注',
+      AppView.search => '搜索',
+      AppView.list => currentAsync.maybeWhen(
+        data: (list) => list?.name ?? 'Achievements',
+        orElse: () => 'Achievements',
+      ),
+    };
 
-    final mainBody = view == AppView.calendar
-        ? const CalendarPage()
-        : currentAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, st) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(Spacing.xl),
-                child: Text('Failed to load: $e'),
-              ),
-            ),
-            data: (list) {
-              final kind = SystemListKind.fromValue(list?.systemKind);
-              if (kind == SystemListKind.today) return const TodayPage();
-              return const ListPage();
-            },
-          );
+    final mainBody = switch (view) {
+      AppView.calendar => const CalendarPage(),
+      AppView.focus => const FocusPage(),
+      AppView.search => const SearchPage(),
+      AppView.list => currentAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, st) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(Spacing.xl),
+            child: Text('Failed to load: $e'),
+          ),
+        ),
+        data: (list) {
+          final kind = SystemListKind.fromValue(list?.systemKind);
+          if (kind == SystemListKind.today) return const TodayPage();
+          return const ListPage();
+        },
+      ),
+    };
 
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -149,6 +157,7 @@ class _ModernAppBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final view = ref.watch(currentViewNotifierProvider);
 
     return Container(
       height: 56,
@@ -173,14 +182,15 @@ class _ModernAppBar extends ConsumerWidget {
             ),
           ),
           const _SyncStatusIcon(),
-          // ── Search button (placeholder) ──
-          IconButton(
-            icon: Icon(Icons.search_rounded, color: scheme.onSurfaceVariant),
-            tooltip: 'Search',
-            onPressed: () {
-              // Phase 3: open search
-            },
-          ),
+          // search 视图自带 SearchBarField,这里不再重复入口
+          if (view != AppView.search)
+            IconButton(
+              icon: Icon(Icons.search_rounded, color: scheme.onSurfaceVariant),
+              tooltip: '搜索',
+              onPressed: ref
+                  .read(currentViewNotifierProvider.notifier)
+                  .showSearch,
+            ),
         ],
       ),
     );

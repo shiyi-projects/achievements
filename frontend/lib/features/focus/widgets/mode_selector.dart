@@ -29,7 +29,6 @@ class ModeSelector extends ConsumerWidget {
             _ModeChip(
               label: label,
               selected: state.mode == mode,
-              enabled: isEnabled,
               onSelected: isEnabled ? () => notifier.setMode(mode) : null,
             ),
             if (mode != _modes.last.$1) const SizedBox(width: Spacing.sm),
@@ -44,13 +43,11 @@ class _ModeChip extends StatelessWidget {
   const _ModeChip({
     required this.label,
     required this.selected,
-    required this.enabled,
     required this.onSelected,
   });
 
   final String label;
   final bool selected;
-  final bool enabled;
   final VoidCallback? onSelected;
 
   @override
@@ -59,7 +56,6 @@ class _ModeChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       showCheckmark: false,
-      isEnabled: enabled,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Radii.chip),
       ),

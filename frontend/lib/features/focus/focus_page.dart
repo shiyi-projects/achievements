@@ -17,21 +17,20 @@ class FocusPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
+    return const SingleChildScrollView(
+      padding: EdgeInsets.symmetric(
         horizontal: Spacing.base,
         vertical: Spacing.xl,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const ModeSelector(),
-          const SizedBox(height: Spacing.xl),
-          const TimerDisplay(),
-          const SizedBox(height: Spacing.lg),
-          const TaskPicker(),
-          const SizedBox(height: Spacing.xl),
-          const TimerControls(),
+          ModeSelector(),
+          SizedBox(height: Spacing.xl),
+          TimerDisplay(),
+          SizedBox(height: Spacing.lg),
+          TaskPicker(),
+          SizedBox(height: Spacing.xl),
+          TimerControls(),
         ],
       ),
     );

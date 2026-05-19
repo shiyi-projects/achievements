@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// 全局搜索页(组装层)。
 ///
 /// 布局:
-/// ```
+/// ```text
 /// Column
 ///   SearchBarField          ← 固定顶部
 ///   Divider

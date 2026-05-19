@@ -49,7 +49,7 @@ class FocusSessionRepository {
                 s.durationSeconds.isNotNull(),
           ))
         .get();
-    return rows.fold(0, (sum, r) => sum + (r.durationSeconds ?? 0));
+    return rows.fold<int>(0, (sum, r) => sum + (r.durationSeconds ?? 0));
   }
 
   /// 最近 [limit] 条会话,按开始时间倒序。

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:achievements/data/repositories/focus_session_repository.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'focus_providers.g.dart';
@@ -53,14 +52,14 @@ class FocusTimerState {
   });
 
   /// 默认初始状态：番茄钟，空闲，25 分钟。
-  factory FocusTimerState.initial() => FocusTimerState(
+  factory FocusTimerState.initial() => const FocusTimerState(
         mode: FocusMode.pomodoro,
         phase: FocusPhase.idle,
-        remaining: const Duration(minutes: 25),
+        remaining: Duration(minutes: 25),
         elapsed: Duration.zero,
         isRunning: false,
-        workDuration: const Duration(minutes: 25),
-        breakDuration: const Duration(minutes: 5),
+        workDuration: Duration(minutes: 25),
+        breakDuration: Duration(minutes: 5),
         completedPomodoros: 0,
       );
 
