@@ -86,8 +86,12 @@ class TaskRepository {
   }
 
   /// 局部更新任务字段。传入 `Value.absent()` 的字段保持不变。
+  ///
+  /// [knownVersion] 由调用方传入(通常来自已持有的 Task 对象),跳过
+  /// 额外的 SELECT 查询;未传入时回退到事务内读取(兼容旧调用路径)。
   Future<void> update(
     String id, {
+    int? knownVersion,
     Value<String> title = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     Value<DateTime?> dueAt = const Value.absent(),
@@ -97,9 +101,11 @@ class TaskRepository {
     Value<String> listId = const Value.absent(),
   }) async {
     await _db.transaction(() async {
-      final current = await (_db.select(
-        _db.tasks,
-      )..where((t) => t.id.equals(id))).getSingle();
+      final version =
+          knownVersion ??
+          (await (_db.select(
+            _db.tasks,
+          )..where((t) => t.id.equals(id))).getSingle()).version;
       await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
         TasksCompanion(
           title: title,
@@ -126,7 +132,7 @@ class TaskRepository {
         entity: 'task',
         op: 'upsert',
         entityId: id,
-        baseVersion: current.version,
+        baseVersion: version,
         payload: payload,
       );
     });

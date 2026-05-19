@@ -3,18 +3,19 @@ import 'dart:async';
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
-import 'package:achievements/data/repositories/list_repository.dart';
-import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:achievements/features/task_detail/widgets/collapsible_meta.dart';
+import 'package:achievements/features/task_detail/widgets/date_chip.dart';
+import 'package:achievements/features/task_detail/widgets/list_dropdown.dart';
+import 'package:achievements/features/task_detail/widgets/priority_chips.dart';
 import 'package:achievements/features/task_detail/widgets/subtasks_section.dart';
 import 'package:achievements/features/task_detail/widgets/tag_editor.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
-const Duration _kTextDebounce = Duration(milliseconds: 400);
+const Duration _kDebounce = Duration(milliseconds: 400);
 
 class TaskDetailPanel extends ConsumerWidget {
   const TaskDetailPanel({super.key});
@@ -78,8 +79,11 @@ class _TaskDetailForm extends ConsumerStatefulWidget {
 class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _notesCtrl;
-  Timer? _titleDebounce;
-  Timer? _notesDebounce;
+
+  // 累积文本字段变更,统一 flush 到一次事务,避免每个字段单独 SELECT+UPDATE+INSERT。
+  Value<String> _dirtyTitle = const Value.absent();
+  Value<String?> _dirtyNotes = const Value.absent();
+  Timer? _flushTimer;
 
   @override
   void initState() {
@@ -92,6 +96,8 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
   void didUpdateWidget(_TaskDetailForm old) {
     super.didUpdateWidget(old);
     if (old.task.id != widget.task.id) {
+      // 切换任务:先 flush 旧任务的未提交变更,再重置控制器
+      _flushPending(taskId: old.task.id, version: old.task.version);
       _titleCtrl.text = widget.task.title;
       _notesCtrl.text = widget.task.notes ?? '';
     }
@@ -99,8 +105,8 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
 
   @override
   void dispose() {
-    _titleDebounce?.cancel();
-    _notesDebounce?.cancel();
+    _flushTimer?.cancel();
+    _flushPending(taskId: widget.task.id, version: widget.task.version);
     _titleCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
@@ -108,23 +114,39 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
 
   TaskRepository get _repo => ref.read(taskRepositoryProvider);
 
-  void _onTitleChanged(String v) {
-    _titleDebounce?.cancel();
-    _titleDebounce = Timer(_kTextDebounce, () async {
-      final t = v.trim();
-      if (t.isEmpty) return;
-      await _repo.update(widget.task.id, title: Value(t));
+  /// 标记字段脏,重置 debounce 计时器。
+  void _markDirty({Value<String>? title, Value<String?>? notes}) {
+    if (title != null) _dirtyTitle = title;
+    if (notes != null) _dirtyNotes = notes;
+    _flushTimer?.cancel();
+    _flushTimer = Timer(_kDebounce, () {
+      _flushPending(taskId: widget.task.id, version: widget.task.version);
     });
   }
 
+  /// 把积累的变更写入 DB(一次事务),直接用已知 [version] 跳过额外的 SELECT。
+  void _flushPending({required String taskId, required int version}) {
+    if (!_dirtyTitle.present && !_dirtyNotes.present) return;
+    final title = _dirtyTitle;
+    final notes = _dirtyNotes;
+    _dirtyTitle = const Value.absent();
+    _dirtyNotes = const Value.absent();
+    _repo.update(
+      taskId,
+      knownVersion: version,
+      title: title,
+      notes: notes,
+    );
+  }
+
+  void _onTitleChanged(String v) {
+    final t = v.trim();
+    if (t.isEmpty) return;
+    _markDirty(title: Value(t));
+  }
+
   void _onNotesChanged(String v) {
-    _notesDebounce?.cancel();
-    _notesDebounce = Timer(_kTextDebounce, () async {
-      await _repo.update(
-        widget.task.id,
-        notes: Value(v.trim().isEmpty ? null : v),
-      );
-    });
+    _markDirty(notes: Value(v.trim().isEmpty ? null : v));
   }
 
   void _close() {
@@ -144,6 +166,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     if (picked == null) return;
     await _repo.update(
       widget.task.id,
+      knownVersion: widget.task.version,
       dueAt: Value(DateTime(picked.year, picked.month, picked.day, 23, 59)),
     );
   }
@@ -165,6 +188,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     if (time == null) return;
     await _repo.update(
       widget.task.id,
+      knownVersion: widget.task.version,
       remindAt: Value(
         DateTime(date.year, date.month, date.day, time.hour, time.minute),
       ),
@@ -213,8 +237,6 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final task = widget.task;
-    final df = DateFormat.yMMMd();
-    final dtf = DateFormat.yMd().add_jm();
 
     return Material(
       color: scheme.surface,
@@ -224,10 +246,18 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
             // ── Top Bar ──
             _TopBar(
               starred: task.starred,
+              completed: task.completedAt != null,
               isTrashed: task.deletedAt != null,
               onClose: _close,
-              onToggleStar: () =>
-                  _repo.update(task.id, starred: Value(!task.starred)),
+              onToggleComplete: () => _repo.setCompleted(
+                task.id,
+                completed: task.completedAt == null,
+              ),
+              onToggleStar: () => _repo.update(
+                task.id,
+                knownVersion: task.version,
+                starred: Value(!task.starred),
+              ),
               onSoftDelete: _softDelete,
               onRestore: _restore,
               onHardDelete: _hardDelete,
@@ -236,20 +266,23 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
-                  Spacing.xl,
-                  Spacing.base,
-                  Spacing.xl,
-                  Spacing.xl,
+                  Spacing.xl, Spacing.base, Spacing.xl, Spacing.xl,
                 ),
                 children: [
-                  // Title
+                  // ── Title (改动6: 完成状态反馈) ──
                   TextField(
                     controller: _titleCtrl,
                     onChanged: _onTitleChanged,
-                    style: theme.textTheme.headlineSmall,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      decoration: task.completedAt != null
+                          ? TextDecoration.lineThrough
+                          : null,
+                      color: task.completedAt != null ? scheme.outline : null,
+                      decorationColor: scheme.outline,
+                    ),
                     textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(
-                      hintText: 'Task title',
+                      hintText: '任务标题',
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
@@ -259,7 +292,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                     ),
                   ),
                   const SizedBox(height: Spacing.base),
-                  // Notes
+                  // ── Notes ──
                   TextField(
                     controller: _notesCtrl,
                     onChanged: _onNotesChanged,
@@ -268,7 +301,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                     keyboardType: TextInputType.multiline,
                     style: theme.textTheme.bodyLarge,
                     decoration: InputDecoration(
-                      hintText: 'Add description...',
+                      hintText: '添加描述...',
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
@@ -281,76 +314,73 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                     ),
                   ),
                   const SizedBox(height: Spacing.lg),
-                  // Properties card
-                  _PropsCard(
+
+                  // ── 属性区 (改动4: 流式分组) ──
+                  const _SectionHeader(label: '属性'),
+                  const SizedBox(height: Spacing.sm),
+                  PriorityChips(
+                    priority: TaskPriority.fromValue(task.priority),
+                    onChanged: (p) => _repo.update(
+                      task.id,
+                      knownVersion: task.version,
+                      priority: Value(p.value),
+                    ),
+                  ),
+                  const SizedBox(height: Spacing.md),
+                  ListDropdown(
+                    currentListId: task.listId,
+                    onChanged: (newId) => _repo.update(
+                      task.id,
+                      knownVersion: task.version,
+                      listId: Value(newId),
+                    ),
+                  ),
+                  const SizedBox(height: Spacing.sm),
+                  TagEditor(taskId: task.id),
+
+                  const SizedBox(height: Spacing.lg),
+                  const _SectionHeader(label: '时间'),
+                  const SizedBox(height: Spacing.sm),
+                  Wrap(
+                    spacing: Spacing.sm,
+                    runSpacing: Spacing.sm,
                     children: [
-                      _PrioritySel(
-                        priority: TaskPriority.fromValue(task.priority),
-                        onChanged: (p) =>
-                            _repo.update(task.id, priority: Value(p.value)),
+                      DateChip(
+                        date: task.dueAt,
+                        icon: Icons.event_rounded,
+                        emptyLabel: '截止日期',
+                        onTap: _pickDueDate,
+                        onClear: task.dueAt != null
+                            ? () => _repo.update(
+                                  task.id,
+                                  knownVersion: task.version,
+                                  dueAt: const Value(null),
+                                )
+                            : null,
                       ),
-                      _ListDropdown(
-                        currentListId: task.listId,
-                        onChanged: (newId) =>
-                            _repo.update(task.id, listId: Value(newId)),
+                      DateChip(
+                        date: task.remindAt,
+                        icon: Icons.notifications_rounded,
+                        emptyLabel: '提醒',
+                        showTime: true,
+                        onTap: _pickRemind,
+                        onClear: task.remindAt != null
+                            ? () => _repo.update(
+                                  task.id,
+                                  knownVersion: task.version,
+                                  remindAt: const Value(null),
+                                )
+                            : null,
                       ),
-                      TagEditor(taskId: task.id),
                     ],
                   ),
-                  const SizedBox(height: Spacing.base),
+
+                  const SizedBox(height: Spacing.lg),
                   SubtasksSection(parent: task),
-                  Divider(
-                    height: Spacing.xxl,
-                    color: scheme.outlineVariant.withValues(alpha: 0.3),
-                  ),
-                  // Due date
-                  _PropRow(
-                    icon: Icons.event_rounded,
-                    onTap: _pickDueDate,
-                    trailing: task.dueAt != null
-                        ? _ClearBtn(
-                            onTap: () =>
-                                _repo.update(task.id, dueAt: const Value(null)),
-                          )
-                        : null,
-                    child: Text(
-                      task.dueAt == null
-                          ? 'No due date'
-                          : 'Due ${df.format(task.dueAt!)}',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                  _PropRow(
-                    icon: Icons.notifications_rounded,
-                    onTap: _pickRemind,
-                    trailing: task.remindAt != null
-                        ? _ClearBtn(
-                            onTap: () => _repo.update(
-                              task.id,
-                              remindAt: const Value(null),
-                            ),
-                          )
-                        : null,
-                    child: Text(
-                      task.remindAt == null
-                          ? 'No reminder'
-                          : 'Remind ${dtf.format(task.remindAt!)}',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                  Divider(
-                    height: Spacing.xxl,
-                    color: scheme.outlineVariant.withValues(alpha: 0.3),
-                  ),
-                  _Meta(label: 'Created', value: dtf.format(task.createdAt)),
-                  _Meta(label: 'Updated', value: dtf.format(task.updatedAt)),
-                  if (task.completedAt != null)
-                    _Meta(
-                      label: 'Completed',
-                      value: dtf.format(task.completedAt!),
-                    ),
-                  if (task.deletedAt != null)
-                    _Meta(label: 'Trashed', value: dtf.format(task.deletedAt!)),
+
+                  const SizedBox(height: Spacing.lg),
+                  // ── 元信息 (改动5: 折叠) ──
+                  CollapsibleMeta(task: task),
                 ],
               ),
             ),
@@ -364,15 +394,18 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.starred,
+    required this.completed,
     required this.isTrashed,
     required this.onClose,
+    required this.onToggleComplete,
     required this.onToggleStar,
     required this.onSoftDelete,
     required this.onRestore,
     required this.onHardDelete,
   });
-  final bool starred, isTrashed;
+  final bool starred, completed, isTrashed;
   final VoidCallback onClose,
+      onToggleComplete,
       onToggleStar,
       onSoftDelete,
       onRestore,
@@ -394,21 +427,27 @@ class _TopBar extends StatelessWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.close_rounded),
-            tooltip: 'Close',
+            tooltip: '关闭',
             onPressed: onClose,
           ),
           const Spacer(),
+          // ── 完成切换 ──
+          _AnimatedCompleteButton(
+            completed: completed,
+            onTap: onToggleComplete,
+          ),
+          const SizedBox(width: Spacing.xs),
           IconButton(
             icon: Icon(
               starred ? Icons.star_rounded : Icons.star_outline_rounded,
               color: starred ? scheme.tertiary : null,
             ),
-            tooltip: starred ? 'Unstar' : 'Star',
+            tooltip: starred ? '取消星标' : '添加星标',
             onPressed: onToggleStar,
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded),
-            tooltip: 'More',
+            tooltip: '更多',
             onSelected: (v) {
               switch (v) {
                 case 'del':
@@ -421,12 +460,12 @@ class _TopBar extends StatelessWidget {
             },
             itemBuilder: (_) => [
               if (!isTrashed)
-                const PopupMenuItem(value: 'del', child: Text('Move to Trash'))
+                const PopupMenuItem(value: 'del', child: Text('移至回收站'))
               else ...[
-                const PopupMenuItem(value: 'res', child: Text('Restore')),
+                const PopupMenuItem(value: 'res', child: Text('恢复')),
                 const PopupMenuItem(
                   value: 'hdel',
-                  child: Text('Delete forever'),
+                  child: Text('永久删除'),
                 ),
               ],
             ],
@@ -437,290 +476,90 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _PropsCard extends StatelessWidget {
-  const _PropsCard({required this.children});
-  final List<Widget> children;
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(Radii.card),
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: Spacing.base,
-        vertical: Spacing.sm,
-      ),
-      child: Column(
-        children: [
-          for (int i = 0; i < children.length; i++) ...[
-            children[i],
-            if (i < children.length - 1)
-              Divider(
-                height: 1,
-                color: scheme.outlineVariant.withValues(alpha: 0.2),
-              ),
-          ],
-        ],
-      ),
-    );
-  }
-}
 
-class _PropRow extends StatelessWidget {
-  const _PropRow({
-    required this.icon,
-    required this.child,
-    this.onTap,
-    this.trailing,
+// ─────────────────────────────────────────────────────────────────────
+// 改动1: 带动画的完成按钮
+// ─────────────────────────────────────────────────────────────────────
+
+class _AnimatedCompleteButton extends StatelessWidget {
+  const _AnimatedCompleteButton({
+    required this.completed,
+    required this.onTap,
   });
-  final IconData icon;
-  final Widget child;
-  final VoidCallback? onTap;
-  final Widget? trailing;
+  final bool completed;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(Radii.chip),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: Spacing.md),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: scheme.onSurfaceVariant),
-            const SizedBox(width: Spacing.base),
-            Expanded(child: child),
-            if (trailing != null) trailing!,
-          ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(Radii.circle),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.sm),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutBack,
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: completed ? scheme.primary : Colors.transparent,
+              border: Border.all(
+                color: completed ? scheme.primary : scheme.outline,
+                width: 2,
+              ),
+            ),
+            child: completed
+                ? const Icon(Icons.check_rounded,
+                    size: 14, color: Colors.white)
+                : null,
+          ),
         ),
       ),
     );
   }
 }
 
-class _ListDropdown extends ConsumerWidget {
-  const _ListDropdown({required this.currentListId, required this.onChanged});
-  final String currentListId;
-  final ValueChanged<String> onChanged;
+// ─────────────────────────────────────────────────────────────────────
+// 改动4: 分区标题
+// ─────────────────────────────────────────────────────────────────────
 
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+  final String label;
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final lists = ref.watch(movableListsProvider);
-    final folders = ref
-        .watch(allFoldersProvider)
-        .maybeWhen(data: (d) => d, orElse: () => const <Folder>[]);
-    final currentName =
-        lists
-            .where((l) => l.id == currentListId)
-            .map((l) => l.name)
-            .firstOrNull ??
-        '—';
-
-    // Group: inbox first, then root lists, then folder lists
-    final inbox = lists.where((l) => l.isSystem).toList();
-    final rootLists = lists
-        .where((l) => !l.isSystem && l.folderId == null)
-        .toList();
-    final folderIds = folders.map((f) => f.id).toSet();
-    final byFolder = <String, List<TaskList>>{};
-    for (final l in lists.where((l) => !l.isSystem && l.folderId != null)) {
-      if (folderIds.contains(l.folderId)) {
-        byFolder.putIfAbsent(l.folderId!, () => []).add(l);
-      } else {
-        rootLists.add(l);
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-      child: Row(
-        children: [
-          Icon(
-            Icons.folder_open_rounded,
-            size: 20,
-            color: scheme.onSurfaceVariant,
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.2),
           ),
-          const SizedBox(width: Spacing.base),
-          Expanded(
-            child: PopupMenuButton<String>(
-              initialValue: currentListId,
-              onSelected: (id) {
-                if (id != currentListId) onChanged(id);
-              },
-              offset: const Offset(0, 36),
-              constraints: const BoxConstraints(maxHeight: 400, minWidth: 200),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Radii.input),
-              ),
-              itemBuilder: (_) => [
-                // System lists (Inbox)
-                for (final l in inbox) _buildItem(l, scheme),
-                // Root custom lists
-                for (final l in rootLists) _buildItem(l, scheme),
-                // Folder groups
-                for (final folder in folders) ...[
-                  if (byFolder.containsKey(folder.id)) ...[
-                    PopupMenuItem<String>(
-                      enabled: false,
-                      height: 32,
-                      child: Text(
-                        folder.name,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.outline,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                    for (final l in byFolder[folder.id]!)
-                      _buildItem(l, scheme, indent: true),
-                  ],
-                ],
-              ],
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Spacing.md,
-                  vertical: Spacing.sm,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(Radii.chip),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        currentName,
-                        style: theme.textTheme.bodyMedium,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: Spacing.xs),
-                    Icon(
-                      Icons.unfold_more_rounded,
-                      size: 16,
-                      color: scheme.outline,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  PopupMenuItem<String> _buildItem(
-    TaskList l,
-    ColorScheme scheme, {
-    bool indent = false,
-  }) {
-    return PopupMenuItem<String>(
-      value: l.id,
-      child: Padding(
-        padding: EdgeInsets.only(left: indent ? Spacing.base : 0),
-        child: Row(
-          children: [
-            Icon(
-              l.isSystem
-                  ? Icons.inbox_rounded
-                  : Icons.format_list_bulleted_rounded,
-              size: 18,
-              color: scheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: Spacing.md),
-            Expanded(child: Text(l.name)),
-            if (l.id == currentListId)
-              Icon(Icons.check_rounded, size: 18, color: scheme.primary),
-          ],
         ),
-      ),
-    );
-  }
-}
-
-class _PrioritySel extends StatelessWidget {
-  const _PrioritySel({required this.priority, required this.onChanged});
-  final TaskPriority priority;
-  final ValueChanged<TaskPriority> onChanged;
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-      child: Row(
-        children: [
-          Icon(
-            Icons.flag_rounded,
-            size: 20,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: Spacing.base),
-          Expanded(
-            child: SegmentedButton<TaskPriority>(
-              segments: const [
-                ButtonSegment(value: TaskPriority.none, label: Text('None')),
-                ButtonSegment(value: TaskPriority.low, label: Text('Low')),
-                ButtonSegment(value: TaskPriority.medium, label: Text('Med')),
-                ButtonSegment(value: TaskPriority.high, label: Text('High')),
-              ],
-              selected: {priority},
-              showSelectedIcon: false,
-              onSelectionChanged: (s) => onChanged(s.first),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+          child: Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.outline,
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ClearBtn extends StatelessWidget {
-  const _ClearBtn({required this.onTap});
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => IconButton(
-    icon: const Icon(Icons.close_rounded, size: 16),
-    tooltip: 'Clear',
-    onPressed: onTap,
-    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-    padding: EdgeInsets.zero,
-  );
-}
-
-class _Meta extends StatelessWidget {
-  const _Meta({required this.label, required this.value});
-  final String label, value;
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
-            ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.2),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
