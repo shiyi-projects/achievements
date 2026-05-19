@@ -1,33 +1,28 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'bootstrap_provider.dart';
+part of 'notification_service.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appBootstrapHash() => r'4c8f99837cbd662bab88d4b9bcdbfb0001b7b762';
+String _$notificationServiceHash() =>
+    r'3c53e0488fa3e6f95be9ddf3a70decdb6cf92990';
 
-/// 应用启动期一次性初始化:
-///   1. 种入系统清单(幂等)
-///   2. 初始化 NotificationService(时区 + Android 通道)并尝试申请权限
-///
-/// AchievementsApp 在渲染前 watch 此 Future,完成后再放行 router。
-///
-/// Copied from [appBootstrap].
-@ProviderFor(appBootstrap)
-final appBootstrapProvider = FutureProvider<void>.internal(
-  appBootstrap,
-  name: r'appBootstrapProvider',
+/// See also [notificationService].
+@ProviderFor(notificationService)
+final notificationServiceProvider = Provider<NotificationService>.internal(
+  notificationService,
+  name: r'notificationServiceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$appBootstrapHash,
+      : _$notificationServiceHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef AppBootstrapRef = FutureProviderRef<void>;
+typedef NotificationServiceRef = ProviderRef<NotificationService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
