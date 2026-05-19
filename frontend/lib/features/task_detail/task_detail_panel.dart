@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:achievements/features/task_detail/widgets/subtasks_section.dart';
 import 'package:achievements/features/task_detail/widgets/tag_editor.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:drift/drift.dart' show Value;
@@ -263,7 +264,9 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
             const SizedBox(height: 8),
             const SizedBox(height: 8),
             TagEditor(taskId: task.id),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            SubtasksSection(parent: task),
+            const Divider(height: 32),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.event_outlined),
