@@ -8,7 +8,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.system_lists import SYSTEM_LIST_DISPLAY_NAMES, SystemListKind
+from app.core.system_lists import (
+    SYSTEM_LIST_DISPLAY_NAMES,
+    SYSTEM_LIST_IDS,
+    SystemListKind,
+)
 from app.models import TaskList
 from app.schemas.task_list import TaskListCreate, TaskListUpdate
 
@@ -90,6 +94,7 @@ async def ensure_system_lists(session: AsyncSession, user_id: UUID) -> None:
             continue
         session.add(
             TaskList(
+                id=SYSTEM_LIST_IDS[kind],
                 user_id=user_id,
                 name=SYSTEM_LIST_DISPLAY_NAMES[kind],
                 is_system=True,

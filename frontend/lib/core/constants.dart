@@ -27,17 +27,22 @@ enum TaskPriority {
 ///
 /// 这些清单会在首次启动时由 ListRepository.ensureSystemLists 写入,
 /// `isSystem=true`,不可删除。Sidebar 据此渲染固定入口。
+///
+/// 每个 kind 绑定一个固定 UUID(``id``),与后端
+/// ``app/core/system_lists.py:SYSTEM_LIST_IDS`` 保持一致。两端用同一主键
+/// 落库,sync pull 通过 `insertOnConflictUpdate` 命中既有行,避免重复。
 enum SystemListKind {
-  inbox('inbox'),
-  today('today'),
-  important('important'),
-  planned('planned'),
-  all('all'),
-  completed('completed'),
-  trash('trash');
+  inbox('inbox', '01900000-0000-7000-8000-000000000001'),
+  today('today', '01900000-0000-7000-8000-000000000002'),
+  important('important', '01900000-0000-7000-8000-000000000003'),
+  planned('planned', '01900000-0000-7000-8000-000000000004'),
+  all('all', '01900000-0000-7000-8000-000000000005'),
+  completed('completed', '01900000-0000-7000-8000-000000000006'),
+  trash('trash', '01900000-0000-7000-8000-000000000007');
 
-  const SystemListKind(this.value);
+  const SystemListKind(this.value, this.id);
   final String value;
+  final String id;
 
   static SystemListKind? fromValue(String? value) {
     if (value == null) return null;
