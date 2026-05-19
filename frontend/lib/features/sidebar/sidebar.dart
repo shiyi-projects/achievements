@@ -2,6 +2,7 @@ import 'package:achievements/core/constants.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
+import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/widgets/name_input_dialog.dart';
 import 'package:achievements/state/expanded_folders.dart';
 import 'package:achievements/state/selected_list.dart';
@@ -250,6 +251,8 @@ class _SidebarTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final color = selected ? Theme.of(context).colorScheme.primary : null;
+    final countAsync = ref.watch(taskCountForListIdProvider(list.id));
+    final count = countAsync.maybeWhen(data: (n) => n, orElse: () => 0);
     return GestureDetector(
       onSecondaryTapDown: (d) => _showMenu(context, ref, d.globalPosition),
       onLongPress: () => _showMenu(context, ref, null),
@@ -258,6 +261,9 @@ class _SidebarTile extends ConsumerWidget {
         selected: selected,
         leading: Icon(icon, size: 20, color: color),
         title: Text(list.name, style: TextStyle(color: color)),
+        trailing: count == 0
+            ? null
+            : _CountBadge(count: count, dimmed: !selected),
         onTap: () {
           ref.read(selectedListIdProvider.notifier).select(list.id);
           final scaffold = Scaffold.maybeOf(context);
@@ -376,6 +382,26 @@ class _NewFolderTile extends ConsumerWidget {
         if (name == null) return;
         await ref.read(folderRepositoryProvider).create(name: name);
       },
+    );
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count, required this.dimmed});
+
+  final int count;
+  final bool dimmed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Text(
+      '$count',
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: dimmed ? scheme.outline : scheme.primary,
+      ),
     );
   }
 }
