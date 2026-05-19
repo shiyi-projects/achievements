@@ -8,6 +8,7 @@ authors = [{ name = "shiyi" }]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
+    "gunicorn>=22.0",
     "sqlalchemy[asyncio]>=2.0.30",
     "asyncpg>=0.29",
     "aiosqlite>=0.20",

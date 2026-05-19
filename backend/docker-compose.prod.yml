@@ -1,0 +1,54 @@
+# 生产 override:与 docker-compose.yml 合并使用
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# 关键差异:
+# - 关闭 reload,改用 gunicorn + uvicorn worker
+# - 不映射数据库端口到宿主机,只在内网暴露
+# - 不挂载源码,镜像即不可变交付物
+# - storage 挂载到宿主机持久化路径
+# - 资源 limit + restart policy
+
+name: achievements-prod
+
+services:
+  api:
+    image: achievements/backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: achievements-api
+    env_file: .env.prod
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    volumes:
+      - /var/lib/achievements/attachments:/app/storage/attachments
+    command: >
+      gunicorn app.main:app
+      --bind 0.0.0.0:8000
+      --workers 4
+      --worker-class uvicorn.workers.UvicornWorker
+      --access-logfile -
+      --error-logfile -
+    ports: !reset []
+    expose:
+      - "8000"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1024M
+
+  db:
+    volumes:
+      - /var/lib/achievements/postgres:/var/lib/postgresql/data
+    ports: !reset []
+    restart: always
+
+  redis:
+    volumes:
+      - /var/lib/achievements/redis:/data
+    ports: !reset []
+    restart: always

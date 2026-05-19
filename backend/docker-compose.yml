@@ -1,0 +1,70 @@
+# 开发环境 compose:挂载源代码热重载,Postgres / Redis / Storage 用本地命名卷持久化。
+# 生产请使用 docker-compose.prod.yml override。
+
+name: achievements-dev
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: achievements/backend:dev
+    container_name: achievements-api
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+asyncpg://achievements:achievements@db:5432/achievements
+      REDIS_URL: redis://redis:6379/0
+      APP_DEBUG: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app:ro
+      - ./alembic:/app/alembic:ro
+      - ./alembic.ini:/app/alembic.ini:ro
+      - attachments:/app/storage/attachments
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: achievements-db
+    environment:
+      POSTGRES_DB: achievements
+      POSTGRES_USER: achievements
+      POSTGRES_PASSWORD: achievements
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U achievements -d achievements"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: achievements-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  attachments:
