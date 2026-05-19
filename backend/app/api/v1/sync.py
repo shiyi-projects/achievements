@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import CurrentUserId
 from app.db.session import get_session
-from app.schemas.sync import SyncPullResponse
+from app.schemas.sync import SyncPullResponse, SyncPushRequest, SyncPushResponse
 from app.services import sync_service
 
 router = APIRouter()
@@ -25,3 +25,12 @@ async def pull(
     since: Annotated[datetime | None, Query()] = None,
 ) -> SyncPullResponse:
     return await sync_service.pull(session, user_id, since)
+
+
+@router.post("/push", response_model=SyncPushResponse)
+async def push(
+    payload: SyncPushRequest,
+    session: SessionDep,
+    user_id: CurrentUserId,
+) -> SyncPushResponse:
+    return await sync_service.push(session, user_id, payload)

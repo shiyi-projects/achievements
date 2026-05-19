@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -75,3 +75,121 @@ async def test_pull_future_since_returns_empty(client: AsyncClient) -> None:
     body = pull.json()
     assert body["lists"] == []
     assert body["tasks"] == []
+
+
+# ---- push -----------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_push_creates_new_entities(client: AsyncClient) -> None:
+    list_id = str(uuid4())
+    task_id = str(uuid4())
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "list",
+                    "op": "upsert",
+                    "id": list_id,
+                    "base_version": 0,
+                    "payload": {"name": "Pushed list"},
+                },
+                {
+                    "entity": "task",
+                    "op": "upsert",
+                    "id": task_id,
+                    "base_version": 0,
+                    "payload": {
+                        "list_id": list_id,
+                        "title": "Pushed task",
+                        "priority": 2,
+                    },
+                },
+            ]
+        },
+    )
+    assert push.status_code == 200
+    results = push.json()["results"]
+    assert [r["status"] for r in results] == ["applied", "applied"]
+    assert all(r["version"] == 1 for r in results)
+
+    pull = (await client.get("/api/v1/sync/pull")).json()
+    assert any(item["id"] == list_id for item in pull["lists"])
+    assert any(t["id"] == task_id and t["priority"] == 2 for t in pull["tasks"])
+
+
+@pytest.mark.asyncio
+async def test_push_update_with_matching_version_bumps(
+    client: AsyncClient,
+) -> None:
+    list_id = (await client.post("/api/v1/lists", json={"name": "Foo"})).json()["id"]
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "list",
+                    "op": "upsert",
+                    "id": list_id,
+                    "base_version": 1,
+                    "payload": {"name": "Foo (renamed)"},
+                }
+            ]
+        },
+    )
+    body = push.json()
+    assert body["results"][0]["status"] == "applied"
+    assert body["results"][0]["version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_push_stale_base_version_yields_conflict(
+    client: AsyncClient,
+) -> None:
+    list_id = (await client.post("/api/v1/lists", json={"name": "Local"})).json()["id"]
+    # 服务端 version=1。客户端送 base_version=0 → 冲突
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "list",
+                    "op": "upsert",
+                    "id": list_id,
+                    "base_version": 0,
+                    "payload": {"name": "Loser"},
+                }
+            ]
+        },
+    )
+    result = push.json()["results"][0]
+    assert result["status"] == "conflict"
+    assert result["version"] == 1
+    assert result["server_value"]["name"] == "Local"
+
+
+@pytest.mark.asyncio
+async def test_push_delete_soft_deletes(client: AsyncClient) -> None:
+    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    task_id = (
+        await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "doomed"})
+    ).json()["id"]
+
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task",
+                    "op": "delete",
+                    "id": task_id,
+                    "base_version": 1,
+                    "payload": {},
+                }
+            ]
+        },
+    )
+    assert push.json()["results"][0]["status"] == "applied"
+    fetched = await client.get(f"/api/v1/tasks/{task_id}")
+    assert fetched.json()["deleted_at"] is not None
