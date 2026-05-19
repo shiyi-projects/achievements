@@ -6,14 +6,14 @@ part of 'bootstrap_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appBootstrapHash() => r'e155ff87ab25b1903a7ad7e1277d7590d78c3087';
+String _$appBootstrapHash() => r'9ea77414ee10fd193e9400a8922bade7b8ab6730';
 
 /// 应用启动期一次性初始化:
 ///   1. 种入系统清单(幂等)
 ///   2. 初始化 NotificationService(时区 + Android 通道)并尝试申请权限
 ///   3. 启动 ReminderScheduler:watch 待提醒任务流并 reconcile 本地排程
-///   4. SyncEngine 首次 pull:从服务端拉增量并合并到本地 Drift
-///      (失败不阻塞,SyncStatusController 上报状态)
+///   4. 启动 SyncCoordinator 触发监听(outbox debounce + connectivity 边沿)
+///   5. 跑一次 full sync(pull → push),失败不阻塞,SyncStatus 上报
 ///
 /// AchievementsApp 在渲染前 watch 此 Future,完成后再放行 router。
 ///
@@ -22,9 +22,8 @@ String _$appBootstrapHash() => r'e155ff87ab25b1903a7ad7e1277d7590d78c3087';
 final appBootstrapProvider = FutureProvider<void>.internal(
   appBootstrap,
   name: r'appBootstrapProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$appBootstrapHash,
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$appBootstrapHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );

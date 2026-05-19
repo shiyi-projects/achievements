@@ -15,9 +15,8 @@ String _$currentTaskHash() => r'4a45bd2230cc4fcbaf83bbd029358626ef71047b';
 final currentTaskProvider = AutoDisposeStreamProvider<Task?>.internal(
   currentTask,
   name: r'currentTaskProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$currentTaskHash,
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$currentTaskHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
@@ -38,14 +37,14 @@ String _$selectedTaskIdHash() => r'ef6ba962267ce25c31995c20205cbc5ce58922a6';
 @ProviderFor(SelectedTaskId)
 final selectedTaskIdProvider =
     NotifierProvider<SelectedTaskId, String?>.internal(
-      SelectedTaskId.new,
-      name: r'selectedTaskIdProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$selectedTaskIdHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+  SelectedTaskId.new,
+  name: r'selectedTaskIdProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$selectedTaskIdHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
 typedef _$SelectedTaskId = Notifier<String?>;
 // ignore_for_file: type=lint

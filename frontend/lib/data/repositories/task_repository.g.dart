@@ -6,7 +6,7 @@ part of 'task_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$taskRepositoryHash() => r'85e63b4826a3d6db7d188a8354c50d4d8b378f21';
+String _$taskRepositoryHash() => r'0c39611b69a1d0a2ef7b74cfbcf6c7ad91d755c1';
 
 /// See also [taskRepository].
 @ProviderFor(taskRepository)
@@ -32,14 +32,14 @@ String _$tasksForCurrentListHash() =>
 @ProviderFor(tasksForCurrentList)
 final tasksForCurrentListProvider =
     AutoDisposeStreamProvider<List<Task>>.internal(
-      tasksForCurrentList,
-      name: r'tasksForCurrentListProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$tasksForCurrentListHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+  tasksForCurrentList,
+  name: r'tasksForCurrentListProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$tasksForCurrentListHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
@@ -85,15 +85,21 @@ class SubtasksOfFamily extends Family<AsyncValue<List<Task>>> {
   /// 监听某父任务的直接子任务。
   ///
   /// Copied from [subtasksOf].
-  SubtasksOfProvider call(String parentId) {
-    return SubtasksOfProvider(parentId);
+  SubtasksOfProvider call(
+    String parentId,
+  ) {
+    return SubtasksOfProvider(
+      parentId,
+    );
   }
 
   @override
   SubtasksOfProvider getProviderOverride(
     covariant SubtasksOfProvider provider,
   ) {
-    return call(provider.parentId);
+    return call(
+      provider.parentId,
+    );
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -118,18 +124,24 @@ class SubtasksOfProvider extends AutoDisposeStreamProvider<List<Task>> {
   /// 监听某父任务的直接子任务。
   ///
   /// Copied from [subtasksOf].
-  SubtasksOfProvider(String parentId)
-    : this._internal(
-        (ref) => subtasksOf(ref as SubtasksOfRef, parentId),
-        from: subtasksOfProvider,
-        name: r'subtasksOfProvider',
-        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-            ? null
-            : _$subtasksOfHash,
-        dependencies: SubtasksOfFamily._dependencies,
-        allTransitiveDependencies: SubtasksOfFamily._allTransitiveDependencies,
-        parentId: parentId,
-      );
+  SubtasksOfProvider(
+    String parentId,
+  ) : this._internal(
+          (ref) => subtasksOf(
+            ref as SubtasksOfRef,
+            parentId,
+          ),
+          from: subtasksOfProvider,
+          name: r'subtasksOfProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$subtasksOfHash,
+          dependencies: SubtasksOfFamily._dependencies,
+          allTransitiveDependencies:
+              SubtasksOfFamily._allTransitiveDependencies,
+          parentId: parentId,
+        );
 
   SubtasksOfProvider._internal(
     super._createNotifier, {
@@ -188,8 +200,7 @@ mixin SubtasksOfRef on AutoDisposeStreamProviderRef<List<Task>> {
 }
 
 class _SubtasksOfProviderElement
-    extends AutoDisposeStreamProviderElement<List<Task>>
-    with SubtasksOfRef {
+    extends AutoDisposeStreamProviderElement<List<Task>> with SubtasksOfRef {
   _SubtasksOfProviderElement(super.provider);
 
   @override
@@ -221,15 +232,21 @@ class TaskCountForListIdFamily extends Family<AsyncValue<int>> {
   /// codegen 端引入 Drift 数据类的等值/哈希依赖。
   ///
   /// Copied from [taskCountForListId].
-  TaskCountForListIdProvider call(String listId) {
-    return TaskCountForListIdProvider(listId);
+  TaskCountForListIdProvider call(
+    String listId,
+  ) {
+    return TaskCountForListIdProvider(
+      listId,
+    );
   }
 
   @override
   TaskCountForListIdProvider getProviderOverride(
     covariant TaskCountForListIdProvider provider,
   ) {
-    return call(provider.listId);
+    return call(
+      provider.listId,
+    );
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -256,19 +273,24 @@ class TaskCountForListIdProvider extends AutoDisposeStreamProvider<int> {
   /// codegen 端引入 Drift 数据类的等值/哈希依赖。
   ///
   /// Copied from [taskCountForListId].
-  TaskCountForListIdProvider(String listId)
-    : this._internal(
-        (ref) => taskCountForListId(ref as TaskCountForListIdRef, listId),
-        from: taskCountForListIdProvider,
-        name: r'taskCountForListIdProvider',
-        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-            ? null
-            : _$taskCountForListIdHash,
-        dependencies: TaskCountForListIdFamily._dependencies,
-        allTransitiveDependencies:
-            TaskCountForListIdFamily._allTransitiveDependencies,
-        listId: listId,
-      );
+  TaskCountForListIdProvider(
+    String listId,
+  ) : this._internal(
+          (ref) => taskCountForListId(
+            ref as TaskCountForListIdRef,
+            listId,
+          ),
+          from: taskCountForListIdProvider,
+          name: r'taskCountForListIdProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$taskCountForListIdHash,
+          dependencies: TaskCountForListIdFamily._dependencies,
+          allTransitiveDependencies:
+              TaskCountForListIdFamily._allTransitiveDependencies,
+          listId: listId,
+        );
 
   TaskCountForListIdProvider._internal(
     super._createNotifier, {
@@ -327,13 +349,11 @@ mixin TaskCountForListIdRef on AutoDisposeStreamProviderRef<int> {
 }
 
 class _TaskCountForListIdProviderElement
-    extends AutoDisposeStreamProviderElement<int>
-    with TaskCountForListIdRef {
+    extends AutoDisposeStreamProviderElement<int> with TaskCountForListIdRef {
   _TaskCountForListIdProviderElement(super.provider);
 
   @override
   String get listId => (origin as TaskCountForListIdProvider).listId;
 }
-
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

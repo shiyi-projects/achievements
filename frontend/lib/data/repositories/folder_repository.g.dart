@@ -6,7 +6,7 @@ part of 'folder_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$folderRepositoryHash() => r'0b066c29f12dd4fc3e029172e503199487097544';
+String _$folderRepositoryHash() => r'78ed752ecbf8795a7de856f64a749d30d2fef4d3';
 
 /// See also [folderRepository].
 @ProviderFor(folderRepository)
@@ -30,9 +30,8 @@ String _$allFoldersHash() => r'0aa44e4cb80b32c0eb27f71d01a81fc6b90e2dd6';
 final allFoldersProvider = AutoDisposeStreamProvider<List<Folder>>.internal(
   allFolders,
   name: r'allFoldersProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$allFoldersHash,
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$allFoldersHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
