@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.system_lists import (
@@ -13,7 +14,7 @@ from app.core.system_lists import (
     SYSTEM_LIST_IDS,
     SystemListKind,
 )
-from app.models import TaskList
+from app.models import Task, TaskList
 from app.schemas.task_list import TaskListCreate, TaskListUpdate
 
 
@@ -82,24 +83,44 @@ async def soft_delete_task_list(session: AsyncSession, item: TaskList) -> None:
 
 
 async def ensure_system_lists(session: AsyncSession, user_id: UUID) -> None:
-    """Idempotent seed of the 7 built-in system lists for ``user_id``."""
+    """Idempotent seed of the 7 built-in system lists for ``user_id``.
+
+    若已存在 system_kind 匹配但 id 不是固定值的行(旧随机 UUID),
+    把该行 id 以及所有 tasks.list_id 迁移到固定 UUID。
+    SQLite FK 默认未启用,迁移安全;PostgreSQL 上因先更新 tasks 再更新
+    task_lists,亦满足约束时序。
+    """
     for index, kind in enumerate(SystemListKind):
-        existing = await session.execute(
+        fixed_id = SYSTEM_LIST_IDS[kind]
+        result = await session.execute(
             select(TaskList).where(
                 TaskList.user_id == user_id,
                 TaskList.system_kind == kind.value,
             )
         )
-        if existing.scalar_one_or_none() is not None:
-            continue
-        session.add(
-            TaskList(
-                id=SYSTEM_LIST_IDS[kind],
-                user_id=user_id,
-                name=SYSTEM_LIST_DISPLAY_NAMES[kind],
-                is_system=True,
-                system_kind=kind.value,
-                sort_order=index,
+        row = result.scalar_one_or_none()
+        if row is None:
+            session.add(
+                TaskList(
+                    id=fixed_id,
+                    user_id=user_id,
+                    name=SYSTEM_LIST_DISPLAY_NAMES[kind],
+                    is_system=True,
+                    system_kind=kind.value,
+                    sort_order=index,
+                )
             )
-        )
+        elif row.id != fixed_id:
+            # 旧随机 UUID → 固定 UUID:先迁移 tasks 引用,再更新 task_lists.id
+            await session.execute(
+                sa_update(Task)
+                .where(Task.list_id == row.id)
+                .values(list_id=fixed_id)
+            )
+            await session.execute(
+                sa_update(TaskList)
+                .where(TaskList.id == row.id)
+                .values(id=fixed_id)
+            )
+            session.expunge(row)
     await session.commit()
