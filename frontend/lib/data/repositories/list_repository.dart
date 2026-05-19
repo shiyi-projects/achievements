@@ -104,3 +104,11 @@ ListRepository listRepository(Ref ref) {
 Stream<List<TaskList>> allLists(Ref ref) {
   return ref.watch(listRepositoryProvider).watchAll();
 }
+
+/// 默认 Inbox 清单(系统种子)。Smart filter 视图下的快速创建落到这里。
+@Riverpod(keepAlive: true)
+Future<TaskList?> inboxList(Ref ref) {
+  return ref
+      .watch(listRepositoryProvider)
+      .findBySystemKind(SystemListKind.inbox);
+}

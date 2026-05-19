@@ -1,4 +1,5 @@
 import 'package:achievements/core/constants.dart';
+import 'package:achievements/core/id.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
 import 'package:achievements/state/selected_list.dart';
@@ -12,6 +13,32 @@ class TaskRepository {
   TaskRepository(this._db);
 
   final AppDatabase _db;
+
+  /// 创建一条新任务并落 Drift,返回主键。
+  ///
+  /// 调用方需保证 [listId] 是真实存在的 TaskList(非系统智能过滤,
+  /// 如 today / important 等不可作为 listId)。
+  Future<String> createTask({
+    required String listId,
+    required String title,
+    DateTime? dueAt,
+    bool starred = false,
+  }) async {
+    final id = newId();
+    await _db
+        .into(_db.tasks)
+        .insert(
+          TasksCompanion.insert(
+            id: id,
+            userId: kLocalUserId,
+            listId: listId,
+            title: title,
+            dueAt: Value(dueAt),
+            starred: Value(starred),
+          ),
+        );
+    return id;
+  }
 
   /// 根据 [list] 决定查询策略:系统清单走对应的智能过滤,自定义清单按 listId。
   Stream<List<Task>> watchForList(TaskList list) {
