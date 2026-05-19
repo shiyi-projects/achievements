@@ -36,9 +36,7 @@ async def test_create_and_fetch_task(client: AsyncClient) -> None:
 async def test_update_task(client: AsyncClient) -> None:
     list_id = await _create_list(client)
     created = (
-        await client.post(
-            "/api/v1/tasks", json={"list_id": str(list_id), "title": "Draft"}
-        )
+        await client.post("/api/v1/tasks", json={"list_id": str(list_id), "title": "Draft"})
     ).json()
 
     patch = await client.patch(
@@ -56,20 +54,14 @@ async def test_update_task(client: AsyncClient) -> None:
 async def test_complete_toggle(client: AsyncClient) -> None:
     list_id = await _create_list(client)
     created = (
-        await client.post(
-            "/api/v1/tasks", json={"list_id": str(list_id), "title": "Pay bill"}
-        )
+        await client.post("/api/v1/tasks", json={"list_id": str(list_id), "title": "Pay bill"})
     ).json()
 
-    done = await client.post(
-        f"/api/v1/tasks/{created['id']}/complete", json={"completed": True}
-    )
+    done = await client.post(f"/api/v1/tasks/{created['id']}/complete", json={"completed": True})
     assert done.status_code == 200
     assert done.json()["completed_at"] is not None
 
-    undone = await client.post(
-        f"/api/v1/tasks/{created['id']}/complete", json={"completed": False}
-    )
+    undone = await client.post(f"/api/v1/tasks/{created['id']}/complete", json={"completed": False})
     assert undone.status_code == 200
     assert undone.json()["completed_at"] is None
 
@@ -78,9 +70,7 @@ async def test_complete_toggle(client: AsyncClient) -> None:
 async def test_soft_delete_and_restore(client: AsyncClient) -> None:
     list_id = await _create_list(client)
     created = (
-        await client.post(
-            "/api/v1/tasks", json={"list_id": str(list_id), "title": "Temp"}
-        )
+        await client.post("/api/v1/tasks", json={"list_id": str(list_id), "title": "Temp"})
     ).json()
     task_id = created["id"]
 
@@ -105,9 +95,7 @@ async def test_soft_delete_and_restore(client: AsyncClient) -> None:
 async def test_hard_delete(client: AsyncClient) -> None:
     list_id = await _create_list(client)
     created = (
-        await client.post(
-            "/api/v1/tasks", json={"list_id": str(list_id), "title": "Gone"}
-        )
+        await client.post("/api/v1/tasks", json={"list_id": str(list_id), "title": "Gone"})
     ).json()
     task_id = created["id"]
 

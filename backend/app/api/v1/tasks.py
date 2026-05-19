@@ -10,13 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import CurrentUserId
 from app.db.session import get_session
+from app.schemas.tag import TagRead
 from app.schemas.task import (
     TaskCompleteRequest,
     TaskCreate,
     TaskRead,
     TaskUpdate,
 )
-from app.services import task_service
+from app.services import tag_service, task_service
 
 router = APIRouter()
 
@@ -121,3 +122,48 @@ async def hard_delete_task(
     if task is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
     await task_service.hard_delete_task(session, task)
+
+
+# ----- Task <-> Tag association -----
+
+
+@router.get("/{task_id}/tags", response_model=list[TagRead])
+async def list_task_tags(
+    task_id: UUID,
+    session: SessionDep,
+    user_id: CurrentUserId,
+) -> list[TagRead]:
+    task = await task_service.get_task(session, user_id, task_id, include_deleted=True)
+    if task is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    tags = await tag_service.list_tags_for_task(session, user_id, task_id)
+    return [TagRead.model_validate(t) for t in tags]
+
+
+@router.put("/{task_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def add_tag_to_task(
+    task_id: UUID,
+    tag_id: UUID,
+    session: SessionDep,
+    user_id: CurrentUserId,
+) -> None:
+    task = await task_service.get_task(session, user_id, task_id, include_deleted=True)
+    if task is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    tag = await tag_service.get_tag(session, user_id, tag_id)
+    if tag is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tag not found")
+    await tag_service.add_tag_to_task(session, task_id, tag_id)
+
+
+@router.delete("/{task_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_tag_from_task(
+    task_id: UUID,
+    tag_id: UUID,
+    session: SessionDep,
+    user_id: CurrentUserId,
+) -> None:
+    task = await task_service.get_task(session, user_id, task_id, include_deleted=True)
+    if task is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    await tag_service.remove_tag_from_task(session, task_id, tag_id)
