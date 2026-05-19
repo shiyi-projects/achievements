@@ -112,6 +112,11 @@ async def ensure_system_lists(session: AsyncSession, user_id: UUID) -> None:
             )
         elif row.id != fixed_id:
             # 旧随机 UUID → 固定 UUID:先迁移 tasks 引用,再更新 task_lists.id
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "ensure_system_lists: normalizing %s list UUID %s → %s",
+                kind.value, row.id, fixed_id,
+            )
             await session.execute(
                 sa_update(Task)
                 .where(Task.list_id == row.id)
