@@ -37,8 +37,10 @@ dependencies:
   collection: ^1.18.0
 
   # ---- 提醒 / 后台 ----
-  flutter_local_notifications: ^17.2.4
+  flutter_local_notifications: ^19.4.2
   workmanager: ^0.5.2
+  timezone: ^0.10.0
+  flutter_timezone: ^4.1.1
 
   # ---- 图表 / 动效 ----
   fl_chart: ^0.69.0

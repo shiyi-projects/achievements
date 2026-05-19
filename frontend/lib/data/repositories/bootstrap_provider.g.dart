@@ -6,10 +6,12 @@ part of 'bootstrap_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appBootstrapHash() => r'5376a2571f2cdfaeb922500ac5a051d1be590b87';
+String _$appBootstrapHash() => r'e8d0ed0811e64e168073134bbb3baff13db7648f';
 
 /// 应用启动期一次性初始化:
-///   - 种入系统清单(幂等,已存在则跳过)
+///   1. 种入系统清单(幂等)
+///   2. 初始化 NotificationService(时区 + Android 通道)并尝试申请权限
+///   3. 启动 ReminderScheduler:watch 待提醒任务流并 reconcile 本地排程
 ///
 /// AchievementsApp 在渲染前 watch 此 Future,完成后再放行 router。
 ///

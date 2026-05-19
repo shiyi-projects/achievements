@@ -31,8 +31,20 @@ class TaskTile extends ConsumerWidget {
       orElse: () => const <Tag>[],
     );
 
+    final hasFutureReminder =
+        task.remindAt != null && task.remindAt!.isAfter(DateTime.now());
+
     final trailing = <Widget>[
       if (priority != TaskPriority.none) PriorityChip(priority: priority),
+      if (hasFutureReminder)
+        Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: Icon(
+            Icons.notifications_active_outlined,
+            size: 18,
+            color: theme.colorScheme.outline,
+          ),
+        ),
       if (task.starred)
         Padding(
           padding: const EdgeInsets.only(left: 8),
