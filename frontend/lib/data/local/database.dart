@@ -4,7 +4,9 @@ import 'package:drift/drift.dart';
 
 part 'database.g.dart';
 
-@DriftDatabase(tables: [Folders, TaskLists, Tasks, Tags, TaskTags])
+@DriftDatabase(
+  tables: [Folders, TaskLists, Tasks, Tags, TaskTags, Outbox, SyncCursors],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openLocalConnection());
 
@@ -12,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -21,7 +23,11 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
       },
       onUpgrade: (m, from, to) async {
-        // 暂无升级路径。后续 schemaVersion 提升时按 from->to 编写迁移。
+        // v1 -> v2:为 Phase 2 同步引擎新增 Outbox 与 SyncCursors
+        if (from < 2) {
+          await m.createTable(outbox);
+          await m.createTable(syncCursors);
+        }
       },
     );
   }
