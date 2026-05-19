@@ -1,3 +1,4 @@
+import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/repositories/tag_repository.dart';
 import 'package:achievements/shared/widgets/name_input_dialog.dart';
 import 'package:flutter/material.dart';
@@ -5,10 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 任务详情面板内的标签编辑区。
 ///
-/// - 显示用户所有 active 标签为 FilterChip,已分配给当前任务的标记为 selected
-/// - tap chip 切换 add/remove 关联
-/// - 末尾 ActionChip "+ New" 弹 dialog 创建新标签并自动关联
-/// - 空态(无标签库)时引导 "+ New"
+/// - 显示所有 active 标签为 FilterChip,已关联标记 selected
+/// - tap chip 切换 add/remove
+/// - 末尾 ActionChip "New" 弹 dialog 创建新标签并自动关联
 class TagEditor extends ConsumerWidget {
   const TagEditor({required this.taskId, super.key});
 
@@ -16,55 +16,77 @@ class TagEditor extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final allAsync = ref.watch(allTagsProvider);
     final mineAsync = ref.watch(tagsForTaskProvider(taskId));
 
     return allAsync.when(
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: LinearProgressIndicator(),
+        padding: EdgeInsets.symmetric(vertical: Spacing.sm),
+        child: LinearProgressIndicator(minHeight: 2),
       ),
-      error: (e, st) => Text('标签加载失败:$e'),
+      error: (e, st) => Text('Failed to load tags: $e'),
       data: (allTags) {
         final mine = mineAsync.maybeWhen(
           data: (list) => list.map((t) => t.id).toSet(),
           orElse: () => const <String>{},
         );
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.label_outline,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final tag in allTags)
-                    FilterChip(
-                      label: Text(tag.name),
-                      selected: mine.contains(tag.id),
-                      onSelected: (sel) async {
-                        final repo = ref.read(tagRepositoryProvider);
-                        if (sel) {
-                          await repo.addToTask(taskId, tag.id);
-                        } else {
-                          await repo.removeFromTask(taskId, tag.id);
-                        }
-                      },
-                    ),
-                  ActionChip(
-                    avatar: const Icon(Icons.add, size: 16),
-                    label: const Text('New'),
-                    onPressed: () => _showCreate(context, ref),
-                  ),
-                ],
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.label_rounded,
+                size: 20,
+                color: scheme.onSurfaceVariant,
               ),
-            ),
-          ],
+              const SizedBox(width: Spacing.base),
+              Expanded(
+                child: Wrap(
+                  spacing: Spacing.xs + 2,
+                  runSpacing: Spacing.xs + 2,
+                  children: [
+                    for (final tag in allTags)
+                      FilterChip(
+                        label: Text(tag.name),
+                        labelStyle: theme.textTheme.labelMedium,
+                        selected: mine.contains(tag.id),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(Radii.chip),
+                        ),
+                        onSelected: (sel) async {
+                          final repo = ref.read(tagRepositoryProvider);
+                          if (sel) {
+                            await repo.addToTask(taskId, tag.id);
+                          } else {
+                            await repo.removeFromTask(taskId, tag.id);
+                          }
+                        },
+                      ),
+                    ActionChip(
+                      avatar: Icon(
+                        Icons.add_rounded,
+                        size: 16,
+                        color: scheme.primary,
+                      ),
+                      label: Text(
+                        'New',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: scheme.primary,
+                        ),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(Radii.chip),
+                      ),
+                      onPressed: () => _showCreate(context, ref),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

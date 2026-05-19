@@ -1,4 +1,5 @@
 import 'package:achievements/core/constants.dart';
+import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/widgets/empty_state.dart';
 import 'package:achievements/shared/widgets/pending_completed_list.dart';
@@ -37,16 +38,17 @@ class ListPage extends ConsumerWidget {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, st) => Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('加载失败:$e'),
+                padding: const EdgeInsets.all(Spacing.xl),
+                child: Text('Failed to load: $e'),
               ),
             ),
             data: (tasks) => PendingCompletedList(
               tasks: tasks,
               emptyState: const EmptyState(
-                icon: Icons.inbox_outlined,
+                icon: Icons.inbox_rounded,
                 title: 'No tasks here yet',
-                subtitle: '在底部快速创建,或从其他清单移动过来。',
+                subtitle:
+                    'Create from the input below or move tasks from other lists.',
               ),
             ),
           ),

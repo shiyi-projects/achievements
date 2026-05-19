@@ -1,3 +1,4 @@
+import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
@@ -10,8 +11,8 @@ import 'package:intl/intl.dart';
 
 /// Today 页面主体(不含 Scaffold / AppBar,由外层 AppShell 提供)。
 ///
-/// Phase 1 step 2:欢迎语 / 日期 / 任务计数 / 任务列表 / 底部快速创建。
-/// 任务创建落 Inbox 清单,dueAt = 今天 23:59,确保新建任务立刻出现在 Today。
+/// 包含欢迎卡片(含日期、进度、统计)、快速创建、任务列表。
+/// 任务创建落 Inbox 清单,dueAt = 今天 23:59。
 class TodayPage extends ConsumerWidget {
   const TodayPage({super.key});
 
@@ -25,8 +26,8 @@ class TodayPage extends ConsumerWidget {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, st) => Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('加载失败:$e'),
+                padding: const EdgeInsets.all(Spacing.xl),
+                child: Text('Failed to load: $e'),
               ),
             ),
             data: (tasks) => _TodayBody(tasks: tasks, now: DateTime.now()),
@@ -59,47 +60,149 @@ class _TodayBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final completed = tasks.where((t) => t.completedAt != null).length;
-    final pending = tasks.length - completed;
-    final dateLabel = DateFormat.yMMMMEEEEd().format(now);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_greeting(now.hour), style: theme.textTheme.headlineSmall),
-              const SizedBox(height: 4),
-              Text(
-                dateLabel,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.outline,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                tasks.isEmpty ? '没有今天到期的任务' : '$pending 个待办 · $completed 个已完成',
-                style: theme.textTheme.titleSmall,
-              ),
-            ],
+    return CustomScrollView(
+      slivers: [
+        // ── Welcome Card ──
+        SliverToBoxAdapter(
+          child: _WelcomeCard(
+            hour: now.hour,
+            date: now,
+            total: tasks.length,
+            completed: completed,
           ),
         ),
-        const Divider(height: 1),
-        Expanded(
-          child: PendingCompletedList(
-            tasks: tasks,
-            emptyState: const EmptyState(
-              icon: Icons.task_alt_outlined,
+
+        // ── Task List ──
+        if (tasks.isEmpty)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: EmptyState(
+              icon: Icons.task_alt_rounded,
               title: 'Nothing on today',
-              subtitle: '在底部输入框创建第一个任务。',
+              subtitle: 'Create your first task from the input below.',
+            ),
+          )
+        else
+          SliverToBoxAdapter(
+            child: PendingCompletedList(
+              tasks: tasks,
+              emptyState: const SizedBox.shrink(),
             ),
           ),
-        ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Welcome Card
+// ─────────────────────────────────────────────────────────────────────
+
+class _WelcomeCard extends StatelessWidget {
+  const _WelcomeCard({
+    required this.hour,
+    required this.date,
+    required this.total,
+    required this.completed,
+  });
+
+  final int hour;
+  final DateTime date;
+  final int total;
+  final int completed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dateLabel = DateFormat.yMMMMEEEEd().format(date);
+    final pending = total - completed;
+    final progress = total > 0 ? completed / total : 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.base,
+        Spacing.md,
+        Spacing.base,
+        Spacing.sm,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primaryContainer,
+              scheme.primaryContainer.withValues(alpha: 0.6),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(Radii.card),
+        ),
+        padding: const EdgeInsets.all(Spacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Greeting ──
+            Text(
+              _greeting(hour),
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: scheme.onPrimaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: Spacing.xs),
+            Text(
+              dateLabel,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onPrimaryContainer.withValues(alpha: 0.7),
+              ),
+            ),
+
+            const SizedBox(height: Spacing.base),
+
+            // ── Progress ──
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(Radii.circle),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: scheme.onPrimaryContainer.withValues(
+                        alpha: 0.12,
+                      ),
+                      valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: Spacing.md),
+                Text(
+                  '$completed / $total',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: Spacing.sm),
+
+            // ── Summary ──
+            Text(
+              total == 0
+                  ? 'No tasks due today'
+                  : '$pending pending · $completed completed',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onPrimaryContainer.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

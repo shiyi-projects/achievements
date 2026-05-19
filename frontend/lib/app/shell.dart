@@ -1,4 +1,5 @@
 import 'package:achievements/core/constants.dart';
+import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/features/list_view/list_page.dart';
 import 'package:achievements/features/sidebar/sidebar.dart';
 import 'package:achievements/features/task_detail/task_detail_panel.dart';
@@ -10,25 +11,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 响应式应用外壳。
 ///
-/// 三档断点:
-/// - 移动(< 720):Sidebar 进 Drawer;任务详情走 modal bottom sheet
-/// - 平板(720–1023):Sidebar 常驻;任务详情走 modal bottom sheet
-/// - 桌面(>= 1024):Sidebar + 主视图 + 任务详情面板 三列并存
+/// 三档断点(ui_design_spec §6.1):
+/// - Compact(< 600):Sidebar 进 Drawer;任务详情走 modal bottom sheet
+/// - Medium(600–839):Sidebar 常驻;任务详情走 modal bottom sheet
+/// - Expanded(≥ 840):Sidebar + 主视图 + 任务详情面板 三列并存
 ///
 /// 主视图根据 [currentListProvider] 在 [TodayPage] / [ListPage] 间切换。
 class AppShell extends ConsumerWidget {
   const AppShell({super.key});
 
-  static const double _kSidebarBreakpoint = 720;
-  static const double _kDetailDockBreakpoint = 1024;
-  static const double _kSidebarWidth = 280;
+  static const double _kCompactBreakpoint = 600;
+  static const double _kExpandedBreakpoint = 840;
+  static const double _kSidebarWidth = 260;
   static const double _kDetailWidth = 360;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.sizeOf(context).width;
-    final showSidebarInline = width >= _kSidebarBreakpoint;
-    final dockDetail = width >= _kDetailDockBreakpoint;
+    final showSidebarInline = width >= _kCompactBreakpoint;
+    final dockDetail = width >= _kExpandedBreakpoint;
 
     final currentAsync = ref.watch(currentListProvider);
     final selectedTaskId = ref.watch(selectedTaskIdProvider);
@@ -46,12 +47,13 @@ class AppShell extends ConsumerWidget {
       data: (list) => list?.name ?? 'Achievements',
       orElse: () => 'Achievements',
     );
+
     final mainBody = currentAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, st) => Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('Sidebar 选中态加载失败:$e'),
+          padding: const EdgeInsets.all(Spacing.xl),
+          child: Text('Failed to load: $e'),
         ),
       ),
       data: (list) {
@@ -61,32 +63,48 @@ class AppShell extends ConsumerWidget {
       },
     );
 
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     if (showSidebarInline) {
       return Scaffold(
         body: Row(
           children: [
-            const SizedBox(width: _kSidebarWidth, child: Sidebar()),
-            const VerticalDivider(width: 1),
+            SizedBox(width: _kSidebarWidth, child: const Sidebar()),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: scheme.outlineVariant.withValues(alpha: 0.3),
+            ),
             Expanded(
               child: Column(
                 children: [
-                  AppBar(title: Text(title), automaticallyImplyLeading: false),
+                  _ModernAppBar(title: title),
                   Expanded(child: mainBody),
                 ],
               ),
             ),
             if (dockDetail && selectedTaskId != null) ...[
-              const VerticalDivider(width: 1),
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: scheme.outlineVariant.withValues(alpha: 0.3),
+              ),
               const SizedBox(width: _kDetailWidth, child: TaskDetailPanel()),
             ],
           ],
         ),
       );
     }
+
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      drawer: const Drawer(
-        child: SizedBox(width: _kSidebarWidth, child: Sidebar()),
+      appBar: AppBar(
+        title: Text(title),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
+      drawer: Drawer(
+        child: SizedBox(width: _kSidebarWidth, child: const Sidebar()),
       ),
       body: mainBody,
     );
@@ -103,7 +121,57 @@ class AppShell extends ConsumerWidget {
         child: TaskDetailPanel(),
       ),
     );
-    // sheet 关闭(无论是 close 按钮 / 滑动 / 系统返回)后清空选中
+    // sheet 关闭后清空选中
     ref.read(selectedTaskIdProvider.notifier).clear();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Modern AppBar (inline mode)
+// ─────────────────────────────────────────────────────────────────────
+
+class _ModernAppBar extends StatelessWidget {
+  const _ModernAppBar({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.2),
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+      alignment: Alignment.centerLeft,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          // ── Search button (placeholder) ──
+          IconButton(
+            icon: Icon(Icons.search_rounded, color: scheme.onSurfaceVariant),
+            tooltip: 'Search',
+            onPressed: () {
+              // Phase 3: open search
+            },
+          ),
+        ],
+      ),
+    );
   }
 }
