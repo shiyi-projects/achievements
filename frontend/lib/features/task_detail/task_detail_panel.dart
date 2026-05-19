@@ -150,6 +150,43 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     await _repo.update(widget.task.id, starred: Value(!widget.task.starred));
   }
 
+  Future<void> _softDelete() async {
+    await _repo.softDelete(widget.task.id);
+    _close();
+  }
+
+  Future<void> _restore() async {
+    await _repo.restore(widget.task.id);
+    _close();
+  }
+
+  Future<void> _hardDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete forever?'),
+        content: Text('"${widget.task.title}" 将被彻底删除,无法恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.tonal(
+            style: FilledButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
+              backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _repo.hardDelete(widget.task.id);
+    _close();
+  }
+
   void _close() {
     ref.read(selectedTaskIdProvider.notifier).clear();
     final navigator = Navigator.maybeOf(context);
@@ -238,8 +275,75 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                 label: 'Completed',
                 value: dtf.format(task.completedAt!),
               ),
+            if (task.deletedAt != null)
+              _MetadataRow(
+                label: 'Trashed',
+                value: dtf.format(task.deletedAt!),
+              ),
+            const SizedBox(height: 24),
+            _DangerActions(
+              isTrashed: task.deletedAt != null,
+              onSoftDelete: _softDelete,
+              onRestore: _restore,
+              onHardDelete: _hardDelete,
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DangerActions extends StatelessWidget {
+  const _DangerActions({
+    required this.isTrashed,
+    required this.onSoftDelete,
+    required this.onRestore,
+    required this.onHardDelete,
+  });
+
+  final bool isTrashed;
+  final VoidCallback onSoftDelete;
+  final VoidCallback onRestore;
+  final VoidCallback onHardDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (isTrashed) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.restore),
+              label: const Text('Restore'),
+              onPressed: onRestore,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(
+                foregroundColor: theme.colorScheme.onErrorContainer,
+                backgroundColor: theme.colorScheme.errorContainer,
+              ),
+              icon: const Icon(Icons.delete_forever),
+              label: const Text('Delete forever'),
+              onPressed: onHardDelete,
+            ),
+          ),
+        ],
+      );
+    }
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+        label: Text(
+          'Move to Trash',
+          style: TextStyle(color: theme.colorScheme.error),
+        ),
+        onPressed: onSoftDelete,
       ),
     );
   }

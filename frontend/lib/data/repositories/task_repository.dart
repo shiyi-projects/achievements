@@ -71,6 +71,26 @@ class TaskRepository {
     );
   }
 
+  /// 软删:写入 deletedAt = now,任务从所有非 Trash 视图自动消失。
+  Future<void> softDelete(String id) async {
+    await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
+      TasksCompanion(deletedAt: Value(DateTime.now())),
+    );
+  }
+
+  /// 恢复:清空 deletedAt,任务回到原 listId 对应清单。
+  Future<void> restore(String id) async {
+    await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
+      const TasksCompanion(deletedAt: Value(null)),
+    );
+  }
+
+  /// 彻底删除:从 Drift 真删行。Phase 2 同步引擎需要单独向服务端
+  /// 广播 hard-delete(否则其他端会再次同步回来)。
+  Future<void> hardDelete(String id) async {
+    await (_db.delete(_db.tasks)..where((t) => t.id.equals(id))).go();
+  }
+
   /// 根据 [list] 决定查询策略:系统清单走对应的智能过滤,自定义清单按 listId。
   Stream<List<Task>> watchForList(TaskList list) {
     if (list.isSystem) {
