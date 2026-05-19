@@ -3,9 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'current_view.g.dart';
 
 /// 主内容区当前显示的视图。
-///
-/// 侧边栏点击清单 → [AppView.list];点击日历图标 → [AppView.calendar]。
-enum AppView { list, calendar }
+enum AppView { list, calendar, focus, search }
 
 @Riverpod(keepAlive: true)
 class CurrentViewNotifier extends _$CurrentViewNotifier {
@@ -14,4 +12,6 @@ class CurrentViewNotifier extends _$CurrentViewNotifier {
 
   void showList() => state = AppView.list;
   void showCalendar() => state = AppView.calendar;
+  void showFocus() => state = AppView.focus;
+  void showSearch() => state = AppView.search;
 }

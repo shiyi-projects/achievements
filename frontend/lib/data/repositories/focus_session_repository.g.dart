@@ -1,27 +1,29 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'current_view.dart';
+part of 'focus_session_repository.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$currentViewNotifierHash() =>
-    r'4fd1d89e91ea952af3a9dab307bc69e56609dbcb';
+String _$focusSessionRepositoryHash() =>
+    r'0bba027b7868c0316e54edd5ec330db389d62f0d';
 
-/// See also [CurrentViewNotifier].
-@ProviderFor(CurrentViewNotifier)
-final currentViewNotifierProvider =
-    NotifierProvider<CurrentViewNotifier, AppView>.internal(
-  CurrentViewNotifier.new,
-  name: r'currentViewNotifierProvider',
+/// See also [focusSessionRepository].
+@ProviderFor(focusSessionRepository)
+final focusSessionRepositoryProvider =
+    Provider<FocusSessionRepository>.internal(
+  focusSessionRepository,
+  name: r'focusSessionRepositoryProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$currentViewNotifierHash,
+      : _$focusSessionRepositoryHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
-typedef _$CurrentViewNotifier = Notifier<AppView>;
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef FocusSessionRepositoryRef = ProviderRef<FocusSessionRepository>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
