@@ -150,6 +150,36 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     await _repo.update(widget.task.id, dueAt: const Value(null));
   }
 
+  Future<void> _pickRemind() async {
+    final initial =
+        widget.task.remindAt ?? DateTime.now().add(const Duration(hours: 1));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+    );
+    if (date == null) return;
+    if (!mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null) return;
+    final at = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    await _repo.update(widget.task.id, remindAt: Value(at));
+  }
+
+  Future<void> _clearRemind() async {
+    await _repo.update(widget.task.id, remindAt: const Value(null));
+  }
+
   Future<void> _toggleStarred() async {
     await _repo.update(widget.task.id, starred: Value(!widget.task.starred));
   }
@@ -317,6 +347,23 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                       onPressed: _clearDueDate,
                     ),
               onTap: _pickDueDate,
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.notifications_outlined),
+              title: Text(
+                task.remindAt == null
+                    ? 'No reminder'
+                    : 'Remind ${dtf.format(task.remindAt!)}',
+              ),
+              trailing: task.remindAt == null
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Clear',
+                      onPressed: _clearRemind,
+                    ),
+              onTap: _pickRemind,
             ),
             const Divider(height: 32),
             _MetadataRow(label: 'Created', value: dtf.format(task.createdAt)),
