@@ -13,13 +13,12 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-from app.core.config import get_settings
-from app.db.base import Base
 
 # 触发所有模型注册到 Base.metadata,供 autogenerate 使用。
-# 当新增 ORM 模型文件时,在此 import 即可。
-# Phase 0 暂无业务模型,留空。
-# 例:`from app import models`(模型聚合后取消注释)
+# app.models 的 __init__ 已聚合所有模型 import。
+from app import models  # noqa: F401
+from app.core.config import get_settings
+from app.db.base import Base
 
 config = context.config
 

@@ -7,7 +7,9 @@
 - ``VersionMixin``: version,LWW 冲突解决用,服务端每次写入自增。
 
 所有可由客户端同步的表应组合 ``SyncableMixin``,它聚合了上述四个 mixin 并附带
-``user_id`` 外键占位(Phase 0 暂不强约束 users 表)。
+``user_id`` 占位字段(Phase 0/1 暂不强约束 users 表)。
+
+UUID 列用 ``sqlalchemy.Uuid`` 跨库:Postgres 用原生 UUID,SQLite 落 CHAR(32)。
 """
 
 from __future__ import annotations
@@ -15,14 +17,13 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, func
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy import DateTime, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 
 class UUIDPKMixin:
     id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
+        Uuid(),
         primary_key=True,
         default=uuid4,
     )
@@ -58,7 +59,7 @@ class SyncableMixin(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, VersionMixin):
     """Convenience aggregate mixin for any client-syncable entity."""
 
     user_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
+        Uuid(),
         nullable=False,
         index=True,
     )

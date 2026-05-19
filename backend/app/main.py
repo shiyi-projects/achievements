@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from uuid import UUID
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,12 +14,17 @@ from app import __version__
 from app.api.v1 import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.db.session import SessionLocal
+from app.services.list_service import ensure_system_lists
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(debug=settings.app_debug)
+    # Phase 0/1:为占位用户种入系统清单(幂等)
+    async with SessionLocal() as session:
+        await ensure_system_lists(session, UUID(settings.local_user_id))
     yield
 
 
