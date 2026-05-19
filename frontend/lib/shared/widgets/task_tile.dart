@@ -80,61 +80,56 @@ class TaskTile extends ConsumerWidget {
                       Spacing.md,
                       Spacing.sm,
                     ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final showTrailing = constraints.maxWidth > 180;
-                        return Row(
-                          children: [
-                            // ── Checkbox ──
-                            _RoundCheckbox(
-                              checked: done,
-                              color: done ? scheme.primary : scheme.outline,
-                              onTap: () => ref
-                                  .read(taskRepositoryProvider)
-                                  .setCompleted(task.id, completed: !done),
-                            ),
-                            const SizedBox(width: Spacing.md),
+                    child: Row(
+                      children: [
+                        // ── Checkbox ──
+                        _RoundCheckbox(
+                          checked: done,
+                          color: done ? scheme.primary : scheme.outline,
+                          onTap: () => ref
+                              .read(taskRepositoryProvider)
+                              .setCompleted(task.id, completed: !done),
+                        ),
+                        const SizedBox(width: Spacing.md),
 
-                            // ── Title + Tags ──
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    task.title,
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      decoration: done
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                      color: done ? scheme.outline : null,
-                                      decorationColor: scheme.outline,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
+                        // ── Title + Tags ──
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                task.title,
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  decoration: done
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  color: done ? scheme.outline : null,
+                                  decorationColor: scheme.outline,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (tags.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: Spacing.xs,
                                   ),
-                                  if (tags.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: Spacing.xs,
-                                      ),
-                                      child: TagsRow(tags: tags),
-                                    ),
-                                ],
-                              ),
-                            ),
+                                  child: TagsRow(tags: tags),
+                                ),
+                            ],
+                          ),
+                        ),
 
-                            // ── Trailing ──
-                            if (showTrailing)
-                              ..._buildTrailing(
-                                theme,
-                                scheme,
-                                priority,
-                                hasFutureReminder,
-                              ),
-                          ],
-                        );
-                      },
+                        // ── Trailing ──
+                        // trailing 总宽 ~80dp,挤压时 title 走 ellipsis 截断,不再做窄屏隐藏
+                        ..._buildTrailing(
+                          theme,
+                          scheme,
+                          priority,
+                          hasFutureReminder,
+                        ),
+                      ],
                     ),
                   ),
                 ),
