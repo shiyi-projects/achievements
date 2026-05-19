@@ -1,7 +1,9 @@
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/data/local/database.dart';
+import 'package:achievements/data/repositories/tag_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/widgets/priority_chip.dart';
+import 'package:achievements/shared/widgets/tags_row.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +25,11 @@ class TaskTile extends ConsumerWidget {
     final selectedId = ref.watch(selectedTaskIdProvider);
     final selected = selectedId == task.id;
     final priority = TaskPriority.fromValue(task.priority);
+    final tagsAsync = ref.watch(tagsForTaskProvider(task.id));
+    final tags = tagsAsync.maybeWhen(
+      data: (list) => list,
+      orElse: () => const <Tag>[],
+    );
 
     final trailing = <Widget>[
       if (priority != TaskPriority.none) PriorityChip(priority: priority),
@@ -52,6 +59,12 @@ class TaskTile extends ConsumerWidget {
           color: done ? theme.colorScheme.outline : null,
         ),
       ),
+      subtitle: tags.isEmpty
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: TagsRow(tags: tags),
+            ),
       trailing: trailing.isEmpty
           ? null
           : Row(mainAxisSize: MainAxisSize.min, children: trailing),
