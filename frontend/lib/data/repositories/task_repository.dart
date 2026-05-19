@@ -3,6 +3,7 @@ import 'package:achievements/core/id.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
+import 'package:achievements/data/repositories/outbox_repository.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,9 +14,10 @@ part 'task_repository.g.dart';
 typedef _TaskFilter = Expression<bool> Function($TasksTable);
 
 class TaskRepository {
-  TaskRepository(this._db);
+  TaskRepository(this._db, this._outbox);
 
   final AppDatabase _db;
+  final OutboxRepository _outbox;
 
   /// 创建一条新任务并落 Drift,返回主键。
   Future<String> createTask({
@@ -26,20 +28,35 @@ class TaskRepository {
     bool starred = false,
   }) async {
     final id = newId();
-    await _db
-        .into(_db.tasks)
-        .insert(
-          TasksCompanion.insert(
-            id: id,
-            userId: kLocalUserId,
-            listId: listId,
-            title: title,
-            parentId: Value(parentId),
-            dueAt: Value(dueAt),
-            starred: Value(starred),
-          ),
-        );
-    return id;
+    return _db.transaction(() async {
+      await _db
+          .into(_db.tasks)
+          .insert(
+            TasksCompanion.insert(
+              id: id,
+              userId: kLocalUserId,
+              listId: listId,
+              title: title,
+              parentId: Value(parentId),
+              dueAt: Value(dueAt),
+              starred: Value(starred),
+            ),
+          );
+      await _outbox.enqueue(
+        entity: 'task',
+        op: 'upsert',
+        entityId: id,
+        baseVersion: 0,
+        payload: {
+          'list_id': listId,
+          'title': title,
+          'parent_id': parentId,
+          'due_at': dueAt?.toUtc().toIso8601String(),
+          'starred': starred,
+        },
+      );
+      return id;
+    });
   }
 
   /// 监听某父任务的直接子任务(单层)。
@@ -50,9 +67,22 @@ class TaskRepository {
   }
 
   Future<void> setCompleted(String id, {required bool completed}) async {
-    await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
-      TasksCompanion(completedAt: Value(completed ? DateTime.now() : null)),
-    );
+    await _db.transaction(() async {
+      final current = await (_db.select(
+        _db.tasks,
+      )..where((t) => t.id.equals(id))).getSingle();
+      final completedAt = completed ? DateTime.now() : null;
+      await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
+        TasksCompanion(completedAt: Value(completedAt)),
+      );
+      await _outbox.enqueue(
+        entity: 'task',
+        op: 'upsert',
+        entityId: id,
+        baseVersion: current.version,
+        payload: {'completed_at': completedAt?.toUtc().toIso8601String()},
+      );
+    });
   }
 
   /// 局部更新任务字段。传入 `Value.absent()` 的字段保持不变。
@@ -66,17 +96,40 @@ class TaskRepository {
     Value<int> priority = const Value.absent(),
     Value<String> listId = const Value.absent(),
   }) async {
-    await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
-      TasksCompanion(
-        title: title,
-        notes: notes,
-        dueAt: dueAt,
-        remindAt: remindAt,
-        starred: starred,
-        priority: priority,
-        listId: listId,
-      ),
-    );
+    await _db.transaction(() async {
+      final current = await (_db.select(
+        _db.tasks,
+      )..where((t) => t.id.equals(id))).getSingle();
+      await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
+        TasksCompanion(
+          title: title,
+          notes: notes,
+          dueAt: dueAt,
+          remindAt: remindAt,
+          starred: starred,
+          priority: priority,
+          listId: listId,
+        ),
+      );
+      final payload = <String, dynamic>{
+        if (title.present) 'title': title.value,
+        if (notes.present) 'notes': notes.value,
+        if (dueAt.present) 'due_at': dueAt.value?.toUtc().toIso8601String(),
+        if (remindAt.present)
+          'remind_at': remindAt.value?.toUtc().toIso8601String(),
+        if (starred.present) 'starred': starred.value,
+        if (priority.present) 'priority': priority.value,
+        if (listId.present) 'list_id': listId.value,
+      };
+      if (payload.isEmpty) return;
+      await _outbox.enqueue(
+        entity: 'task',
+        op: 'upsert',
+        entityId: id,
+        baseVersion: current.version,
+        payload: payload,
+      );
+    });
   }
 
   /// 监听所有"待提醒"任务:remind_at 非空,未完成,未软删。
@@ -91,19 +144,61 @@ class TaskRepository {
   }
 
   Future<void> softDelete(String id) async {
-    await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
-      TasksCompanion(deletedAt: Value(DateTime.now())),
-    );
+    await _db.transaction(() async {
+      final current = await (_db.select(
+        _db.tasks,
+      )..where((t) => t.id.equals(id))).getSingle();
+      await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
+        TasksCompanion(deletedAt: Value(DateTime.now())),
+      );
+      await _outbox.enqueue(
+        entity: 'task',
+        op: 'delete',
+        entityId: id,
+        baseVersion: current.version,
+        payload: const {},
+      );
+    });
   }
 
   Future<void> restore(String id) async {
-    await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
-      const TasksCompanion(deletedAt: Value(null)),
-    );
+    await _db.transaction(() async {
+      final current = await (_db.select(
+        _db.tasks,
+      )..where((t) => t.id.equals(id))).getSingle();
+      await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
+        const TasksCompanion(deletedAt: Value(null)),
+      );
+      await _outbox.enqueue(
+        entity: 'task',
+        op: 'upsert',
+        entityId: id,
+        baseVersion: current.version,
+        payload: const {'deleted_at': null},
+      );
+    });
   }
 
+  /// 硬删本地行。同步语义降级为 server 软删:enqueue 一条 delete,服务端
+  /// 据此把 deleted_at 写上,其他端 pull 后也变成软删。本地行已经物理消失,
+  /// 后续 pull 回来 server 那行的 deleted_at 时,本地不会再恢复(insertOnConflictUpdate
+  /// 仍会落,但 UI 查询都过滤了 deletedAt 非空,效果等价于不可见)。
   Future<void> hardDelete(String id) async {
-    await (_db.delete(_db.tasks)..where((t) => t.id.equals(id))).go();
+    await _db.transaction(() async {
+      final current = await (_db.select(
+        _db.tasks,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      await (_db.delete(_db.tasks)..where((t) => t.id.equals(id))).go();
+      if (current != null) {
+        await _outbox.enqueue(
+          entity: 'task',
+          op: 'delete',
+          entityId: id,
+          baseVersion: current.version,
+          payload: const {},
+        );
+      }
+    });
   }
 
   /// 单一事实源:根据 [list] 计算 WHERE 表达式。watchForList /
@@ -186,7 +281,10 @@ class TaskRepository {
 
 @Riverpod(keepAlive: true)
 TaskRepository taskRepository(Ref ref) {
-  return TaskRepository(ref.watch(appDatabaseProvider));
+  return TaskRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(outboxRepositoryProvider),
+  );
 }
 
 /// 当前选中清单的任务流(主视图用)。
