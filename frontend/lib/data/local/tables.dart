@@ -87,3 +87,42 @@ class TaskTags extends Table {
   @override
   Set<Column<Object>> get primaryKey => {taskId, tagId};
 }
+
+/// 同步 outbox。所有本地写操作在 Drift 事务里同时落业务表 + 一行 outbox,
+/// SyncEngine 按 createdAt 顺序批量 POST /sync/push;applied / conflict 后删行,
+/// rejected 增 retryCount + lastError 留作下次重试。
+class Outbox extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// folder / list / task / tag / task_tag
+  TextColumn get entity => text()();
+
+  /// upsert / delete
+  TextColumn get op => text()();
+
+  /// 业务实体的 UUID 主键(关联表用 ``${taskId}:${tagId}`` 占位)。
+  TextColumn get entityId => text()();
+
+  /// 序列化后的 payload(JSON 字符串),客户端构造 mutation envelope 时 inline。
+  TextColumn get payload => text()();
+
+  /// 客户端入队时认为的服务端 version。服务端比对后:相等才 apply,
+  /// 否则 conflict 回 server_value。
+  IntColumn get baseVersion => integer().withDefault(const Constant(0))();
+
+  IntColumn get retryCount => integer().withDefault(const Constant(0))();
+
+  TextColumn get lastError => text().nullable()();
+
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+/// 同步游标键值表。已知 key:`last_pulled_at`(ISO datetime,服务端回的
+/// SyncPullResponse.cursor)。
+class SyncCursors extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
+}

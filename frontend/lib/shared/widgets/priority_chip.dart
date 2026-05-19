@@ -1,12 +1,13 @@
 import 'package:achievements/core/constants.dart';
+import 'package:achievements/core/theme/app_colors.dart';
+import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:flutter/material.dart';
 
 /// 优先级标签:[TaskPriority.none] 时不渲染。
 ///
-/// 配色:
-/// - low    -> surfaceContainerHighest(中性,弱提示)
-/// - medium -> tertiaryContainer
-/// - high   -> errorContainer
+/// 配色使用 ui_design_spec §2.4 优先级色,背景 12% 透明度;
+/// 圆角 8px(ui_design_spec §4.2 Chip);
+/// 文字 labelMedium (12sp W500)。
 class PriorityChip extends StatelessWidget {
   const PriorityChip({required this.priority, super.key});
 
@@ -15,29 +16,35 @@ class PriorityChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (priority == TaskPriority.none) return const SizedBox.shrink();
-    final scheme = Theme.of(context).colorScheme;
-    final (bg, fg) = switch (priority) {
-      TaskPriority.high => (scheme.errorContainer, scheme.onErrorContainer),
-      TaskPriority.medium => (
-        scheme.tertiaryContainer,
-        scheme.onTertiaryContainer,
-      ),
-      TaskPriority.low => (
-        scheme.surfaceContainerHighest,
-        scheme.onSurfaceVariant,
-      ),
-      TaskPriority.none => (Colors.transparent, Colors.transparent),
-    };
+    final theme = Theme.of(context);
+    final color = _color(priority);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 2),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(Radii.chip),
       ),
       child: Text(
         priority.label,
-        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600),
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
+  }
+
+  Color _color(TaskPriority p) {
+    switch (p) {
+      case TaskPriority.high:
+        return AppColors.urgent;
+      case TaskPriority.medium:
+        return AppColors.medium;
+      case TaskPriority.low:
+        return AppColors.low;
+      case TaskPriority.none:
+        return Colors.transparent;
+    }
   }
 }

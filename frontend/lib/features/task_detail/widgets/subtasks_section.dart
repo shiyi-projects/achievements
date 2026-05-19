@@ -1,3 +1,4 @@
+import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/state/selected_task.dart';
@@ -5,9 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 任务详情面板内的子任务区。
-///
-/// - 列出当前任务的直接子任务(单层),tap 钻入该子任务详情
-/// - 底部输入框 Enter 即创建子任务(继承父任务的 list_id + parent_id)
 class SubtasksSection extends ConsumerStatefulWidget {
   const SubtasksSection({required this.parent, super.key});
 
@@ -51,6 +49,7 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final subtasksAsync = ref.watch(subtasksOfProvider(widget.parent.id));
 
     return Column(
@@ -58,27 +57,23 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
       children: [
         Row(
           children: [
-            Icon(
-              Icons.account_tree_outlined,
-              size: 18,
-              color: theme.colorScheme.outline,
-            ),
-            const SizedBox(width: 8),
+            Icon(Icons.account_tree_rounded, size: 18, color: scheme.outline),
+            const SizedBox(width: Spacing.sm),
             Text('Subtasks', style: theme.textTheme.labelLarge),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: Spacing.sm),
         subtasksAsync.when(
           loading: () => const LinearProgressIndicator(minHeight: 2),
-          error: (e, st) => Text('加载失败:$e'),
+          error: (e, st) => Text('Failed to load: $e'),
           data: (subs) {
             if (subs.isEmpty) {
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
                 child: Text(
-                  '暂无子任务',
+                  'No subtasks yet',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outline,
+                    color: scheme.outline,
                   ),
                 ),
               );
@@ -89,28 +84,34 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
           },
         ),
         Padding(
-          padding: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.only(top: Spacing.sm),
           child: Row(
             children: [
-              const Icon(Icons.add, size: 18),
-              const SizedBox(width: 12),
+              Icon(Icons.add_rounded, size: 18, color: scheme.primary),
+              const SizedBox(width: Spacing.md),
               Expanded(
                 child: TextField(
                   controller: _controller,
                   focusNode: _focusNode,
                   enabled: !_submitting,
                   onSubmitted: (_) => _submit(),
-                  decoration: const InputDecoration(
+                  style: theme.textTheme.bodyMedium,
+                  decoration: InputDecoration(
                     hintText: 'Add subtask',
+                    hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.outline,
+                    ),
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    fillColor: Colors.transparent,
+                    filled: false,
                     isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: Spacing.sm,
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.send_outlined, size: 18),
-                tooltip: 'Create',
-                onPressed: _submitting ? null : _submit,
               ),
             ],
           ),
@@ -129,27 +130,57 @@ class _SubtaskRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final done = sub.completedAt != null;
     final theme = Theme.of(context);
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      leading: IconButton(
-        icon: Icon(
-          done ? Icons.check_circle : Icons.radio_button_unchecked,
-          size: 18,
-          color: done ? theme.colorScheme.primary : null,
-        ),
-        onPressed: () => ref
-            .read(taskRepositoryProvider)
-            .setCompleted(sub.id, completed: !done),
-      ),
-      title: Text(
-        sub.title,
-        style: TextStyle(
-          decoration: done ? TextDecoration.lineThrough : null,
-          color: done ? theme.colorScheme.outline : null,
-        ),
-      ),
+    final scheme = theme.colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(Radii.chip),
       onTap: () => ref.read(selectedTaskIdProvider.notifier).select(sub.id),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          vertical: Spacing.xs + 2,
+          horizontal: Spacing.xs,
+        ),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () => ref
+                  .read(taskRepositoryProvider)
+                  .setCompleted(sub.id, completed: !done),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: done ? scheme.primary : Colors.transparent,
+                  border: Border.all(
+                    color: done ? scheme.primary : scheme.outline,
+                    width: 1.5,
+                  ),
+                ),
+                child: done
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      )
+                    : null,
+              ),
+            ),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: Text(
+                sub.title,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  decoration: done ? TextDecoration.lineThrough : null,
+                  color: done ? scheme.outline : null,
+                  decorationColor: scheme.outline,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

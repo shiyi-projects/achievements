@@ -1,4 +1,5 @@
 import 'package:achievements/core/constants.dart';
+import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
@@ -12,10 +13,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// 左侧导航栏。
 ///
 /// 段落:
-///   1. System(7 个内置清单)
-///   2. Folders + 各文件夹下的清单(可折叠;长按文件夹改 / 删)
-///   3. 根目录用户清单(folder_id IS NULL)
-///   4. 末尾 "+ New list" 与 "+ New folder" 入口
+///   1. 品牌 Header
+///   2. System 清单(7 个内置)
+///   3. Folders + 各文件夹下的清单(可折叠;长按文件夹改 / 删)
+///   4. 根目录用户清单(folder_id IS NULL)
+///   5. 末尾 "+ New list" 与 "+ New folder" 入口
+///   6. 底部设置占位
 class Sidebar extends ConsumerWidget {
   const Sidebar({super.key});
 
@@ -29,9 +32,10 @@ class Sidebar extends ConsumerWidget {
       orElse: () => null,
     );
     final expanded = ref.watch(expandedFoldersProvider);
+    final theme = Theme.of(context);
 
     return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      color: theme.colorScheme.surfaceContainerLow,
       child: allLists.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) => _SidebarError(message: e.toString()),
@@ -43,7 +47,6 @@ class Sidebar extends ConsumerWidget {
             orElse: () => const <Folder>[],
           );
           final folderIds = {for (final f in folders) f.id};
-          // 用户清单按 folder_id 归桶;folder_id 未识别(或 null)的归根目录
           final byFolder = <String, List<TaskList>>{};
           final rootLists = <TaskList>[];
           for (final list in lists.where((l) => !l.isSystem)) {
@@ -59,45 +62,91 @@ class Sidebar extends ConsumerWidget {
           }
           rootLists.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-          return ListView(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+          return Column(
             children: [
-              for (final list in systemLists)
-                _SidebarTile(
-                  list: list,
-                  icon: _systemIcon(SystemListKind.fromValue(list.systemKind)),
-                  selected: list.id == currentId,
-                ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 16, 16, 8),
-                child: Text(
-                  'Lists',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+              // ── Brand Header ──
+              const _BrandHeader(),
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+              ),
+              // ── Content ──
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+                  children: [
+                    // ── System lists ──
+                    for (final list in systemLists)
+                      _SidebarTile(
+                        list: list,
+                        icon: _systemIcon(
+                          SystemListKind.fromValue(list.systemKind),
+                        ),
+                        selected: list.id == currentId,
+                      ),
+
+                    // ── Separator ──
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        Spacing.lg,
+                        Spacing.base,
+                        Spacing.base,
+                        Spacing.sm,
+                      ),
+                      child: Text(
+                        'LISTS',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.outline,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+
+                    // ── Folders ──
+                    for (final folder in folders)
+                      _FolderGroup(
+                        folder: folder,
+                        lists: byFolder[folder.id] ?? const [],
+                        isExpanded: expanded.contains(folder.id),
+                        currentId: currentId,
+                      ),
+
+                    // ── Root lists ──
+                    for (final list in rootLists)
+                      _SidebarTile(
+                        list: list,
+                        icon: Icons.format_list_bulleted_rounded,
+                        selected: list.id == currentId,
+                      ),
+
+                    // ── Create actions ──
+                    const _NewListTile(),
+                    const _NewFolderTile(),
+
+                    if (folders.isEmpty && rootLists.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          Spacing.lg,
+                          Spacing.xs,
+                          Spacing.base,
+                          Spacing.sm,
+                        ),
+                        child: Text(
+                          'No custom lists yet',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              for (final folder in folders)
-                _FolderGroup(
-                  folder: folder,
-                  lists: byFolder[folder.id] ?? const [],
-                  isExpanded: expanded.contains(folder.id),
-                  currentId: currentId,
-                ),
-              for (final list in rootLists)
-                _SidebarTile(
-                  list: list,
-                  icon: Icons.list_outlined,
-                  selected: list.id == currentId,
-                ),
-              const _NewListTile(),
-              const _NewFolderTile(),
-              if (folders.isEmpty && rootLists.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 4, 16, 8),
-                  child: Text(
-                    'No custom lists yet',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
-                  ),
-                ),
+              // ── Bottom Settings ──
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+              ),
+              const _SettingsTile(),
             ],
           );
         },
@@ -108,24 +157,81 @@ class Sidebar extends ConsumerWidget {
   IconData _systemIcon(SystemListKind? kind) {
     switch (kind) {
       case SystemListKind.inbox:
-        return Icons.inbox_outlined;
+        return Icons.inbox_rounded;
       case SystemListKind.today:
-        return Icons.today_outlined;
+        return Icons.today_rounded;
       case SystemListKind.important:
-        return Icons.star_outline;
+        return Icons.star_rounded;
       case SystemListKind.planned:
-        return Icons.event_outlined;
+        return Icons.event_rounded;
       case SystemListKind.all:
-        return Icons.all_inbox_outlined;
+        return Icons.checklist_rounded;
       case SystemListKind.completed:
-        return Icons.check_circle_outline;
+        return Icons.task_alt_rounded;
       case SystemListKind.trash:
-        return Icons.delete_outline;
+        return Icons.delete_outline_rounded;
       case null:
-        return Icons.list_alt_outlined;
+        return Icons.list_alt_rounded;
     }
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Brand Header
+// ─────────────────────────────────────────────────────────────────────
+
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.xl,
+        Spacing.base,
+        Spacing.base,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.emoji_events_rounded,
+              color: theme.colorScheme.onPrimary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            child: Text(
+              'Achievements',
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Folder Group
+// ─────────────────────────────────────────────────────────────────────
 
 class _FolderGroup extends ConsumerWidget {
   const _FolderGroup({
@@ -142,33 +248,44 @@ class _FolderGroup extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         GestureDetector(
           onSecondaryTapDown: (d) => _showMenu(context, ref, d.globalPosition),
           onLongPress: () => _showMenu(context, ref, null),
-          child: ListTile(
-            dense: true,
-            leading: Icon(
-              isExpanded ? Icons.folder_open_outlined : Icons.folder_outlined,
-              size: 20,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+            child: ListTile(
+              dense: true,
+              leading: Icon(
+                isExpanded ? Icons.folder_open_rounded : Icons.folder_rounded,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              title: Text(
+                folder.name,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              trailing: Icon(
+                isExpanded ? Icons.expand_less : Icons.expand_more,
+                size: 18,
+                color: theme.colorScheme.outline,
+              ),
+              onTap: () =>
+                  ref.read(expandedFoldersProvider.notifier).toggle(folder.id),
             ),
-            title: Text(folder.name),
-            trailing: Icon(
-              isExpanded ? Icons.expand_less : Icons.expand_more,
-              size: 18,
-            ),
-            onTap: () =>
-                ref.read(expandedFoldersProvider.notifier).toggle(folder.id),
           ),
         ),
         if (isExpanded)
           for (final list in lists)
             Padding(
-              padding: const EdgeInsets.only(left: 16),
+              padding: const EdgeInsets.only(left: Spacing.base),
               child: _SidebarTile(
                 list: list,
-                icon: Icons.list_outlined,
+                icon: Icons.format_list_bulleted_rounded,
                 selected: list.id == currentId,
               ),
             ),
@@ -213,7 +330,10 @@ class _FolderGroup extends ConsumerWidget {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Delete folder?'),
-            content: Text('文件夹 "${folder.name}" 将被删除;其下清单移到根目录,不会丢失。'),
+            content: Text(
+              'Folder "${folder.name}" will be deleted. Lists inside will '
+              'be moved to root and will not be lost.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -237,6 +357,10 @@ class _FolderGroup extends ConsumerWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Sidebar Tile
+// ─────────────────────────────────────────────────────────────────────
+
 class _SidebarTile extends ConsumerWidget {
   const _SidebarTile({
     required this.list,
@@ -250,27 +374,88 @@ class _SidebarTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = selected ? Theme.of(context).colorScheme.primary : null;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final countAsync = ref.watch(taskCountForListIdProvider(list.id));
     final count = countAsync.maybeWhen(data: (n) => n, orElse: () => 0);
-    return GestureDetector(
-      onSecondaryTapDown: (d) => _showMenu(context, ref, d.globalPosition),
-      onLongPress: () => _showMenu(context, ref, null),
-      child: ListTile(
-        dense: true,
-        selected: selected,
-        leading: Icon(icon, size: 20, color: color),
-        title: Text(list.name, style: TextStyle(color: color)),
-        trailing: count == 0
-            ? null
-            : _CountBadge(count: count, dimmed: !selected),
-        onTap: () {
-          ref.read(selectedListIdProvider.notifier).select(list.id);
-          final scaffold = Scaffold.maybeOf(context);
-          if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
-            Navigator.of(context).pop();
-          }
-        },
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
+      child: GestureDetector(
+        onSecondaryTapDown: (d) => _showMenu(context, ref, d.globalPosition),
+        onLongPress: () => _showMenu(context, ref, null),
+        child: Material(
+          color: selected ? scheme.secondaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(Radii.input),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(Radii.input),
+            onTap: () {
+              ref.read(selectedListIdProvider.notifier).select(list.id);
+              final scaffold = Scaffold.maybeOf(context);
+              if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
+                Navigator.of(context).pop();
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Spacing.md,
+                vertical: Spacing.sm + 2,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: selected
+                        ? scheme.onSecondaryContainer
+                        : scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: Spacing.md),
+                  Expanded(
+                    child: Text(
+                      list.name,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: selected
+                            ? scheme.onSecondaryContainer
+                            : scheme.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (count > 0)
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 22),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? scheme.onSecondaryContainer.withValues(
+                                alpha: 0.12,
+                              )
+                            : scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(Radii.circle),
+                      ),
+                      child: Text(
+                        '$count',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: selected
+                              ? scheme.onSecondaryContainer
+                              : scheme.outline,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -321,7 +506,7 @@ class _SidebarTile extends ConsumerWidget {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Delete list?'),
-            content: Text('清单 "$name" 及其中任务将被移到 Trash。'),
+            content: Text('List "$name" and its tasks will be moved to Trash.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -342,24 +527,41 @@ class _SidebarTile extends ConsumerWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Create Tiles
+// ─────────────────────────────────────────────────────────────────────
+
 class _NewListTile extends ConsumerWidget {
   const _NewListTile();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ListTile(
-      dense: true,
-      leading: const Icon(Icons.add, size: 20),
-      title: const Text('New list'),
-      onTap: () async {
-        final name = await showNameInputDialog(
-          context,
-          title: 'New list',
-          confirm: 'Create',
-        );
-        if (name == null) return;
-        await ref.read(listRepositoryProvider).create(name: name);
-      },
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+      child: ListTile(
+        dense: true,
+        leading: Icon(
+          Icons.add_rounded,
+          size: 20,
+          color: theme.colorScheme.primary,
+        ),
+        title: Text(
+          'New list',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.primary,
+          ),
+        ),
+        onTap: () async {
+          final name = await showNameInputDialog(
+            context,
+            title: 'New list',
+            confirm: 'Create',
+          );
+          if (name == null) return;
+          await ref.read(listRepositoryProvider).create(name: name);
+        },
+      ),
     );
   }
 }
@@ -369,42 +571,75 @@ class _NewFolderTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ListTile(
-      dense: true,
-      leading: const Icon(Icons.create_new_folder_outlined, size: 20),
-      title: const Text('New folder'),
-      onTap: () async {
-        final name = await showNameInputDialog(
-          context,
-          title: 'New folder',
-          confirm: 'Create',
-        );
-        if (name == null) return;
-        await ref.read(folderRepositoryProvider).create(name: name);
-      },
-    );
-  }
-}
-
-class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.count, required this.dimmed});
-
-  final int count;
-  final bool dimmed;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Text(
-      '$count',
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-        color: dimmed ? scheme.outline : scheme.primary,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+      child: ListTile(
+        dense: true,
+        leading: Icon(
+          Icons.create_new_folder_outlined,
+          size: 20,
+          color: theme.colorScheme.primary,
+        ),
+        title: Text(
+          'New folder',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.primary,
+          ),
+        ),
+        onTap: () async {
+          final name = await showNameInputDialog(
+            context,
+            title: 'New folder',
+            confirm: 'Create',
+          );
+          if (name == null) return;
+          await ref.read(folderRepositoryProvider).create(name: name);
+        },
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Settings Tile (placeholder)
+// ─────────────────────────────────────────────────────────────────────
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.sm,
+        vertical: Spacing.sm,
+      ),
+      child: ListTile(
+        dense: true,
+        leading: Icon(
+          Icons.settings_rounded,
+          size: 20,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        title: Text(
+          'Settings',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        onTap: () {
+          // Phase 4: navigate to settings
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Error State
+// ─────────────────────────────────────────────────────────────────────
 
 class _SidebarError extends StatelessWidget {
   const _SidebarError({required this.message});
@@ -414,9 +649,9 @@ class _SidebarError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(Spacing.base),
       child: Text(
-        'Sidebar 加载失败:$message',
+        'Failed to load sidebar: $message',
         style: TextStyle(color: Theme.of(context).colorScheme.error),
       ),
     );

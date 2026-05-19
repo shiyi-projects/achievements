@@ -1,3 +1,4 @@
+import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:flutter/material.dart';
 
@@ -11,23 +12,25 @@ class TagsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (tags.isEmpty) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
+    final textStyle = Theme.of(context).textTheme.labelSmall;
+
     return Wrap(
-      spacing: 6,
-      runSpacing: 4,
+      spacing: Spacing.xs + 2,
+      runSpacing: Spacing.xs,
       children: [
         for (final tag in tags)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            padding: const EdgeInsets.symmetric(
+              horizontal: Spacing.sm,
+              vertical: 2,
+            ),
             decoration: BoxDecoration(
-              color: scheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(999),
+              color: scheme.secondaryContainer.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(Radii.chip),
             ),
             child: Text(
               '#${tag.name}',
-              style: TextStyle(
-                color: scheme.onSecondaryContainer,
-                fontSize: 11,
-              ),
+              style: textStyle?.copyWith(color: scheme.onSecondaryContainer),
             ),
           ),
       ],
