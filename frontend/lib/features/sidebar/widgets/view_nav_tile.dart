@@ -1,18 +1,23 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
-import 'package:achievements/state/current_view.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// ─────────────────────────────────────────────────────────────────────
-// Calendar Nav Tile
-// ─────────────────────────────────────────────────────────────────────
+/// 通用顶部导航条目(日历 / 专注 / 搜索)。对应 AppView 切换,而不是清单切换。
+class ViewNavTile extends StatelessWidget {
+  const ViewNavTile({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
 
-class CalendarNavTile extends ConsumerWidget {
-  const CalendarNavTile({required this.selected, super.key});
+  final IconData icon;
+  final String label;
   final bool selected;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -24,7 +29,7 @@ class CalendarNavTile extends ConsumerWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(Radii.input),
           onTap: () {
-            ref.read(currentViewNotifierProvider.notifier).showCalendar();
+            onTap();
             final scaffold = Scaffold.maybeOf(context);
             if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
               Navigator.of(context).pop();
@@ -38,7 +43,7 @@ class CalendarNavTile extends ConsumerWidget {
             child: Row(
               children: [
                 Icon(
-                  Icons.calendar_month_rounded,
+                  icon,
                   size: 20,
                   color: selected
                       ? scheme.onSecondaryContainer
@@ -46,10 +51,9 @@ class CalendarNavTile extends ConsumerWidget {
                 ),
                 const SizedBox(width: Spacing.md),
                 Text(
-                  '日历',
+                  label,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight:
-                        selected ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     color: selected
                         ? scheme.onSecondaryContainer
                         : scheme.onSurface,

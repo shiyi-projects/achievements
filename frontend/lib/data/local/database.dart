@@ -8,7 +8,7 @@ import 'package:drift/drift.dart';
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Folders, TaskLists, Tasks, Tags, TaskTags, Outbox, SyncCursors],
+  tables: [Folders, TaskLists, Tasks, Tags, TaskTags, Outbox, SyncCursors, FocusSessions],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openLocalConnection());
@@ -17,7 +17,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -42,6 +42,10 @@ class AppDatabase extends _$AppDatabase {
         // push 时服务端只有固定 UUID,触发 FK violation → rejected。
         if (from < 4) {
           await _normalizeSystemListIds();
+        }
+        // v4 -> v5:新增专注会话表(Phase 3)。
+        if (from < 5) {
+          await m.createTable(focusSessions);
         }
       },
     );

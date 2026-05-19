@@ -4,10 +4,10 @@ import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/features/sidebar/widgets/brand_header.dart';
-import 'package:achievements/features/sidebar/widgets/calendar_nav_tile.dart';
 import 'package:achievements/features/sidebar/widgets/create_tiles.dart';
 import 'package:achievements/features/sidebar/widgets/folder_group.dart';
 import 'package:achievements/features/sidebar/widgets/sidebar_tile.dart';
+import 'package:achievements/features/sidebar/widgets/view_nav_tile.dart';
 import 'package:achievements/state/current_view.dart';
 import 'package:achievements/state/expanded_folders.dart';
 import 'package:achievements/state/selected_list.dart';
@@ -36,6 +36,8 @@ class Sidebar extends ConsumerWidget {
       orElse: () => null,
     );
     final expanded = ref.watch(expandedFoldersProvider);
+    final currentView = ref.watch(currentViewNotifierProvider);
+    final viewNotifier = ref.read(currentViewNotifierProvider.notifier);
     final theme = Theme.of(context);
 
     return Material(
@@ -93,10 +95,24 @@ class Sidebar extends ConsumerWidget {
                         selected: list.id == currentId,
                       ),
 
-                    // ── Calendar nav entry ──
-                    CalendarNavTile(
-                      selected: ref.watch(currentViewNotifierProvider) ==
-                          AppView.calendar,
+                    // ── Top-level view nav entries ──
+                    ViewNavTile(
+                      icon: Icons.calendar_month_rounded,
+                      label: '日历',
+                      selected: currentView == AppView.calendar,
+                      onTap: viewNotifier.showCalendar,
+                    ),
+                    ViewNavTile(
+                      icon: Icons.timer_outlined,
+                      label: '专注',
+                      selected: currentView == AppView.focus,
+                      onTap: viewNotifier.showFocus,
+                    ),
+                    ViewNavTile(
+                      icon: Icons.search_rounded,
+                      label: '搜索',
+                      selected: currentView == AppView.search,
+                      onTap: viewNotifier.showSearch,
                     ),
 
                     // ── Separator ──

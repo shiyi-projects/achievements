@@ -126,3 +126,30 @@ class SyncCursors extends Table {
   @override
   Set<Column<Object>> get primaryKey => {key};
 }
+
+/// 专注会话记录。Phase 3 本地优先,暂不进入 outbox(后续随 /focus-sessions 端点启用)。
+class FocusSessions extends Table {
+  /// 客户端生成的 UUIDv7。
+  TextColumn get id => text()();
+  TextColumn get userId => text()();
+
+  /// 关联的任务(可选)。
+  TextColumn get taskId => text().nullable()();
+
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get endedAt => dateTime().nullable()();
+
+  /// 实际专注时长(秒)。结束时写入。
+  IntColumn get durationSeconds => integer().nullable()();
+
+  /// pomodoro / free
+  TextColumn get mode => text().withDefault(const Constant('pomodoro'))();
+
+  /// 是否完整完成(非中途放弃)。
+  BoolColumn get completed => boolean().withDefault(const Constant(false))();
+
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
