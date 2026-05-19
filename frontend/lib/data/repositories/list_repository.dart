@@ -164,3 +164,18 @@ Future<TaskList?> inboxList(Ref ref) {
       .watch(listRepositoryProvider)
       .findBySystemKind(SystemListKind.inbox);
 }
+
+/// 任务可被移动到的目标清单:Inbox + 全部用户自定义清单。其他系统清单
+/// (today/important/planned 等)是智能过滤,不存储任务,无法作为目标。
+@riverpod
+List<TaskList> movableLists(Ref ref) {
+  final all = ref
+      .watch(allListsProvider)
+      .maybeWhen(data: (list) => list, orElse: () => const <TaskList>[]);
+  return [
+    for (final l in all)
+      if (!l.isSystem ||
+          SystemListKind.fromValue(l.systemKind) == SystemListKind.inbox)
+        l,
+  ];
+}
