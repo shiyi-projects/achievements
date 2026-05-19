@@ -1,11 +1,13 @@
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/features/achievement/achievement_page.dart';
 import 'package:achievements/features/calendar/calendar_page.dart';
 import 'package:achievements/features/focus/focus_page.dart';
 import 'package:achievements/features/list_view/list_page.dart';
 import 'package:achievements/features/search/search_page.dart';
 import 'package:achievements/features/sidebar/sidebar.dart';
+import 'package:achievements/features/statistics/statistics_page.dart';
 import 'package:achievements/features/task_detail/task_detail_panel.dart';
 import 'package:achievements/features/today/today_page.dart';
 import 'package:achievements/state/current_view.dart';
@@ -54,6 +56,8 @@ class AppShell extends ConsumerWidget {
       AppView.calendar => '日历',
       AppView.focus => '专注',
       AppView.search => '搜索',
+      AppView.statistics => '统计',
+      AppView.achievement => '成就',
       AppView.list => currentAsync.maybeWhen(
         data: (list) => list?.name ?? 'Achievements',
         orElse: () => 'Achievements',
@@ -64,6 +68,8 @@ class AppShell extends ConsumerWidget {
       AppView.calendar => const CalendarPage(),
       AppView.focus => const FocusPage(),
       AppView.search => const SearchPage(),
+      AppView.statistics => const StatisticsPage(),
+      AppView.achievement => const AchievementPage(),
       AppView.list => currentAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) => Center(
