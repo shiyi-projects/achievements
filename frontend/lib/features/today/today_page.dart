@@ -16,10 +16,7 @@ class TodayPage extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Achievements',
-                style: theme.textTheme.headlineMedium,
-              ),
+              Text('Achievements', style: theme.textTheme.headlineMedium),
               const SizedBox(height: 12),
               Text(
                 'Phase 0 scaffold ready — Task #8 has wired theme + router + root app.',
