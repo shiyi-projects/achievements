@@ -116,3 +116,46 @@ async def test_filter_by_list(client: AsyncClient) -> None:
     only_a = await client.get("/api/v1/tasks", params={"list_id": str(a)})
     titles = {t["title"] for t in only_a.json()}
     assert titles == {"in-A"}
+
+
+@pytest.mark.asyncio
+async def test_filter_by_parent_and_root_only(client: AsyncClient) -> None:
+    list_id = await _create_list(client)
+    parent = (
+        await client.post("/api/v1/tasks", json={"list_id": str(list_id), "title": "parent"})
+    ).json()
+    await client.post(
+        "/api/v1/tasks",
+        json={
+            "list_id": str(list_id),
+            "parent_id": parent["id"],
+            "title": "child-1",
+        },
+    )
+    await client.post(
+        "/api/v1/tasks",
+        json={
+            "list_id": str(list_id),
+            "parent_id": parent["id"],
+            "title": "child-2",
+        },
+    )
+
+    # 默认无 filter → 3 条
+    all_resp = await client.get("/api/v1/tasks")
+    assert len(all_resp.json()) == 3
+
+    # parent_id=<uuid> → 仅子任务
+    children = await client.get("/api/v1/tasks", params={"parent_id": parent["id"]})
+    assert {t["title"] for t in children.json()} == {"child-1", "child-2"}
+
+    # root_only=true → 仅根任务
+    roots = await client.get("/api/v1/tasks", params={"root_only": True})
+    assert [t["title"] for t in roots.json()] == ["parent"]
+
+    # root_only=true 优先于 parent_id(同时给)
+    only_root = await client.get(
+        "/api/v1/tasks",
+        params={"parent_id": parent["id"], "root_only": True},
+    )
+    assert [t["title"] for t in only_root.json()] == ["parent"]

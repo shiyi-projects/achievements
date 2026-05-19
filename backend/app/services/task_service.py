@@ -17,12 +17,25 @@ async def list_tasks(
     user_id: UUID,
     *,
     list_id: UUID | None = None,
+    parent_id: UUID | None = None,
+    root_only: bool = False,
     include_deleted: bool = False,
 ) -> list[Task]:
-    """List tasks belonging to ``user_id``;按 list_id 过滤可选。"""
+    """List tasks belonging to ``user_id``。
+
+    过滤选项:
+      - ``list_id``:限定到某清单
+      - ``parent_id``:限定到某父任务(取直接子任务)
+      - ``root_only``:仅取根任务(parent_id IS NULL);True 时优先于 parent_id
+      - ``include_deleted``:False 时跳过软删任务
+    """
     query = select(Task).where(Task.user_id == user_id)
     if list_id is not None:
         query = query.where(Task.list_id == list_id)
+    if root_only:
+        query = query.where(Task.parent_id.is_(None))
+    elif parent_id is not None:
+        query = query.where(Task.parent_id == parent_id)
     if not include_deleted:
         query = query.where(Task.deleted_at.is_(None))
     query = query.order_by(Task.sort_order, Task.created_at)

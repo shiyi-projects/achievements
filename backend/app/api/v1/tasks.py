@@ -29,10 +29,17 @@ async def list_tasks(
     session: SessionDep,
     user_id: CurrentUserId,
     list_id: Annotated[UUID | None, Query()] = None,
+    parent_id: Annotated[UUID | None, Query()] = None,
+    root_only: Annotated[bool, Query()] = False,
     include_deleted: Annotated[bool, Query()] = False,
 ) -> list[TaskRead]:
     tasks = await task_service.list_tasks(
-        session, user_id, list_id=list_id, include_deleted=include_deleted
+        session,
+        user_id,
+        list_id=list_id,
+        parent_id=parent_id,
+        root_only=root_only,
+        include_deleted=include_deleted,
     )
     return [TaskRead.model_validate(t) for t in tasks]
 
