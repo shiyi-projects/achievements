@@ -1,0 +1,80 @@
+# 开发环境 compose。
+#
+# 默认形态(只跑后端,DB / Redis 走宿主机已有容器):
+#   docker compose up --build
+#
+# 完整形态(同时拉起内置 Postgres + Redis,适合一台干净机器):
+#   docker compose --profile full up --build
+#
+# 生产请使用 docker-compose.prod.yml override(也按需求选 profile)。
+
+name: achievements-dev
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: achievements/backend:dev
+    container_name: achievements-api
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # 默认连宿主机已有的 PG / Redis;改用 --profile full 时请在 .env 改成 db / redis
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://achievements:achievements@host.docker.internal:5432/achievements}
+      REDIS_URL: ${REDIS_URL:-redis://host.docker.internal:6379/0}
+      APP_DEBUG: "true"
+    extra_hosts:
+      # Linux 上 host.docker.internal 默认不解析,显式声明以保证跨平台一致
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app:ro
+      - ./alembic:/app/alembic:ro
+      - ./alembic.ini:/app/alembic.ini:ro
+      - attachments:/app/storage/attachments
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    restart: unless-stopped
+
+  # ----- profile: full -----
+  # 仅在 `--profile full` 时启动,适合无本地 DB / Redis 的环境
+  db:
+    profiles: ["full"]
+    image: postgres:16-alpine
+    container_name: achievements-db
+    environment:
+      POSTGRES_DB: achievements
+      POSTGRES_USER: achievements
+      POSTGRES_PASSWORD: achievements
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U achievements -d achievements"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    profiles: ["full"]
+    image: redis:7-alpine
+    container_name: achievements-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  attachments:

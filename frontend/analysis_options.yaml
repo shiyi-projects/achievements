@@ -1,0 +1,25 @@
+## Achievements 前端静态分析配置
+## 在 very_good_analysis 之上做项目级微调,所有规则对生成代码豁免。
+
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/*.gr.dart"
+    - "**/generated/**"
+    - "**/build/**"
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  # custom_lint 暂未启用(riverpod_lint 引入的传递依赖目前与 build_runner 不兼容)
+  # plugins:
+  #   - custom_lint
+
+linter:
+  rules:
+    public_member_api_docs: false      # 内部应用,无需为每个 public API 写文档
+    lines_longer_than_80_chars: false  # 走 100 字符,与后端 ruff 一致
+    sort_pub_dependencies: false       # pubspec 按用途分组(状态/路由/数据层…)优先于字典序
