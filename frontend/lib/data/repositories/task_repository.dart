@@ -40,6 +40,16 @@ class TaskRepository {
     return id;
   }
 
+  /// 切换任务完成态:写入 / 清空 completedAt,Drift 自动更新 updatedAt。
+  ///
+  /// Phase 2 同步引擎接入后,会在 customUpdate 里同步 `version = version + 1`,
+  /// 当前 Phase 1 不强依赖,留待迁移。
+  Future<void> setCompleted(String id, {required bool completed}) async {
+    await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
+      TasksCompanion(completedAt: Value(completed ? DateTime.now() : null)),
+    );
+  }
+
   /// 根据 [list] 决定查询策略:系统清单走对应的智能过滤,自定义清单按 listId。
   Stream<List<Task>> watchForList(TaskList list) {
     if (list.isSystem) {

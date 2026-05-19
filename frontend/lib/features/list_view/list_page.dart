@@ -1,8 +1,8 @@
 import 'package:achievements/core/constants.dart';
-import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/widgets/empty_state.dart';
 import 'package:achievements/shared/widgets/quick_create_input.dart';
+import 'package:achievements/shared/widgets/task_tile.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -49,7 +49,7 @@ class ListPage extends ConsumerWidget {
                 : ListView.separated(
                     itemCount: tasks.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, i) => _TaskTile(task: tasks[i]),
+                    itemBuilder: (context, i) => TaskTile(task: tasks[i]),
                   ),
           ),
         ),
@@ -61,30 +61,6 @@ class ListPage extends ConsumerWidget {
                 .createTask(listId: current.id, title: title),
           ),
       ],
-    );
-  }
-}
-
-class _TaskTile extends StatelessWidget {
-  const _TaskTile({required this.task});
-
-  final Task task;
-
-  @override
-  Widget build(BuildContext context) {
-    final done = task.completedAt != null;
-    return ListTile(
-      leading: Icon(
-        done ? Icons.check_circle : Icons.radio_button_unchecked,
-        color: done ? Theme.of(context).colorScheme.primary : null,
-      ),
-      title: Text(
-        task.title,
-        style: TextStyle(
-          decoration: done ? TextDecoration.lineThrough : null,
-          color: done ? Theme.of(context).colorScheme.outline : null,
-        ),
-      ),
     );
   }
 }
