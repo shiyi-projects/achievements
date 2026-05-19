@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:achievements/core/constants.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/state/selected_task.dart';
@@ -150,6 +151,10 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     await _repo.update(widget.task.id, starred: Value(!widget.task.starred));
   }
 
+  Future<void> _setPriority(TaskPriority p) async {
+    await _repo.update(widget.task.id, priority: Value(p.value));
+  }
+
   Future<void> _softDelete() async {
     await _repo.softDelete(widget.task.id);
     _close();
@@ -250,6 +255,11 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
               onChanged: _scheduleNotes,
             ),
             const SizedBox(height: 24),
+            _PrioritySelector(
+              priority: TaskPriority.fromValue(task.priority),
+              onChanged: _setPriority,
+            ),
+            const SizedBox(height: 8),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.event_outlined),
@@ -290,6 +300,37 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PrioritySelector extends StatelessWidget {
+  const _PrioritySelector({required this.priority, required this.onChanged});
+
+  final TaskPriority priority;
+  final ValueChanged<TaskPriority> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(Icons.flag_outlined, color: theme.colorScheme.outline),
+        const SizedBox(width: 16),
+        Expanded(
+          child: SegmentedButton<TaskPriority>(
+            segments: const [
+              ButtonSegment(value: TaskPriority.none, label: Text('None')),
+              ButtonSegment(value: TaskPriority.low, label: Text('Low')),
+              ButtonSegment(value: TaskPriority.medium, label: Text('Med')),
+              ButtonSegment(value: TaskPriority.high, label: Text('High')),
+            ],
+            selected: {priority},
+            showSelectedIcon: false,
+            onSelectionChanged: (s) => onChanged(s.first),
+          ),
+        ),
+      ],
     );
   }
 }
