@@ -14,11 +14,16 @@ UUID 列用 ``sqlalchemy.Uuid`` 跨库:Postgres 用原生 UUID,SQLite 落 CHAR(3
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Uuid, func
+from sqlalchemy import DateTime, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
+
+
+def _utcnow() -> datetime:
+    """Microsecond-precision UTC now,跨库一致(避免 SQLite 的秒级 CURRENT_TIMESTAMP)。"""
+    return datetime.now(UTC)
 
 
 class UUIDPKMixin:
@@ -33,13 +38,13 @@ class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
+        default=_utcnow,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
+        default=_utcnow,
+        onupdate=_utcnow,
     )
 
 
