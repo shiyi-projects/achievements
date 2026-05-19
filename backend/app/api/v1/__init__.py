@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, health
+from app.api.v1 import auth, folders, health, lists
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(folders.router, prefix="/folders", tags=["folders"])
+api_router.include_router(lists.router, prefix="/lists", tags=["lists"])
