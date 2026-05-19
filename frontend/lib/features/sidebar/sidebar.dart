@@ -3,16 +3,18 @@ import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/shared/widgets/name_input_dialog.dart';
+import 'package:achievements/state/expanded_folders.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 左侧导航栏。
 ///
-/// - System 段:7 个内置清单(inbox/today/important/planned/all/completed/trash)
-/// - Lists 段:用户自定义清单,末尾 "+ New list" 按钮;长按 / 右键弹菜单
-///   Rename / Delete。
-/// - 文件夹分组渲染下次 commit 接入,本轮先平铺显示。
+/// 段落:
+///   1. System(7 个内置清单)
+///   2. Folders + 各文件夹下的清单(可折叠;长按文件夹改 / 删)
+///   3. 根目录用户清单(folder_id IS NULL)
+///   4. 末尾 "+ New list" 与 "+ New folder" 入口
 class Sidebar extends ConsumerWidget {
   const Sidebar({super.key});
 
@@ -25,6 +27,7 @@ class Sidebar extends ConsumerWidget {
       data: (list) => list?.id,
       orElse: () => null,
     );
+    final expanded = ref.watch(expandedFoldersProvider);
 
     return Material(
       color: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -34,12 +37,26 @@ class Sidebar extends ConsumerWidget {
         data: (lists) {
           final systemLists = lists.where((l) => l.isSystem).toList()
             ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-          final userLists = lists.where((l) => !l.isSystem).toList()
-            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
           final folders = allFolders.maybeWhen(
             data: (data) => data,
             orElse: () => const <Folder>[],
           );
+          final folderIds = {for (final f in folders) f.id};
+          // 用户清单按 folder_id 归桶;folder_id 未识别(或 null)的归根目录
+          final byFolder = <String, List<TaskList>>{};
+          final rootLists = <TaskList>[];
+          for (final list in lists.where((l) => !l.isSystem)) {
+            final fid = list.folderId;
+            if (fid != null && folderIds.contains(fid)) {
+              byFolder.putIfAbsent(fid, () => []).add(list);
+            } else {
+              rootLists.add(list);
+            }
+          }
+          for (final bucket in byFolder.values) {
+            bucket.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+          }
+          rootLists.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
           return ListView(
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -57,14 +74,22 @@ class Sidebar extends ConsumerWidget {
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
-              for (final list in userLists)
+              for (final folder in folders)
+                _FolderGroup(
+                  folder: folder,
+                  lists: byFolder[folder.id] ?? const [],
+                  isExpanded: expanded.contains(folder.id),
+                  currentId: currentId,
+                ),
+              for (final list in rootLists)
                 _SidebarTile(
                   list: list,
                   icon: Icons.list_outlined,
                   selected: list.id == currentId,
                 ),
-              _NewListTile(),
-              if (folders.isEmpty && userLists.isEmpty)
+              const _NewListTile(),
+              const _NewFolderTile(),
+              if (folders.isEmpty && rootLists.isEmpty)
                 const Padding(
                   padding: EdgeInsets.fromLTRB(20, 4, 16, 8),
                   child: Text(
@@ -101,6 +126,116 @@ class Sidebar extends ConsumerWidget {
   }
 }
 
+class _FolderGroup extends ConsumerWidget {
+  const _FolderGroup({
+    required this.folder,
+    required this.lists,
+    required this.isExpanded,
+    required this.currentId,
+  });
+
+  final Folder folder;
+  final List<TaskList> lists;
+  final bool isExpanded;
+  final String? currentId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        GestureDetector(
+          onSecondaryTapDown: (d) => _showMenu(context, ref, d.globalPosition),
+          onLongPress: () => _showMenu(context, ref, null),
+          child: ListTile(
+            dense: true,
+            leading: Icon(
+              isExpanded ? Icons.folder_open_outlined : Icons.folder_outlined,
+              size: 20,
+            ),
+            title: Text(folder.name),
+            trailing: Icon(
+              isExpanded ? Icons.expand_less : Icons.expand_more,
+              size: 18,
+            ),
+            onTap: () =>
+                ref.read(expandedFoldersProvider.notifier).toggle(folder.id),
+          ),
+        ),
+        if (isExpanded)
+          for (final list in lists)
+            Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: _SidebarTile(
+                list: list,
+                icon: Icons.list_outlined,
+                selected: list.id == currentId,
+              ),
+            ),
+      ],
+    );
+  }
+
+  Future<void> _showMenu(
+    BuildContext context,
+    WidgetRef ref,
+    Offset? position,
+  ) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final anchor = position ?? overlay.localToGlobal(Offset.zero);
+    final selection = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        anchor.dx,
+        anchor.dy,
+        overlay.size.width - anchor.dx,
+        overlay.size.height - anchor.dy,
+      ),
+      items: const [
+        PopupMenuItem(value: 'rename', child: Text('Rename')),
+        PopupMenuItem(value: 'delete', child: Text('Delete')),
+      ],
+    );
+    if (!context.mounted) return;
+    switch (selection) {
+      case 'rename':
+        final name = await showNameInputDialog(
+          context,
+          title: 'Rename folder',
+          initial: folder.name,
+        );
+        if (name != null && name != folder.name) {
+          await ref.read(folderRepositoryProvider).rename(folder.id, name);
+        }
+      case 'delete':
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete folder?'),
+            content: Text('文件夹 "${folder.name}" 将被删除;其下清单移到根目录,不会丢失。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton.tonal(
+                style: FilledButton.styleFrom(
+                  foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
+                  backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed ?? false) {
+          await ref.read(folderRepositoryProvider).softDelete(folder);
+        }
+    }
+  }
+}
+
 class _SidebarTile extends ConsumerWidget {
   const _SidebarTile({
     required this.list,
@@ -116,8 +251,7 @@ class _SidebarTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final color = selected ? Theme.of(context).colorScheme.primary : null;
     return GestureDetector(
-      onSecondaryTapDown: (details) =>
-          _showMenu(context, ref, details.globalPosition),
+      onSecondaryTapDown: (d) => _showMenu(context, ref, d.globalPosition),
       onLongPress: () => _showMenu(context, ref, null),
       child: ListTile(
         dense: true,
@@ -140,8 +274,9 @@ class _SidebarTile extends ConsumerWidget {
     WidgetRef ref,
     Offset? position,
   ) async {
-    if (list.isSystem) return; // 系统清单不允许改
-    final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+    if (list.isSystem) return;
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
     final anchor = position ?? overlay.localToGlobal(Offset.zero);
     final selection = await showMenu<String>(
       context: context,
@@ -202,6 +337,8 @@ class _SidebarTile extends ConsumerWidget {
 }
 
 class _NewListTile extends ConsumerWidget {
+  const _NewListTile();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
@@ -216,6 +353,28 @@ class _NewListTile extends ConsumerWidget {
         );
         if (name == null) return;
         await ref.read(listRepositoryProvider).create(name: name);
+      },
+    );
+  }
+}
+
+class _NewFolderTile extends ConsumerWidget {
+  const _NewFolderTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListTile(
+      dense: true,
+      leading: const Icon(Icons.create_new_folder_outlined, size: 20),
+      title: const Text('New folder'),
+      onTap: () async {
+        final name = await showNameInputDialog(
+          context,
+          title: 'New folder',
+          confirm: 'Create',
+        );
+        if (name == null) return;
+        await ref.read(folderRepositoryProvider).create(name: name);
       },
     );
   }
