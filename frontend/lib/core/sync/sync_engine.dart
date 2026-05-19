@@ -148,7 +148,7 @@ class SyncEngine {
         await _resolveConflict(row, result);
       case 'rejected':
         debugPrint('sync: rejected ${row.entity}/${row.entityId}');
-        await _outbox.deleteById(row.id);
+        await _outbox.markFailed(row.id, 'rejected by server');
       default:
         await _outbox.markFailed(row.id, 'unknown status: $status');
     }

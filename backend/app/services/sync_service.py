@@ -135,13 +135,32 @@ async def push(
     user_id: UUID,
     request: SyncPushRequest,
 ) -> SyncPushResponse:
-    """批量应用客户端 mutations。单条异常仅自身被 rejected,其他 commit。"""
-    results: list[MutationResult] = []
-    for mut in request.mutations:
-        result = await _apply_one(session, user_id, mut)
-        results.append(result)
+    """批量应用客户端 mutations。单条异常仅自身被 rejected,其他 commit。
+
+    使用 savepoint 隔离每条 mutation,一条 FK 违例不会破坏整个 session。
+    按 entity 依赖顺序排序:folder → list → task → tag → task_tag。
+    """
+    # 按依赖排序,父实体先于子实体
+    _ORDER: dict[str, int] = {
+        "folder": 0,
+        "list": 1,
+        "tag": 2,
+        "task": 3,
+        "task_tag": 4,
+    }
+    indexed = list(enumerate(request.mutations))
+    indexed.sort(key=lambda pair: _ORDER.get(pair[1].entity, 99))
+
+    # slot for results, preserve original order
+    results: list[MutationResult | None] = [None] * len(request.mutations)
+    for orig_idx, mut in indexed:
+        results[orig_idx] = await _apply_one(session, user_id, mut)
+
     await session.commit()
-    return SyncPushResponse(cursor=datetime.now(UTC), results=results)
+    return SyncPushResponse(
+        cursor=datetime.now(UTC),
+        results=[r for r in results if r is not None],
+    )
 
 
 async def _apply_one(
@@ -160,43 +179,60 @@ async def _apply_one(
     try:
         payload_schema = _ENTITY_PAYLOAD_SCHEMA[mut.entity]
         parsed = payload_schema.model_validate(mut.payload)
-    except Exception:
-        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
-
-    existing = await session.get(model, mut.id)
-
-    if existing is None:
-        if mut.op == "delete":
-            return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=1)
-        row = model(id=mut.id, user_id=user_id)
-        _assign(row, parsed)
-        session.add(row)
-        await session.flush()
-        return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=row.version)
-
-    if existing.user_id != user_id:
-        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
-
-    if existing.version != mut.base_version:
-        return MutationResult(
-            entity=mut.entity,
-            id=mut.id,
-            status="conflict",
-            version=existing.version,
-            server_value=_ENTITY_READ_SCHEMA[mut.entity]
-            .model_validate(existing)
-            .model_dump(mode="json"),
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "sync: mutation %s/%s rejected (payload validation): %s: %s",
+            mut.entity, mut.id, type(exc).__name__, exc,
         )
+        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
 
-    if mut.op == "delete":
-        existing.deleted_at = datetime.now(UTC)
-    else:
-        _assign(existing, parsed)
-    existing.version += 1
-    await session.flush()
-    return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=existing.version)
+    # 使用 savepoint 隔离,单条 IntegrityError 不会使整个 session 失效
+    try:
+        async with session.begin_nested():
+            existing = await session.get(model, mut.id)
+
+            if existing is None:
+                if mut.op == "delete":
+                    return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=1)
+                row = model(id=mut.id, user_id=user_id)
+                _assign(row, parsed)
+                session.add(row)
+                await session.flush()
+                return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=row.version)
+
+            if existing.user_id != user_id:
+                return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+
+            if existing.version != mut.base_version:
+                return MutationResult(
+                    entity=mut.entity,
+                    id=mut.id,
+                    status="conflict",
+                    version=existing.version,
+                    server_value=_ENTITY_READ_SCHEMA[mut.entity]
+                    .model_validate(existing)
+                    .model_dump(mode="json"),
+                )
+
+            if mut.op == "delete":
+                existing.deleted_at = datetime.now(UTC)
+            else:
+                _assign(existing, parsed)
+            existing.version += 1
+            await session.flush()
+            return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=existing.version)
+    except Exception as exc:
+        # IntegrityError, FK violation, etc. — reject this mutation only
+        import logging
+        logging.getLogger(__name__).warning(
+            "sync: mutation %s/%s rejected due to %s: %s",
+            mut.entity, mut.id, type(exc).__name__, exc,
+        )
+        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
 
 
 def _assign(row: Any, parsed: Any) -> None:
     for key, value in parsed.model_dump(exclude_unset=True).items():
         setattr(row, key, value)
+
