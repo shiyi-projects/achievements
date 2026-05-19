@@ -27,7 +27,6 @@ Dio apiClient(Ref ref) {
       sendTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
       contentType: 'application/json',
-      responseType: ResponseType.json,
     ),
   );
   return dio;

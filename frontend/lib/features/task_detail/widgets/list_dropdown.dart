@@ -1,7 +1,7 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
-import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
+import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

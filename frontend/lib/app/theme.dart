@@ -221,86 +221,86 @@ ThemeData _buildTheme(ColorScheme scheme) {
 
 /// 按 ui_design_spec §3.1 构建字体比例尺。
 TextTheme _buildTextTheme(ColorScheme scheme) {
-  final base = TextTheme(
-    displayLarge: const TextStyle(
+  const base = TextTheme(
+    displayLarge: TextStyle(
       fontSize: 57,
       fontWeight: FontWeight.w400,
       height: 64 / 57,
       letterSpacing: -0.25,
     ),
-    displayMedium: const TextStyle(
+    displayMedium: TextStyle(
       fontSize: 45,
       fontWeight: FontWeight.w400,
       height: 52 / 45,
     ),
-    displaySmall: const TextStyle(
+    displaySmall: TextStyle(
       fontSize: 36,
       fontWeight: FontWeight.w400,
       height: 44 / 36,
     ),
-    headlineLarge: const TextStyle(
+    headlineLarge: TextStyle(
       fontSize: 32,
       fontWeight: FontWeight.w600,
       height: 40 / 32,
     ),
-    headlineMedium: const TextStyle(
+    headlineMedium: TextStyle(
       fontSize: 28,
       fontWeight: FontWeight.w600,
       height: 36 / 28,
     ),
-    headlineSmall: const TextStyle(
+    headlineSmall: TextStyle(
       fontSize: 24,
       fontWeight: FontWeight.w600,
       height: 32 / 24,
     ),
-    titleLarge: const TextStyle(
+    titleLarge: TextStyle(
       fontSize: 22,
       fontWeight: FontWeight.w500,
       height: 28 / 22,
     ),
-    titleMedium: const TextStyle(
+    titleMedium: TextStyle(
       fontSize: 16,
       fontWeight: FontWeight.w500,
       height: 24 / 16,
       letterSpacing: 0.15,
     ),
-    titleSmall: const TextStyle(
+    titleSmall: TextStyle(
       fontSize: 14,
       fontWeight: FontWeight.w500,
       height: 20 / 14,
       letterSpacing: 0.1,
     ),
-    bodyLarge: const TextStyle(
+    bodyLarge: TextStyle(
       fontSize: 16,
       fontWeight: FontWeight.w400,
       height: 24 / 16,
       letterSpacing: 0.15,
     ),
-    bodyMedium: const TextStyle(
+    bodyMedium: TextStyle(
       fontSize: 14,
       fontWeight: FontWeight.w400,
       height: 20 / 14,
       letterSpacing: 0.25,
     ),
-    bodySmall: const TextStyle(
+    bodySmall: TextStyle(
       fontSize: 12,
       fontWeight: FontWeight.w400,
       height: 16 / 12,
       letterSpacing: 0.4,
     ),
-    labelLarge: const TextStyle(
+    labelLarge: TextStyle(
       fontSize: 14,
       fontWeight: FontWeight.w500,
       height: 20 / 14,
       letterSpacing: 0.1,
     ),
-    labelMedium: const TextStyle(
+    labelMedium: TextStyle(
       fontSize: 12,
       fontWeight: FontWeight.w500,
       height: 16 / 12,
       letterSpacing: 0.5,
     ),
-    labelSmall: const TextStyle(
+    labelSmall: TextStyle(
       fontSize: 11,
       fontWeight: FontWeight.w500,
       height: 16 / 11,

@@ -49,7 +49,8 @@ class CollapsibleMeta extends StatelessWidget {
 
 class _MetaLine extends StatelessWidget {
   const _MetaLine({required this.label, required this.value});
-  final String label, value;
+  final String label;
+  final String value;
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
