@@ -104,6 +104,10 @@ class ListRepository {
   }
 
   /// 首次启动时种入所有系统清单(幂等)。
+  ///
+  /// 使用 [SystemListKind.id] 这一前后端共用的固定 UUID 作为主键,确保后续
+  /// sync pull 拿到服务端 seed 时通过主键命中既有行(insertOnConflictUpdate),
+  /// 不会重复落入第二份系统清单。
   Future<void> ensureSystemLists() async {
     return _db.transaction(() async {
       for (var i = 0; i < SystemListKind.values.length; i++) {
@@ -114,7 +118,7 @@ class ListRepository {
             .into(_db.taskLists)
             .insert(
               TaskListsCompanion.insert(
-                id: newId(),
+                id: kind.id,
                 userId: kLocalUserId,
                 name: _displayName(kind),
                 isSystem: const Value(true),
