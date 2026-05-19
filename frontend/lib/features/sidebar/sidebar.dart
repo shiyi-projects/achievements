@@ -82,6 +82,10 @@ class Sidebar extends ConsumerWidget {
                         icon: _systemIcon(
                           SystemListKind.fromValue(list.systemKind),
                         ),
+                        displayName: _systemDisplayName(
+                          SystemListKind.fromValue(list.systemKind),
+                          list.name,
+                        ),
                         selected: list.id == currentId,
                       ),
 
@@ -94,7 +98,7 @@ class Sidebar extends ConsumerWidget {
                         Spacing.sm,
                       ),
                       child: Text(
-                        'LISTS',
+                        '清单',
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: theme.colorScheme.outline,
                           letterSpacing: 1.2,
@@ -132,7 +136,7 @@ class Sidebar extends ConsumerWidget {
                           Spacing.sm,
                         ),
                         child: Text(
-                          'No custom lists yet',
+                          '还没有自定义清单',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.outline,
                           ),
@@ -172,6 +176,29 @@ class Sidebar extends ConsumerWidget {
         return Icons.delete_outline_rounded;
       case null:
         return Icons.list_alt_rounded;
+    }
+  }
+
+  /// 系统清单的中文显示名。数据库里 seed 出的英文(Inbox / Today / …)是给同步
+  /// 协议的稳定标识,UI 这一层做翻译;非系统清单走用户自定义的 [fallback]。
+  String _systemDisplayName(SystemListKind? kind, String fallback) {
+    switch (kind) {
+      case SystemListKind.inbox:
+        return '收件箱';
+      case SystemListKind.today:
+        return '今天';
+      case SystemListKind.important:
+        return '重要';
+      case SystemListKind.planned:
+        return '计划';
+      case SystemListKind.all:
+        return '全部任务';
+      case SystemListKind.completed:
+        return '已完成';
+      case SystemListKind.trash:
+        return '回收站';
+      case null:
+        return fallback;
     }
   }
 }
@@ -310,8 +337,8 @@ class _FolderGroup extends ConsumerWidget {
         overlay.size.height - anchor.dy,
       ),
       items: const [
-        PopupMenuItem(value: 'rename', child: Text('Rename')),
-        PopupMenuItem(value: 'delete', child: Text('Delete')),
+        PopupMenuItem(value: 'rename', child: Text('重命名')),
+        PopupMenuItem(value: 'delete', child: Text('删除')),
       ],
     );
     if (!context.mounted) return;
@@ -319,7 +346,7 @@ class _FolderGroup extends ConsumerWidget {
       case 'rename':
         final name = await showNameInputDialog(
           context,
-          title: 'Rename folder',
+          title: '重命名文件夹',
           initial: folder.name,
         );
         if (name != null && name != folder.name) {
@@ -329,15 +356,12 @@ class _FolderGroup extends ConsumerWidget {
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Delete folder?'),
-            content: Text(
-              'Folder "${folder.name}" will be deleted. Lists inside will '
-              'be moved to root and will not be lost.',
-            ),
+            title: const Text('删除文件夹?'),
+            content: Text('文件夹"${folder.name}"将被删除,其中的清单会移到根目录,不会丢失。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
+                child: const Text('取消'),
               ),
               FilledButton.tonal(
                 style: FilledButton.styleFrom(
@@ -345,7 +369,7 @@ class _FolderGroup extends ConsumerWidget {
                   backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Delete'),
+                child: const Text('删除'),
               ),
             ],
           ),
@@ -366,11 +390,15 @@ class _SidebarTile extends ConsumerWidget {
     required this.list,
     required this.icon,
     required this.selected,
+    this.displayName,
   });
 
   final TaskList list;
   final IconData icon;
   final bool selected;
+
+  /// UI 层覆写显示名(用于系统清单中文化)。为 null 时回退到 `list.name`。
+  final String? displayName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -413,7 +441,7 @@ class _SidebarTile extends ConsumerWidget {
                   const SizedBox(width: Spacing.md),
                   Expanded(
                     child: Text(
-                      list.name,
+                      displayName ?? list.name,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: selected
                             ? FontWeight.w600
@@ -478,8 +506,8 @@ class _SidebarTile extends ConsumerWidget {
         overlay.size.height - anchor.dy,
       ),
       items: const [
-        PopupMenuItem(value: 'rename', child: Text('Rename')),
-        PopupMenuItem(value: 'delete', child: Text('Delete')),
+        PopupMenuItem(value: 'rename', child: Text('重命名')),
+        PopupMenuItem(value: 'delete', child: Text('删除')),
       ],
     );
     if (!context.mounted) return;
@@ -487,7 +515,7 @@ class _SidebarTile extends ConsumerWidget {
       case 'rename':
         final name = await showNameInputDialog(
           context,
-          title: 'Rename list',
+          title: '重命名清单',
           initial: list.name,
         );
         if (name != null && name != list.name) {
@@ -505,12 +533,12 @@ class _SidebarTile extends ConsumerWidget {
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Delete list?'),
-            content: Text('List "$name" and its tasks will be moved to Trash.'),
+            title: const Text('删除清单?'),
+            content: Text('清单"$name"及其任务将被移到回收站。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
+                child: const Text('取消'),
               ),
               FilledButton.tonal(
                 style: FilledButton.styleFrom(
@@ -518,7 +546,7 @@ class _SidebarTile extends ConsumerWidget {
                   backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Delete'),
+                child: const Text('删除'),
               ),
             ],
           ),
@@ -547,7 +575,7 @@ class _NewListTile extends ConsumerWidget {
           color: theme.colorScheme.primary,
         ),
         title: Text(
-          'New list',
+          '新建清单',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.primary,
           ),
@@ -555,8 +583,8 @@ class _NewListTile extends ConsumerWidget {
         onTap: () async {
           final name = await showNameInputDialog(
             context,
-            title: 'New list',
-            confirm: 'Create',
+            title: '新建清单',
+            confirm: '创建',
           );
           if (name == null) return;
           await ref.read(listRepositoryProvider).create(name: name);
@@ -582,7 +610,7 @@ class _NewFolderTile extends ConsumerWidget {
           color: theme.colorScheme.primary,
         ),
         title: Text(
-          'New folder',
+          '新建文件夹',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.primary,
           ),
@@ -590,8 +618,8 @@ class _NewFolderTile extends ConsumerWidget {
         onTap: () async {
           final name = await showNameInputDialog(
             context,
-            title: 'New folder',
-            confirm: 'Create',
+            title: '新建文件夹',
+            confirm: '创建',
           );
           if (name == null) return;
           await ref.read(folderRepositoryProvider).create(name: name);
@@ -624,7 +652,7 @@ class _SettingsTile extends StatelessWidget {
           color: theme.colorScheme.onSurfaceVariant,
         ),
         title: Text(
-          'Settings',
+          '设置',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -651,7 +679,7 @@ class _SidebarError extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(Spacing.base),
       child: Text(
-        'Failed to load sidebar: $message',
+        '侧边栏加载失败:$message',
         style: TextStyle(color: Theme.of(context).colorScheme.error),
       ),
     );
