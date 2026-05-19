@@ -39,6 +39,22 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _createSystemKindUniqueIndex() async {
+    // 先删除重复行：保留 created_at 最早的那一条，删掉其余的。
+    await customStatement('''
+      DELETE FROM task_lists
+      WHERE id IN (
+        SELECT tl.id FROM task_lists tl
+        WHERE tl.deleted_at IS NULL AND tl.system_kind IS NOT NULL
+          AND tl.id != (
+            SELECT tl2.id FROM task_lists tl2
+            WHERE tl2.user_id = tl.user_id
+              AND tl2.system_kind = tl.system_kind
+              AND tl2.deleted_at IS NULL
+            ORDER BY tl2.created_at ASC
+            LIMIT 1
+          )
+      )
+    ''');
     await customStatement(
       'CREATE UNIQUE INDEX IF NOT EXISTS uq_task_lists_user_system_kind_active '
       'ON task_lists (user_id, system_kind) '
