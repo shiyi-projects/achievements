@@ -2,8 +2,8 @@ import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/widgets/empty_state.dart';
+import 'package:achievements/shared/widgets/pending_completed_list.dart';
 import 'package:achievements/shared/widgets/quick_create_input.dart';
-import 'package:achievements/shared/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -90,17 +90,14 @@ class _TodayBody extends StatelessWidget {
         ),
         const Divider(height: 1),
         Expanded(
-          child: tasks.isEmpty
-              ? const EmptyState(
-                  icon: Icons.task_alt_outlined,
-                  title: 'Nothing on today',
-                  subtitle: '在底部输入框创建第一个任务。',
-                )
-              : ListView.separated(
-                  itemCount: tasks.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, i) => TaskTile(task: tasks[i]),
-                ),
+          child: PendingCompletedList(
+            tasks: tasks,
+            emptyState: const EmptyState(
+              icon: Icons.task_alt_outlined,
+              title: 'Nothing on today',
+              subtitle: '在底部输入框创建第一个任务。',
+            ),
+          ),
         ),
       ],
     );

@@ -1,4 +1,5 @@
 import 'package:achievements/data/repositories/tag_repository.dart';
+import 'package:achievements/shared/widgets/name_input_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -70,31 +71,13 @@ class TagEditor extends ConsumerWidget {
   }
 
   Future<void> _showCreate(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    final created = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New tag'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Tag name'),
-          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
+    final created = await showNameInputDialog(
+      context,
+      title: 'New tag',
+      hint: 'Tag name',
+      confirm: 'Create',
     );
-    controller.dispose();
-    if (created == null || created.isEmpty) return;
+    if (created == null) return;
     final repo = ref.read(tagRepositoryProvider);
     final tagId = await repo.create(created);
     await repo.addToTask(taskId, tagId);

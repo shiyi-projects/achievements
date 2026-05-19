@@ -51,6 +51,58 @@ class ListRepository {
         .getSingleOrNull();
   }
 
+  /// 新建用户清单。可指定 folderId 归到某文件夹。
+  Future<String> create({
+    required String name,
+    String? folderId,
+    String? color,
+    String? icon,
+  }) async {
+    final id = newId();
+    final lastSort = await (_db.selectOnly(
+      _db.taskLists,
+    )..addColumns([_db.taskLists.sortOrder.max()])).getSingleOrNull();
+    final nextSort = (lastSort?.read(_db.taskLists.sortOrder.max()) ?? 99) + 1;
+    await _db
+        .into(_db.taskLists)
+        .insert(
+          TaskListsCompanion.insert(
+            id: id,
+            userId: kLocalUserId,
+            name: name,
+            folderId: Value(folderId),
+            color: Value(color),
+            icon: Value(icon),
+            sortOrder: Value(nextSort),
+            isSystem: const Value(false),
+          ),
+        );
+    return id;
+  }
+
+  Future<void> rename(String id, String name) async {
+    await (_db.update(_db.taskLists)..where((t) => t.id.equals(id))).write(
+      TaskListsCompanion(name: Value(name)),
+    );
+  }
+
+  /// 软删用户清单。系统清单抛 [StateError]。
+  Future<void> softDelete(TaskList list) async {
+    if (list.isSystem) {
+      throw StateError('System list cannot be deleted: ${list.name}');
+    }
+    await (_db.update(_db.taskLists)..where((t) => t.id.equals(list.id))).write(
+      TaskListsCompanion(deletedAt: Value(DateTime.now())),
+    );
+  }
+
+  /// 把清单挂到某个文件夹下(folderId=null 即移出文件夹)。
+  Future<void> setFolder(String listId, String? folderId) async {
+    await (_db.update(_db.taskLists)..where((t) => t.id.equals(listId))).write(
+      TaskListsCompanion(folderId: Value(folderId)),
+    );
+  }
+
   /// 首次启动时种入所有系统清单(幂等)。
   Future<void> ensureSystemLists() async {
     return _db.transaction(() async {
@@ -111,4 +163,19 @@ Future<TaskList?> inboxList(Ref ref) {
   return ref
       .watch(listRepositoryProvider)
       .findBySystemKind(SystemListKind.inbox);
+}
+
+/// 任务可被移动到的目标清单:Inbox + 全部用户自定义清单。其他系统清单
+/// (today/important/planned 等)是智能过滤,不存储任务,无法作为目标。
+@riverpod
+List<TaskList> movableLists(Ref ref) {
+  final all = ref
+      .watch(allListsProvider)
+      .maybeWhen(data: (list) => list, orElse: () => const <TaskList>[]);
+  return [
+    for (final l in all)
+      if (!l.isSystem ||
+          SystemListKind.fromValue(l.systemKind) == SystemListKind.inbox)
+        l,
+  ];
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/data/local/database.dart';
+import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/task_detail/widgets/subtasks_section.dart';
 import 'package:achievements/features/task_detail/widgets/tag_editor.dart';
@@ -157,6 +158,38 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     await _repo.update(widget.task.id, priority: Value(p.value));
   }
 
+  Future<void> _pickList() async {
+    final lists = ref.read(movableListsProvider);
+    if (lists.isEmpty) return;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final l in lists)
+              ListTile(
+                leading: Icon(
+                  l.isSystem ? Icons.inbox_outlined : Icons.list_outlined,
+                ),
+                title: Text(l.name),
+                trailing: l.id == widget.task.listId
+                    ? Icon(
+                        Icons.check,
+                        color: Theme.of(ctx).colorScheme.primary,
+                      )
+                    : null,
+                onTap: () => Navigator.pop(ctx, l.id),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null || selected == widget.task.listId) return;
+    await _repo.update(widget.task.id, listId: Value(selected));
+  }
+
   Future<void> _softDelete() async {
     await _repo.softDelete(widget.task.id);
     _close();
@@ -262,6 +295,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
               onChanged: _setPriority,
             ),
             const SizedBox(height: 8),
+            _ListRow(currentListId: task.listId, onPick: _pickList),
             const SizedBox(height: 8),
             TagEditor(taskId: task.id),
             const SizedBox(height: 16),
@@ -307,6 +341,34 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ListRow extends ConsumerWidget {
+  const _ListRow({required this.currentListId, required this.onPick});
+
+  final String currentListId;
+  final VoidCallback onPick;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lists = ref.watch(movableListsProvider);
+    final name =
+        lists
+            .where((l) => l.id == currentListId)
+            .map((l) => l.name)
+            .firstOrNull ??
+        '—';
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        Icons.folder_open_outlined,
+        color: Theme.of(context).colorScheme.outline,
+      ),
+      title: Text('List: $name'),
+      trailing: const Icon(Icons.unfold_more, size: 18),
+      onTap: onPick,
     );
   }
 }

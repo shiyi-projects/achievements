@@ -2,6 +2,7 @@ import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/id.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
+import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,15 +10,14 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'task_repository.g.dart';
 
+typedef _TaskFilter = Expression<bool> Function($TasksTable);
+
 class TaskRepository {
   TaskRepository(this._db);
 
   final AppDatabase _db;
 
   /// 创建一条新任务并落 Drift,返回主键。
-  ///
-  /// 调用方需保证 [listId] 是真实存在的 TaskList(非系统智能过滤,
-  /// 如 today / important 等不可作为 listId)。
   Future<String> createTask({
     required String listId,
     required String title,
@@ -44,23 +44,18 @@ class TaskRepository {
 
   /// 监听某父任务的直接子任务(单层)。
   Stream<List<Task>> watchSubtasks(String parentId) {
-    return _watchActive((t) => t.parentId.equals(parentId));
+    return _watchWith(
+      (t) => t.deletedAt.isNull() & t.parentId.equals(parentId),
+    );
   }
 
-  /// 切换任务完成态:写入 / 清空 completedAt,Drift 自动更新 updatedAt。
-  ///
-  /// Phase 2 同步引擎接入后,会在 customUpdate 里同步 `version = version + 1`,
-  /// 当前 Phase 1 不强依赖,留待迁移。
   Future<void> setCompleted(String id, {required bool completed}) async {
     await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
       TasksCompanion(completedAt: Value(completed ? DateTime.now() : null)),
     );
   }
 
-  /// 局部更新任务字段。
-  ///
-  /// 传入 `Value.absent()` 的字段保持不变;显式想清空 [dueAt] 时传 `Value(null)`。
-  /// 同步引擎接入后,这里会一并 bump version。
+  /// 局部更新任务字段。传入 `Value.absent()` 的字段保持不变。
   Future<void> update(
     String id, {
     Value<String> title = const Value.absent(),
@@ -68,6 +63,7 @@ class TaskRepository {
     Value<DateTime?> dueAt = const Value.absent(),
     Value<bool> starred = const Value.absent(),
     Value<int> priority = const Value.absent(),
+    Value<String> listId = const Value.absent(),
   }) async {
     await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
       TasksCompanion(
@@ -76,93 +72,97 @@ class TaskRepository {
         dueAt: dueAt,
         starred: starred,
         priority: priority,
+        listId: listId,
       ),
     );
   }
 
-  /// 软删:写入 deletedAt = now,任务从所有非 Trash 视图自动消失。
   Future<void> softDelete(String id) async {
     await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
       TasksCompanion(deletedAt: Value(DateTime.now())),
     );
   }
 
-  /// 恢复:清空 deletedAt,任务回到原 listId 对应清单。
   Future<void> restore(String id) async {
     await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
       const TasksCompanion(deletedAt: Value(null)),
     );
   }
 
-  /// 彻底删除:从 Drift 真删行。Phase 2 同步引擎需要单独向服务端
-  /// 广播 hard-delete(否则其他端会再次同步回来)。
   Future<void> hardDelete(String id) async {
     await (_db.delete(_db.tasks)..where((t) => t.id.equals(id))).go();
   }
 
-  /// 根据 [list] 决定查询策略:系统清单走对应的智能过滤,自定义清单按 listId。
-  Stream<List<Task>> watchForList(TaskList list) {
+  /// 单一事实源:根据 [list] 计算 WHERE 表达式。watchForList /
+  /// watchCountForList 共用,保证视觉列表与 Sidebar 徽标数字一致。
+  _TaskFilter _filterFor(TaskList list) {
     if (list.isSystem) {
       switch (SystemListKind.fromValue(list.systemKind)) {
         case SystemListKind.today:
-          return watchToday();
+          final start = _startOfToday();
+          final end = start.add(const Duration(days: 1));
+          return (t) =>
+              t.deletedAt.isNull() & t.dueAt.isBetweenValues(start, end);
         case SystemListKind.important:
-          return _watchActive((t) => t.starred.equals(true));
+          return (t) => t.deletedAt.isNull() & t.starred.equals(true);
         case SystemListKind.planned:
-          return _watchPlanned();
+          final tomorrow = _startOfToday().add(const Duration(days: 1));
+          return (t) =>
+              t.deletedAt.isNull() &
+              t.dueAt.isBiggerOrEqualValue(tomorrow) &
+              t.completedAt.isNull();
         case SystemListKind.all:
-          return _watchActive((t) => const Constant(true));
+          return (t) => t.deletedAt.isNull();
         case SystemListKind.completed:
-          return _watchActive((t) => t.completedAt.isNotNull());
+          return (t) => t.deletedAt.isNull() & t.completedAt.isNotNull();
         case SystemListKind.trash:
-          return _watchTrashed();
+          return (t) => t.deletedAt.isNotNull();
         case SystemListKind.inbox:
         case null:
-          return watchByListId(list.id);
+          return (t) =>
+              t.deletedAt.isNull() &
+              t.listId.equals(list.id) &
+              t.parentId.isNull();
       }
     }
-    return watchByListId(list.id);
+    return (t) =>
+        t.deletedAt.isNull() & t.listId.equals(list.id) & t.parentId.isNull();
   }
 
-  /// 监听今日任务:dueAt 落在今天 00:00 ~ 明日 00:00 之间,且未软删。
-  Stream<List<Task>> watchToday() {
-    final start = _startOfToday();
-    final end = start.add(const Duration(days: 1));
-    return _watchActive((t) => t.dueAt.isBetweenValues(start, end));
-  }
-
-  Stream<List<Task>> watchByListId(String listId) {
-    return _watchActive((t) => t.listId.equals(listId) & t.parentId.isNull());
-  }
-
-  Stream<List<Task>> _watchActive(
-    Expression<bool> Function($TasksTable) filter,
-  ) {
-    return (_db.select(_db.tasks)
-          ..where((t) => t.deletedAt.isNull() & filter(t))
-          ..orderBy([
-            (t) => OrderingTerm(expression: t.completedAt.isNull()),
-            (t) => OrderingTerm(expression: t.sortOrder),
-            (t) => OrderingTerm(expression: t.createdAt),
-          ]))
-        .watch();
-  }
-
-  Stream<List<Task>> _watchPlanned() {
-    final tomorrow = _startOfToday().add(const Duration(days: 1));
-    return _watchActive(
-      (t) => t.dueAt.isBiggerOrEqualValue(tomorrow) & t.completedAt.isNull(),
+  Stream<List<Task>> watchForList(TaskList list) {
+    return _watchWith(
+      _filterFor(list),
+      reverseForTrash: list.systemKind == 'trash',
     );
   }
 
-  Stream<List<Task>> _watchTrashed() {
-    return (_db.select(_db.tasks)
-          ..where((t) => t.deletedAt.isNotNull())
-          ..orderBy([
-            (t) =>
-                OrderingTerm(expression: t.deletedAt, mode: OrderingMode.desc),
-          ]))
-        .watch();
+  /// 监听某清单的任务数量(Sidebar 徽标);与 [watchForList] 同口径。
+  Stream<int> watchCountForList(TaskList list) {
+    final filter = _filterFor(list);
+    final countExpr = _db.tasks.id.count();
+    final query = _db.selectOnly(_db.tasks)
+      ..addColumns([countExpr])
+      ..where(filter(_db.tasks));
+    return query.map((row) => row.read(countExpr) ?? 0).watchSingle();
+  }
+
+  Stream<List<Task>> _watchWith(
+    _TaskFilter filter, {
+    bool reverseForTrash = false,
+  }) {
+    final query = _db.select(_db.tasks)..where(filter);
+    if (reverseForTrash) {
+      query.orderBy([
+        (t) => OrderingTerm(expression: t.deletedAt, mode: OrderingMode.desc),
+      ]);
+    } else {
+      query.orderBy([
+        (t) => OrderingTerm(expression: t.completedAt.isNull()),
+        (t) => OrderingTerm(expression: t.sortOrder),
+        (t) => OrderingTerm(expression: t.createdAt),
+      ]);
+    }
+    return query.watch();
   }
 
   static DateTime _startOfToday() {
@@ -176,10 +176,7 @@ TaskRepository taskRepository(Ref ref) {
   return TaskRepository(ref.watch(appDatabaseProvider));
 }
 
-/// 当前选中清单的任务流。
-///
-/// 用于 Today / ListPage 等主视图。当 [currentListProvider] 仍在 resolve 时
-/// 先 yield 空列表占位。
+/// 当前选中清单的任务流(主视图用)。
 @riverpod
 Stream<List<Task>> tasksForCurrentList(Ref ref) async* {
   final list = await ref.watch(currentListProvider.future);
@@ -194,4 +191,16 @@ Stream<List<Task>> tasksForCurrentList(Ref ref) async* {
 @riverpod
 Stream<List<Task>> subtasksOf(Ref ref, String parentId) {
   return ref.watch(taskRepositoryProvider).watchSubtasks(parentId);
+}
+
+/// 某清单的任务数量(Sidebar 徽标)。家族参数用 listId 字符串避免在
+/// codegen 端引入 Drift 数据类的等值/哈希依赖。
+@riverpod
+Stream<int> taskCountForListId(Ref ref, String listId) async* {
+  final list = await ref.watch(listRepositoryProvider).findById(listId);
+  if (list == null) {
+    yield 0;
+    return;
+  }
+  yield* ref.watch(taskRepositoryProvider).watchCountForList(list);
 }

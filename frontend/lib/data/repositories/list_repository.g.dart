@@ -61,5 +61,25 @@ final inboxListProvider = FutureProvider<TaskList?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef InboxListRef = FutureProviderRef<TaskList?>;
+String _$movableListsHash() => r'018dff18e6bed9606dab64e59093a698aca8d63c';
+
+/// 任务可被移动到的目标清单:Inbox + 全部用户自定义清单。其他系统清单
+/// (today/important/planned 等)是智能过滤,不存储任务,无法作为目标。
+///
+/// Copied from [movableLists].
+@ProviderFor(movableLists)
+final movableListsProvider = AutoDisposeProvider<List<TaskList>>.internal(
+  movableLists,
+  name: r'movableListsProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$movableListsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef MovableListsRef = AutoDisposeProviderRef<List<TaskList>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
