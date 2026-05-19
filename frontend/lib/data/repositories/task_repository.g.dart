@@ -23,22 +23,29 @@ final taskRepositoryProvider = Provider<TaskRepository>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef TaskRepositoryRef = ProviderRef<TaskRepository>;
-String _$todayTasksHash() => r'f1b245c7082f81e60123e41e9ddfaa42e3b74a01';
+String _$tasksForCurrentListHash() =>
+    r'c6dfecf1005754fd50eb49bfec435a34d114c292';
 
-/// See also [todayTasks].
-@ProviderFor(todayTasks)
-final todayTasksProvider = AutoDisposeStreamProvider<List<Task>>.internal(
-  todayTasks,
-  name: r'todayTasksProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$todayTasksHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+/// 当前选中清单的任务流。
+///
+/// 用于 Today / ListPage 等主视图。当 [currentListProvider] 仍在 resolve 时
+/// 先 yield 空列表占位。
+///
+/// Copied from [tasksForCurrentList].
+@ProviderFor(tasksForCurrentList)
+final tasksForCurrentListProvider =
+    AutoDisposeStreamProvider<List<Task>>.internal(
+      tasksForCurrentList,
+      name: r'tasksForCurrentListProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$tasksForCurrentListHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef TodayTasksRef = AutoDisposeStreamProviderRef<List<Task>>;
+typedef TasksForCurrentListRef = AutoDisposeStreamProviderRef<List<Task>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

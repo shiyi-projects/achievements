@@ -42,5 +42,24 @@ final allListsProvider = AutoDisposeStreamProvider<List<TaskList>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AllListsRef = AutoDisposeStreamProviderRef<List<TaskList>>;
+String _$inboxListHash() => r'79a00bb9345c4c1b7245fb2489f0b96a43ca6cde';
+
+/// 默认 Inbox 清单(系统种子)。Smart filter 视图下的快速创建落到这里。
+///
+/// Copied from [inboxList].
+@ProviderFor(inboxList)
+final inboxListProvider = FutureProvider<TaskList?>.internal(
+  inboxList,
+  name: r'inboxListProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$inboxListHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef InboxListRef = FutureProviderRef<TaskList?>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
