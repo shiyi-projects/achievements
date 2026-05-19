@@ -68,6 +68,14 @@ class OutboxRepository {
     );
   }
 
+  /// LWW 冲突:本地新但 base_version 已陈旧。把 outbox 行的 baseVersion
+  /// 改为服务端最新 version,等下一轮 push 再发。createdAt 保留,排序不变。
+  Future<void> updateBaseVersion(int id, int newBaseVersion) {
+    return (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
+      OutboxCompanion(baseVersion: Value(newBaseVersion)),
+    );
+  }
+
   /// 监听 outbox 行数:SyncEngine 据此触发批量推送。
   Stream<int> watchPendingCount() {
     final countExpr = _db.outbox.id.count();

@@ -1,30 +1,27 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'expanded_folders.dart';
+part of 'sync_coordinator.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$expandedFoldersHash() => r'2015bdd8db976af652a3b54d33eabd2712b222de';
+String _$syncCoordinatorHash() => r'212995125478ed50181c29e568c7e0e56dfb64e0';
 
-/// 已展开的文件夹 ID 集合。
-///
-/// Phase 1 仅内存态(应用关闭即重置);后续可持久化到 SharedPreferences。
-///
-/// Copied from [ExpandedFolders].
-@ProviderFor(ExpandedFolders)
-final expandedFoldersProvider =
-    NotifierProvider<ExpandedFolders, Set<String>>.internal(
-  ExpandedFolders.new,
-  name: r'expandedFoldersProvider',
+/// See also [syncCoordinator].
+@ProviderFor(syncCoordinator)
+final syncCoordinatorProvider = Provider<SyncCoordinator>.internal(
+  syncCoordinator,
+  name: r'syncCoordinatorProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$expandedFoldersHash,
+      : _$syncCoordinatorHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
-typedef _$ExpandedFolders = Notifier<Set<String>>;
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef SyncCoordinatorRef = ProviderRef<SyncCoordinator>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

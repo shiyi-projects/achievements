@@ -2,6 +2,7 @@ import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/id.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
+import 'package:achievements/data/repositories/outbox_repository.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -9,9 +10,10 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'tag_repository.g.dart';
 
 class TagRepository {
-  TagRepository(this._db);
+  TagRepository(this._db, this._outbox);
 
   final AppDatabase _db;
+  final OutboxRepository _outbox;
 
   /// 监听所有未软删的标签。
   Stream<List<Tag>> watchAll() {
@@ -39,34 +41,58 @@ class TagRepository {
     if (trimmed.isEmpty) {
       throw ArgumentError.value(name, 'name', 'Tag name must not be blank');
     }
-    final existing =
-        await (_db.select(_db.tags)
-              ..where((t) => t.name.equals(trimmed) & t.deletedAt.isNull())
-              ..limit(1))
-            .getSingleOrNull();
-    if (existing != null) return existing.id;
+    return _db.transaction(() async {
+      final existing =
+          await (_db.select(_db.tags)
+                ..where((t) => t.name.equals(trimmed) & t.deletedAt.isNull())
+                ..limit(1))
+              .getSingleOrNull();
+      if (existing != null) return existing.id;
 
-    final id = newId();
-    await _db
-        .into(_db.tags)
-        .insert(
-          TagsCompanion.insert(
-            id: id,
-            userId: kLocalUserId,
-            name: trimmed,
-            color: Value(color),
-          ),
-        );
-    return id;
+      final id = newId();
+      await _db
+          .into(_db.tags)
+          .insert(
+            TagsCompanion.insert(
+              id: id,
+              userId: kLocalUserId,
+              name: trimmed,
+              color: Value(color),
+            ),
+          );
+      await _outbox.enqueue(
+        entity: 'tag',
+        op: 'upsert',
+        entityId: id,
+        baseVersion: 0,
+        payload: {'name': trimmed, 'color': color},
+      );
+      return id;
+    });
   }
 
   /// 软删标签(同步引擎后再单独广播)。
   Future<void> softDelete(String id) async {
-    await (_db.update(_db.tags)..where((t) => t.id.equals(id))).write(
-      TagsCompanion(deletedAt: Value(DateTime.now())),
-    );
+    await _db.transaction(() async {
+      final current = await (_db.select(
+        _db.tags,
+      )..where((t) => t.id.equals(id))).getSingle();
+      await (_db.update(_db.tags)..where((t) => t.id.equals(id))).write(
+        TagsCompanion(deletedAt: Value(DateTime.now())),
+      );
+      await _outbox.enqueue(
+        entity: 'tag',
+        op: 'delete',
+        entityId: id,
+        baseVersion: current.version,
+        payload: const {},
+      );
+    });
   }
 
+  // TODO(sync): task_tag mutations 服务端目前直接 rejected
+  //   (sync_service.py:_apply_one),addToTask/removeFromTask 暂只走本地。
+  //   待后端补完 task_tag 同步后,这里再 enqueue。
   Future<void> addToTask(String taskId, String tagId) async {
     await _db
         .into(_db.taskTags)
@@ -84,7 +110,10 @@ class TagRepository {
 
 @Riverpod(keepAlive: true)
 TagRepository tagRepository(Ref ref) {
-  return TagRepository(ref.watch(appDatabaseProvider));
+  return TagRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(outboxRepositoryProvider),
+  );
 }
 
 @riverpod

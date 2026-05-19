@@ -6,7 +6,7 @@ part of 'list_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$listRepositoryHash() => r'70a4308d29b4155c540a0b77435d5a4b31760d52';
+String _$listRepositoryHash() => r'c073d4a0e8de49373bbf294c4c9a7db6c3db7645';
 
 /// See also [listRepository].
 @ProviderFor(listRepository)
@@ -32,9 +32,8 @@ String _$allListsHash() => r'29baf4dc3f53fe984d0b7770e289db85df403f8d';
 final allListsProvider = AutoDisposeStreamProvider<List<TaskList>>.internal(
   allLists,
   name: r'allListsProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$allListsHash,
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$allListsHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
@@ -51,9 +50,8 @@ String _$inboxListHash() => r'79a00bb9345c4c1b7245fb2489f0b96a43ca6cde';
 final inboxListProvider = FutureProvider<TaskList?>.internal(
   inboxList,
   name: r'inboxListProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$inboxListHash,
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$inboxListHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
@@ -71,9 +69,8 @@ String _$movableListsHash() => r'018dff18e6bed9606dab64e59093a698aca8d63c';
 final movableListsProvider = AutoDisposeProvider<List<TaskList>>.internal(
   movableLists,
   name: r'movableListsProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$movableListsHash,
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$movableListsHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );

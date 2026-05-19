@@ -17,9 +17,8 @@ String _$currentListHash() => r'2dadc51aaa4cacc4070f0d1916273088b0dfea1a';
 final currentListProvider = FutureProvider<TaskList?>.internal(
   currentList,
   name: r'currentListProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$currentListHash,
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$currentListHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
@@ -37,14 +36,14 @@ String _$selectedListIdHash() => r'b4537635e436348218a3a312be77dee29213abb7';
 @ProviderFor(SelectedListId)
 final selectedListIdProvider =
     NotifierProvider<SelectedListId, String?>.internal(
-      SelectedListId.new,
-      name: r'selectedListIdProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$selectedListIdHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+  SelectedListId.new,
+  name: r'selectedListIdProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$selectedListIdHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
 typedef _$SelectedListId = Notifier<String?>;
 // ignore_for_file: type=lint
