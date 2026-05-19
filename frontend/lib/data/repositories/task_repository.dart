@@ -210,6 +210,27 @@ class TaskRepository {
     );
   }
 
+  /// 按标题 / 备注全文搜索(本地 LIKE)。最多返回 [limit] 条,按 updatedAt 倒序。
+  Future<List<Task>> searchTasks(String query, {int limit = 50}) async {
+    if (query.trim().isEmpty) return [];
+    final pattern = '%${query.toLowerCase()}%';
+    return (_db.select(_db.tasks)
+          ..where(
+            (t) =>
+                t.deletedAt.isNull() &
+                (t.title.lower().like(pattern) |
+                    t.notes.lower().like(pattern)),
+          )
+          ..orderBy([
+            (t) => OrderingTerm(
+              expression: t.updatedAt,
+              mode: OrderingMode.desc,
+            ),
+          ])
+          ..limit(limit))
+        .get();
+  }
+
   /// 监听所有"待提醒"任务:remind_at 非空,未完成,未软删。
   /// ReminderScheduler 据此 reconcile 本地通知排程。
   Stream<List<Task>> watchTasksWithActiveReminders() {
