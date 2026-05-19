@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Task
 from app.schemas.task import TaskCreate, TaskUpdate
+from app.services import achievement_service
 
 
 async def list_tasks(
@@ -100,6 +101,8 @@ async def set_completed(
     completed: bool,
 ) -> Task:
     task.completed_at = datetime.now(UTC) if completed else None
+    if completed:
+        await achievement_service.evaluate(session, task.user_id)
     await session.commit()
     await session.refresh(task)
     return task

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.focus_session import FocusSession
 from app.schemas.focus_session import FocusSessionCreate, FocusSessionUpdate
+from app.services import achievement_service
 
 
 async def list_sessions(
@@ -67,6 +68,8 @@ async def create_session(
     db.add(obj)
     await db.flush()
     await db.refresh(obj)
+    if obj.completed:
+        await achievement_service.evaluate(db, user_id)
     return obj
 
 
