@@ -44,6 +44,13 @@ class ListRepository {
         .getSingleOrNull();
   }
 
+  Future<TaskList?> findById(String id) {
+    return (_db.select(_db.taskLists)
+          ..where((t) => t.id.equals(id))
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   /// 首次启动时种入所有系统清单(幂等)。
   Future<void> ensureSystemLists() async {
     return _db.transaction(() async {
@@ -69,6 +76,8 @@ class ListRepository {
 
   static String _displayName(SystemListKind kind) {
     switch (kind) {
+      case SystemListKind.inbox:
+        return 'Inbox';
       case SystemListKind.today:
         return 'Today';
       case SystemListKind.important:

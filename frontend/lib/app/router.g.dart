@@ -6,12 +6,12 @@ part of 'router.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$routerHash() => r'62a87e17bbb1ec8203da7f843d454742ea40f7b9';
+String _$routerHash() => r'096f9544554fa924f37c56e742f7fc422bbec942';
 
 /// 应用顶层路由配置。
 ///
-/// Phase 0 只暴露根路径 `/`,渲染 TodayPage。后续 Phase 在此基础上追加
-/// `/list/:id`、`/task/:id`、`/calendar`、`/focus`、`/stats` 等。
+/// `/` 渲染 [AppShell],主视图内由 currentListProvider 驱动切换;
+/// 暂未拆出 `/list/:id` 等子路径。
 ///
 /// Copied from [router].
 @ProviderFor(router)

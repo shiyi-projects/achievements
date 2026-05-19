@@ -9,6 +9,7 @@ const String kLocalUserId = '00000000-0000-0000-0000-000000000001';
 /// 这些清单会在首次启动时由 ListRepository.ensureSystemLists 写入,
 /// `isSystem=true`,不可删除。Sidebar 据此渲染固定入口。
 enum SystemListKind {
+  inbox('inbox'),
   today('today'),
   important('important'),
   planned('planned'),

@@ -14,7 +14,7 @@ class TodayPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tasksAsync = ref.watch(todayTasksProvider);
+    final tasksAsync = ref.watch(tasksForCurrentListProvider);
     return tasksAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, st) => Center(

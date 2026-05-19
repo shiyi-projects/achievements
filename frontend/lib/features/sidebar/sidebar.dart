@@ -2,16 +2,17 @@ import 'package:achievements/core/constants.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
+import 'package:achievements/state/selected_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 左侧导航栏。
 ///
-/// Phase 1 step 1:只读渲染,分两段:
-///   1. System(Today / Important / Planned / All / Completed / Trash)
+/// 渲染分两段:
+///   1. System(inbox / today / important / planned / all / completed / trash)
 ///   2. Lists(用户自定义清单)
 ///
-/// 文件夹分组与拖拽排序见后续 commit。
+/// tap 任意 tile 即 dispatch [SelectedListId.select],主视图随之切换。
 class Sidebar extends ConsumerWidget {
   const Sidebar({super.key});
 
@@ -19,6 +20,11 @@ class Sidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final allLists = ref.watch(allListsProvider);
     final allFolders = ref.watch(allFoldersProvider);
+    final currentAsync = ref.watch(currentListProvider);
+    final currentId = currentAsync.maybeWhen(
+      data: (list) => list?.id,
+      orElse: () => null,
+    );
 
     return Material(
       color: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -38,7 +44,12 @@ class Sidebar extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.symmetric(vertical: 12),
             children: [
-              for (final list in systemLists) _SystemListTile(list: list),
+              for (final list in systemLists)
+                _SidebarTile(
+                  list: list,
+                  icon: _systemIcon(SystemListKind.fromValue(list.systemKind)),
+                  selected: list.id == currentId,
+                ),
               if (folders.isNotEmpty || userLists.isNotEmpty)
                 const Padding(
                   padding: EdgeInsets.fromLTRB(20, 16, 16, 8),
@@ -47,7 +58,12 @@ class Sidebar extends ConsumerWidget {
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
-              for (final list in userLists) _UserListTile(list: list),
+              for (final list in userLists)
+                _SidebarTile(
+                  list: list,
+                  icon: Icons.list_outlined,
+                  selected: list.id == currentId,
+                ),
               if (folders.isEmpty && userLists.isEmpty)
                 const Padding(
                   padding: EdgeInsets.fromLTRB(20, 8, 16, 8),
@@ -62,28 +78,11 @@ class Sidebar extends ConsumerWidget {
       ),
     );
   }
-}
 
-class _SystemListTile extends StatelessWidget {
-  const _SystemListTile({required this.list});
-
-  final TaskList list;
-
-  @override
-  Widget build(BuildContext context) {
-    final kind = SystemListKind.fromValue(list.systemKind);
-    return ListTile(
-      dense: true,
-      leading: Icon(_iconFor(kind), size: 20),
-      title: Text(list.name),
-      onTap: () {
-        // Phase 1 step 2:把选中态写入 selectedListProvider,主视图据此刷新
-      },
-    );
-  }
-
-  IconData _iconFor(SystemListKind? kind) {
+  IconData _systemIcon(SystemListKind? kind) {
     switch (kind) {
+      case SystemListKind.inbox:
+        return Icons.inbox_outlined;
       case SystemListKind.today:
         return Icons.today_outlined;
       case SystemListKind.important:
@@ -91,7 +90,7 @@ class _SystemListTile extends StatelessWidget {
       case SystemListKind.planned:
         return Icons.event_outlined;
       case SystemListKind.all:
-        return Icons.inbox_outlined;
+        return Icons.all_inbox_outlined;
       case SystemListKind.completed:
         return Icons.check_circle_outline;
       case SystemListKind.trash:
@@ -102,19 +101,32 @@ class _SystemListTile extends StatelessWidget {
   }
 }
 
-class _UserListTile extends StatelessWidget {
-  const _UserListTile({required this.list});
+class _SidebarTile extends ConsumerWidget {
+  const _SidebarTile({
+    required this.list,
+    required this.icon,
+    required this.selected,
+  });
 
   final TaskList list;
+  final IconData icon;
+  final bool selected;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final color = selected ? Theme.of(context).colorScheme.primary : null;
     return ListTile(
       dense: true,
-      leading: const Icon(Icons.list_outlined, size: 20),
-      title: Text(list.name),
+      selected: selected,
+      leading: Icon(icon, size: 20, color: color),
+      title: Text(list.name, style: TextStyle(color: color)),
       onTap: () {
-        // Phase 1 step 2:同上
+        ref.read(selectedListIdProvider.notifier).select(list.id);
+        // 移动端 Drawer 中 tap 后需关闭抽屉,让用户看到主视图
+        final scaffold = Scaffold.maybeOf(context);
+        if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
+          Navigator.of(context).pop();
+        }
       },
     );
   }
