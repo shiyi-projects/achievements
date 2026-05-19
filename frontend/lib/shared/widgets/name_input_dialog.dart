@@ -8,8 +8,8 @@ Future<String?> showNameInputDialog(
   BuildContext context, {
   required String title,
   String? initial,
-  String hint = 'Name',
-  String confirm = 'Save',
+  String hint = '名称',
+  String confirm = '保存',
 }) async {
   final controller = TextEditingController(text: initial);
   final result = await showDialog<String>(
@@ -25,7 +25,7 @@ Future<String?> showNameInputDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
+          child: const Text('取消'),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(ctx, controller.text.trim()),
