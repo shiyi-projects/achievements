@@ -61,6 +61,7 @@ class TaskRepository {
     Value<String> title = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     Value<DateTime?> dueAt = const Value.absent(),
+    Value<DateTime?> remindAt = const Value.absent(),
     Value<bool> starred = const Value.absent(),
     Value<int> priority = const Value.absent(),
     Value<String> listId = const Value.absent(),
@@ -70,10 +71,22 @@ class TaskRepository {
         title: title,
         notes: notes,
         dueAt: dueAt,
+        remindAt: remindAt,
         starred: starred,
         priority: priority,
         listId: listId,
       ),
+    );
+  }
+
+  /// 监听所有"待提醒"任务:remind_at 非空,未完成,未软删。
+  /// ReminderScheduler 据此 reconcile 本地通知排程。
+  Stream<List<Task>> watchTasksWithActiveReminders() {
+    return _watchWith(
+      (t) =>
+          t.remindAt.isNotNull() &
+          t.completedAt.isNull() &
+          t.deletedAt.isNull(),
     );
   }
 
