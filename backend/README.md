@@ -10,17 +10,31 @@ Copy-Item .env.example .env
 uv run uvicorn app.main:app --reload
 ```
 
-## Docker 一键起开发环境
+## Docker 启动
+
+复制环境变量模板并填入本地 Postgres / Redis 凭据(参考 `.env.example` 注释):
 
 ```powershell
 Copy-Item .env.example .env
+```
+
+**默认形态**:只起后端 `api` 容器,通过 `host.docker.internal` 连宿主机已运行的 Postgres / Redis:
+
+```powershell
 docker compose up --build
+```
+
+**完整形态**(适合干净机器,内置 Postgres + Redis):
+
+```powershell
+# 同步把 .env 里的 DATABASE_URL / REDIS_URL 改回 db / redis
+docker compose --profile full up --build
 ```
 
 访问:
 - API: http://localhost:8000
 - OpenAPI 文档: http://localhost:8000/docs
-- 健康检查: http://localhost:8000/healthz
+- 健康检查: http://localhost:8000/api/v1/healthz
 
 ## 代码质量
 
