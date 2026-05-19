@@ -20,6 +20,7 @@ dependencies:
 
   # ---- 数据层(本地)----
   drift: ^2.21.0
+  sqlite3: ^2.4.7
   sqlite3_flutter_libs: ^0.5.24
   path_provider: ^2.1.5
   path: ^1.9.0
