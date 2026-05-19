@@ -21,6 +21,7 @@ class TaskRepository {
   Future<String> createTask({
     required String listId,
     required String title,
+    String? parentId,
     DateTime? dueAt,
     bool starred = false,
   }) async {
@@ -33,11 +34,17 @@ class TaskRepository {
             userId: kLocalUserId,
             listId: listId,
             title: title,
+            parentId: Value(parentId),
             dueAt: Value(dueAt),
             starred: Value(starred),
           ),
         );
     return id;
+  }
+
+  /// 监听某父任务的直接子任务(单层)。
+  Stream<List<Task>> watchSubtasks(String parentId) {
+    return _watchActive((t) => t.parentId.equals(parentId));
   }
 
   /// 切换任务完成态:写入 / 清空 completedAt,Drift 自动更新 updatedAt。
@@ -181,4 +188,10 @@ Stream<List<Task>> tasksForCurrentList(Ref ref) async* {
     return;
   }
   yield* ref.watch(taskRepositoryProvider).watchForList(list);
+}
+
+/// 监听某父任务的直接子任务。
+@riverpod
+Stream<List<Task>> subtasksOf(Ref ref, String parentId) {
+  return ref.watch(taskRepositoryProvider).watchSubtasks(parentId);
 }
