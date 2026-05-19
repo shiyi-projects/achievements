@@ -14,8 +14,9 @@ analyzer:
     strict-casts: true
     strict-inference: true
     strict-raw-types: true
-  plugins:
-    - custom_lint
+  # custom_lint 暂未启用(riverpod_lint 引入的传递依赖目前与 build_runner 不兼容)
+  # plugins:
+  #   - custom_lint
 
 linter:
   rules:

@@ -26,7 +26,8 @@ dependencies:
 
   # ---- 数据层(远程)----
   dio: ^5.7.0
-  retrofit: ^4.4.1
+  # retrofit 留到 Phase 2 实装 API 客户端时再装(retrofit/retrofit_generator
+  # 的上游版本经常不同步,届时按需锁定到一致的版本对)
 
   # ---- 模型与序列化 ----
   freezed_annotation: ^2.4.4
@@ -62,12 +63,12 @@ dev_dependencies:
   freezed: ^2.5.7
   json_serializable: ^6.8.0
   drift_dev: ^2.21.2
-  retrofit_generator: ^9.1.5
+  # retrofit_generator 与 retrofit 同步引入(见 dependencies 注释)
   riverpod_generator: ^2.6.3
 
-  # Riverpod 专用 lint(配合 custom_lint)
-  custom_lint: ^0.7.0
-  riverpod_lint: ^2.6.3
+  # custom_lint + riverpod_lint 暂不引入:它们间接拉入的 custom_lint_visitor /
+  # analyzer_plugin 与 build_runner 当前发布的 analyzer 版本(2026-05)有交叉
+  # 不兼容,会导致 build_runner 启动失败。Phase 4 静态分析强化时再补回。
 
 flutter:
   uses-material-design: true
