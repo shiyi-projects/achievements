@@ -60,6 +60,7 @@ class TaskRepository {
     Value<String?> notes = const Value.absent(),
     Value<DateTime?> dueAt = const Value.absent(),
     Value<bool> starred = const Value.absent(),
+    Value<int> priority = const Value.absent(),
   }) async {
     await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
       TasksCompanion(
@@ -67,6 +68,7 @@ class TaskRepository {
         notes: notes,
         dueAt: dueAt,
         starred: starred,
+        priority: priority,
       ),
     );
   }
