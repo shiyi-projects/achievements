@@ -2,23 +2,23 @@ import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
-import 'package:achievements/data/repositories/tag_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/widgets/priority_chip.dart';
-import 'package:achievements/shared/widgets/tags_row.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
-/// 任务行,Today / ListPage 共用。
+/// 日历视图专用的任务行。
 ///
 /// 卡片式布局:
-/// - 左侧 4dp 优先级色条
-/// - 圆形 Checkbox
-/// - 标题 + 标签行
-/// - trailing: 优先级 Chip / 提醒图标 / 星标
-class TaskTile extends ConsumerWidget {
-  const TaskTile({required this.task, super.key});
+/// - 左侧 3dp 优先级色条
+/// - 圆形 checkbox (可点击完成/取消)
+/// - 标题（完成时划线）
+/// - 时间标签
+/// - Trailing: 优先级 Chip / 提醒图标 / 星标
+class CalendarTaskTile extends ConsumerWidget {
+  const CalendarTaskTile({required this.task, super.key});
 
   final Task task;
 
@@ -27,51 +27,39 @@ class TaskTile extends ConsumerWidget {
     final done = task.completedAt != null;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final selectedId = ref.watch(selectedTaskIdProvider);
-    final selected = selectedId == task.id;
     final priority = TaskPriority.fromValue(task.priority);
-    final tagsAsync = ref.watch(tagsForTaskProvider(task.id));
-    final tags = tagsAsync.maybeWhen(
-      data: (list) => list,
-      orElse: () => const <Tag>[],
-    );
+    final priorityColor = _priorityColor(priority);
     final hasFutureReminder =
         task.remindAt != null && task.remindAt!.isAfter(DateTime.now());
 
-    final priorityColor = _priorityColor(priority);
+    // Due time label (only show time portion for calendar view)
+    String? timeLabel;
+    if (task.dueAt != null) {
+      final local = task.dueAt!.toLocal();
+      if (local.hour != 0 || local.minute != 0) {
+        timeLabel = DateFormat('HH:mm').format(local);
+      }
+    }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Spacing.base,
-        vertical: Spacing.xs,
-      ),
+      padding: const EdgeInsets.only(bottom: Spacing.xs),
       child: Material(
-        color: selected
-            ? scheme.secondaryContainer.withValues(alpha: 0.5)
-            : scheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(Radii.card),
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(Radii.input),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          borderRadius: BorderRadius.circular(Radii.card),
+          borderRadius: BorderRadius.circular(Radii.input),
           onTap: () =>
               ref.read(selectedTaskIdProvider.notifier).select(task.id),
           child: IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Priority Color Strip ──
+                // — Priority color strip —
                 if (priority != TaskPriority.none)
-                  Container(
-                    width: 4,
-                    decoration: BoxDecoration(
-                      color: priorityColor,
-                      borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(Radii.card),
-                      ),
-                    ),
-                  ),
+                  Container(width: 3, color: priorityColor),
 
-                // ── Main Content ──
+                // — Main content —
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
@@ -85,7 +73,7 @@ class TaskTile extends ConsumerWidget {
                         final showTrailing = constraints.maxWidth > 180;
                         return Row(
                           children: [
-                            // ── Checkbox ──
+                            // Checkbox
                             _RoundCheckbox(
                               checked: done,
                               color: done ? scheme.primary : scheme.outline,
@@ -95,7 +83,7 @@ class TaskTile extends ConsumerWidget {
                             ),
                             const SizedBox(width: Spacing.md),
 
-                            // ── Title + Tags ──
+                            // Title + time
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,35 +91,47 @@ class TaskTile extends ConsumerWidget {
                                 children: [
                                   Text(
                                     task.title,
-                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                    style: theme.textTheme.bodyMedium?.copyWith(
                                       decoration: done
                                           ? TextDecoration.lineThrough
                                           : null,
                                       color: done ? scheme.outline : null,
                                       decorationColor: scheme.outline,
+                                      fontWeight:
+                                          done ? FontWeight.w400 : FontWeight.w500,
                                     ),
-                                    maxLines: 2,
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  if (tags.isNotEmpty)
+                                  if (timeLabel != null)
                                     Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: Spacing.xs,
+                                      padding:
+                                          const EdgeInsets.only(top: Spacing.xs),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.schedule_rounded,
+                                            size: 12,
+                                            color: scheme.outline,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            timeLabel,
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                              color: scheme.outline,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      child: TagsRow(tags: tags),
                                     ),
                                 ],
                               ),
                             ),
 
-                            // ── Trailing ──
+                            // Trailing indicators
                             if (showTrailing)
-                              ..._buildTrailing(
-                                theme,
-                                scheme,
-                                priority,
-                                hasFutureReminder,
-                              ),
+                              ..._buildTrailing(scheme, priority, hasFutureReminder),
                           ],
                         );
                       },
@@ -147,7 +147,6 @@ class TaskTile extends ConsumerWidget {
   }
 
   List<Widget> _buildTrailing(
-    ThemeData theme,
     ColorScheme scheme,
     TaskPriority priority,
     bool hasFutureReminder,
@@ -167,7 +166,7 @@ class TaskTile extends ConsumerWidget {
           padding: const EdgeInsets.only(left: Spacing.sm),
           child: Icon(
             Icons.notifications_active_rounded,
-            size: 18,
+            size: 16,
             color: scheme.outline,
           ),
         ),
@@ -177,7 +176,11 @@ class TaskTile extends ConsumerWidget {
       items.add(
         Padding(
           padding: const EdgeInsets.only(left: Spacing.sm),
-          child: Icon(Icons.star_rounded, size: 18, color: scheme.tertiary),
+          child: Icon(
+            Icons.star_rounded,
+            size: 16,
+            color: Colors.amber.shade600,
+          ),
         ),
       );
     }
@@ -220,15 +223,15 @@ class _RoundCheckbox extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutBack,
-        width: 24,
-        height: 24,
+        width: 22,
+        height: 22,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: checked ? color : Colors.transparent,
-          border: Border.all(color: color, width: 2),
+          border: Border.all(color: color, width: 1.5),
         ),
         child: checked
-            ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+            ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
             : null,
       ),
     );

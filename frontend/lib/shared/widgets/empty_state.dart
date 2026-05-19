@@ -27,46 +27,48 @@ class EmptyState extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.xxl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                shape: BoxShape.circle,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.lg), // Changed from xxl to lg to save space
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72, // Slightly reduced
+                height: 72,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 36, color: scheme.outlineVariant),
               ),
-              child: Icon(icon, size: 40, color: scheme.outlineVariant),
-            ),
-            const SizedBox(height: Spacing.lg),
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: scheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: Spacing.sm),
+              const SizedBox(height: Spacing.base),
               Text(
-                subtitle!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.outline,
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: scheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
+              if (subtitle != null) ...[
+                const SizedBox(height: Spacing.xs),
+                Text(
+                  subtitle!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.outline,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: Spacing.base),
+                FilledButton.tonal(
+                  onPressed: onAction,
+                  child: Text(actionLabel!),
+                ),
+              ],
             ],
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: Spacing.lg),
-              FilledButton.tonal(
-                onPressed: onAction,
-                child: Text(actionLabel!),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );

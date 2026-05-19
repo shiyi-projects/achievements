@@ -10,6 +10,7 @@ import 'package:achievements/features/task_detail/widgets/list_dropdown.dart';
 import 'package:achievements/features/task_detail/widgets/priority_chips.dart';
 import 'package:achievements/features/task_detail/widgets/subtasks_section.dart';
 import 'package:achievements/features/task_detail/widgets/tag_editor.dart';
+import 'package:achievements/features/task_detail/widgets/top_bar.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -244,7 +245,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
         child: Column(
           children: [
             // ── Top Bar ──
-            _TopBar(
+            TaskDetailTopBar(
               starred: task.starred,
               completed: task.completedAt != null,
               isTrashed: task.deletedAt != null,
@@ -316,7 +317,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                   const SizedBox(height: Spacing.lg),
 
                   // ── 属性区 (改动4: 流式分组) ──
-                  const _SectionHeader(label: '属性'),
+                  const SectionHeader(label: '属性'),
                   const SizedBox(height: Spacing.sm),
                   PriorityChips(
                     priority: TaskPriority.fromValue(task.priority),
@@ -339,7 +340,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                   TagEditor(taskId: task.id),
 
                   const SizedBox(height: Spacing.lg),
-                  const _SectionHeader(label: '时间'),
+                  const SectionHeader(label: '时间'),
                   const SizedBox(height: Spacing.sm),
                   Wrap(
                     spacing: Spacing.sm,
@@ -387,181 +388,6 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.starred,
-    required this.completed,
-    required this.isTrashed,
-    required this.onClose,
-    required this.onToggleComplete,
-    required this.onToggleStar,
-    required this.onSoftDelete,
-    required this.onRestore,
-    required this.onHardDelete,
-  });
-  final bool starred;
-  final bool completed;
-  final bool isTrashed;
-  final VoidCallback onClose;
-  final VoidCallback onToggleComplete;
-  final VoidCallback onToggleStar;
-  final VoidCallback onSoftDelete;
-  final VoidCallback onRestore;
-  final VoidCallback onHardDelete;
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: scheme.outlineVariant.withValues(alpha: 0.2),
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.close_rounded),
-            tooltip: '关闭',
-            onPressed: onClose,
-          ),
-          const Spacer(),
-          // ── 完成切换 ──
-          _AnimatedCompleteButton(
-            completed: completed,
-            onTap: onToggleComplete,
-          ),
-          const SizedBox(width: Spacing.xs),
-          IconButton(
-            icon: Icon(
-              starred ? Icons.star_rounded : Icons.star_outline_rounded,
-              color: starred ? scheme.tertiary : null,
-            ),
-            tooltip: starred ? '取消星标' : '添加星标',
-            onPressed: onToggleStar,
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded),
-            tooltip: '更多',
-            onSelected: (v) {
-              switch (v) {
-                case 'del':
-                  onSoftDelete();
-                case 'res':
-                  onRestore();
-                case 'hdel':
-                  onHardDelete();
-              }
-            },
-            itemBuilder: (_) => [
-              if (!isTrashed)
-                const PopupMenuItem(value: 'del', child: Text('移至回收站'))
-              else ...[
-                const PopupMenuItem(value: 'res', child: Text('恢复')),
-                const PopupMenuItem(
-                  value: 'hdel',
-                  child: Text('永久删除'),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-
-// ─────────────────────────────────────────────────────────────────────
-// 改动1: 带动画的完成按钮
-// ─────────────────────────────────────────────────────────────────────
-
-class _AnimatedCompleteButton extends StatelessWidget {
-  const _AnimatedCompleteButton({
-    required this.completed,
-    required this.onTap,
-  });
-  final bool completed;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.circle),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.sm),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutBack,
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: completed ? scheme.primary : Colors.transparent,
-              border: Border.all(
-                color: completed ? scheme.primary : scheme.outline,
-                width: 2,
-              ),
-            ),
-            child: completed
-                ? const Icon(Icons.check_rounded,
-                    size: 14, color: Colors.white)
-                : null,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// 改动4: 分区标题
-// ─────────────────────────────────────────────────────────────────────
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.label});
-  final String label;
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 1,
-            color: scheme.outlineVariant.withValues(alpha: 0.2),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-          child: Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: scheme.outline,
-              letterSpacing: 1.2,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Container(
-            height: 1,
-            color: scheme.outlineVariant.withValues(alpha: 0.2),
-          ),
-        ),
-      ],
     );
   }
 }
