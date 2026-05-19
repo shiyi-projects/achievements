@@ -89,6 +89,8 @@ Icon?
 .env
 .env.*
 !.env.example
+!.env.prod.example
+!.env.*.example
 *.local
 secrets/
 *.pem
