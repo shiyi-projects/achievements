@@ -1,0 +1,112 @@
+# ----- Python / FastAPI -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+*.egg
+*.egg-info/
+pip-log.txt
+pip-delete-this-directory.txt
+.python-version
+
+# ----- Flutter / Dart -----
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/build/
+**/generated_plugin_registrant.dart
+**/pubspec.lock.bak
+**/doc/api/
+**/coverage/
+
+# Flutter generated code (committed by user choice; uncomment to ignore)
+# *.g.dart
+# *.freezed.dart
+# *.gr.dart
+
+# Android
+**/android/**/gradle-wrapper.jar
+**/android/.gradle
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+**/*.jks
+**/*.keystore
+
+# Windows (Flutter desktop)
+**/windows/flutter/generated_plugin_registrant.cc
+**/windows/flutter/generated_plugin_registrant.h
+**/windows/flutter/generated_plugins.cmake
+
+# iOS / macOS (kept for future cross-platform)
+**/ios/Flutter/.last_build_id
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/macos/Pods/
+
+# ----- Editors / IDE -----
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json.example
+*.swp
+*.swo
+*~
+
+# ----- OS -----
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+Icon?
+
+# ----- Env / Secrets -----
+.env
+.env.*
+!.env.example
+*.local
+secrets/
+*.pem
+*.key
+
+# ----- Docker / Data volumes -----
+backend/storage/attachments/
+backend/storage/**/*
+!backend/storage/.gitkeep
+postgres-data/
+redis-data/
+
+# ----- Logs -----
+*.log
+logs/
+
+# ----- Misc -----
+node_modules/
+.cache/
+tmp/
+temp/
