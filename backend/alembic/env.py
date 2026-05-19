@@ -19,7 +19,7 @@ from app.db.base import Base
 # 触发所有模型注册到 Base.metadata,供 autogenerate 使用。
 # 当新增 ORM 模型文件时,在此 import 即可。
 # Phase 0 暂无业务模型,留空。
-# from app import models  # noqa: F401  (uncomment when models exist)
+# 例:`from app import models`(模型聚合后取消注释)
 
 config = context.config
 
