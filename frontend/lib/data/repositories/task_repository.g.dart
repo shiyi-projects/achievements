@@ -1,0 +1,44 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'task_repository.dart';
+
+// **************************************************************************
+// RiverpodGenerator
+// **************************************************************************
+
+String _$taskRepositoryHash() => r'85e63b4826a3d6db7d188a8354c50d4d8b378f21';
+
+/// See also [taskRepository].
+@ProviderFor(taskRepository)
+final taskRepositoryProvider = Provider<TaskRepository>.internal(
+  taskRepository,
+  name: r'taskRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$taskRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TaskRepositoryRef = ProviderRef<TaskRepository>;
+String _$todayTasksHash() => r'f1b245c7082f81e60123e41e9ddfaa42e3b74a01';
+
+/// See also [todayTasks].
+@ProviderFor(todayTasks)
+final todayTasksProvider = AutoDisposeStreamProvider<List<Task>>.internal(
+  todayTasks,
+  name: r'todayTasksProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$todayTasksHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TodayTasksRef = AutoDisposeStreamProviderRef<List<Task>>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
