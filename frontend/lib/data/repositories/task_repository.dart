@@ -50,6 +50,27 @@ class TaskRepository {
     );
   }
 
+  /// 局部更新任务字段。
+  ///
+  /// 传入 `Value.absent()` 的字段保持不变;显式想清空 [dueAt] 时传 `Value(null)`。
+  /// 同步引擎接入后,这里会一并 bump version。
+  Future<void> update(
+    String id, {
+    Value<String> title = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    Value<DateTime?> dueAt = const Value.absent(),
+    Value<bool> starred = const Value.absent(),
+  }) async {
+    await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
+      TasksCompanion(
+        title: title,
+        notes: notes,
+        dueAt: dueAt,
+        starred: starred,
+      ),
+    );
+  }
+
   /// 根据 [list] 决定查询策略:系统清单走对应的智能过滤,自定义清单按 listId。
   Stream<List<Task>> watchForList(TaskList list) {
     if (list.isSystem) {
