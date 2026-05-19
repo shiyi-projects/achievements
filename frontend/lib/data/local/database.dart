@@ -39,22 +39,33 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _createSystemKindUniqueIndex() async {
-    // 先删除重复行：保留 created_at 最早的那一条，删掉其余的。
+    // 先把每个 (user_id, system_kind) 重复组里的 keeper(created_at 最早) 与 duplicate
+    // 收集到临时表;再把所有指向 duplicate 的 tasks.list_id 改写到 keeper;最后删
+    // duplicate 行。这样既消重又不丢任务(否则任务的 list_id 会变成悬挂引用)。
+    await customStatement('''
+      CREATE TEMP TABLE _dup_system_lists AS
+      SELECT tl.id AS dup_id,
+             (SELECT k.id FROM task_lists k
+               WHERE k.user_id = tl.user_id
+                 AND k.system_kind = tl.system_kind
+                 AND k.deleted_at IS NULL
+               ORDER BY k.created_at ASC LIMIT 1) AS keeper_id
+      FROM task_lists tl
+      WHERE tl.deleted_at IS NULL AND tl.system_kind IS NOT NULL
+    ''');
+    await customStatement('''
+      UPDATE tasks
+         SET list_id = (SELECT keeper_id FROM _dup_system_lists
+                         WHERE dup_id = tasks.list_id)
+       WHERE list_id IN (SELECT dup_id FROM _dup_system_lists
+                          WHERE dup_id <> keeper_id)
+    ''');
     await customStatement('''
       DELETE FROM task_lists
-      WHERE id IN (
-        SELECT tl.id FROM task_lists tl
-        WHERE tl.deleted_at IS NULL AND tl.system_kind IS NOT NULL
-          AND tl.id != (
-            SELECT tl2.id FROM task_lists tl2
-            WHERE tl2.user_id = tl.user_id
-              AND tl2.system_kind = tl.system_kind
-              AND tl2.deleted_at IS NULL
-            ORDER BY tl2.created_at ASC
-            LIMIT 1
-          )
-      )
+       WHERE id IN (SELECT dup_id FROM _dup_system_lists
+                     WHERE dup_id <> keeper_id)
     ''');
+    await customStatement('DROP TABLE _dup_system_lists');
     await customStatement(
       'CREATE UNIQUE INDEX IF NOT EXISTS uq_task_lists_user_system_kind_active '
       'ON task_lists (user_id, system_kind) '
