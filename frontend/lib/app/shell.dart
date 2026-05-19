@@ -1,10 +1,12 @@
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/features/calendar/calendar_page.dart';
 import 'package:achievements/features/list_view/list_page.dart';
 import 'package:achievements/features/sidebar/sidebar.dart';
 import 'package:achievements/features/task_detail/task_detail_panel.dart';
 import 'package:achievements/features/today/today_page.dart';
+import 'package:achievements/state/current_view.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:flutter/material.dart';
@@ -44,25 +46,31 @@ class AppShell extends ConsumerWidget {
       });
     }
 
-    final title = currentAsync.maybeWhen(
-      data: (list) => list?.name ?? 'Achievements',
-      orElse: () => 'Achievements',
-    );
+    final view = ref.watch(currentViewNotifierProvider);
 
-    final mainBody = currentAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, st) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.xl),
-          child: Text('Failed to load: $e'),
-        ),
-      ),
-      data: (list) {
-        final kind = SystemListKind.fromValue(list?.systemKind);
-        if (kind == SystemListKind.today) return const TodayPage();
-        return const ListPage();
-      },
-    );
+    final title = view == AppView.calendar
+        ? '日历'
+        : currentAsync.maybeWhen(
+            data: (list) => list?.name ?? 'Achievements',
+            orElse: () => 'Achievements',
+          );
+
+    final mainBody = view == AppView.calendar
+        ? const CalendarPage()
+        : currentAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, st) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(Spacing.xl),
+                child: Text('Failed to load: $e'),
+              ),
+            ),
+            data: (list) {
+              final kind = SystemListKind.fromValue(list?.systemKind);
+              if (kind == SystemListKind.today) return const TodayPage();
+              return const ListPage();
+            },
+          );
 
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;

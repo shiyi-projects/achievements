@@ -82,7 +82,72 @@ class TaskRepository {
         baseVersion: current.version,
         payload: {'completed_at': completedAt?.toUtc().toIso8601String()},
       );
+
+      // 完成重复任务时生成下一实例
+      if (completed) await _maybeCreateNextRepeat(current);
     });
+  }
+
+  Future<void> _maybeCreateNextRepeat(Task current) async {
+    final rule = current.repeatRule;
+    if (rule == null || rule.isEmpty) return;
+    final nextDue = _nextOccurrence(rule, current.dueAt);
+    if (nextDue == null) return;
+
+    DateTime? nextRemind;
+    if (current.remindAt != null && current.dueAt != null) {
+      final offset = current.remindAt!.difference(current.dueAt!);
+      nextRemind = nextDue.add(offset);
+    }
+
+    final nextId = newId();
+    await _db.into(_db.tasks).insert(
+      TasksCompanion.insert(
+        id: nextId,
+        userId: kLocalUserId,
+        listId: current.listId,
+        title: current.title,
+        notes: Value(current.notes),
+        priority: Value(current.priority),
+        dueAt: Value(nextDue),
+        remindAt: Value(nextRemind),
+        repeatRule: Value(rule),
+        starred: Value(current.starred),
+      ),
+    );
+    await _outbox.enqueue(
+      entity: 'task',
+      op: 'upsert',
+      entityId: nextId,
+      baseVersion: 0,
+      payload: {
+        'list_id': current.listId,
+        'title': current.title,
+        'notes': current.notes,
+        'priority': current.priority,
+        'due_at': nextDue.toUtc().toIso8601String(),
+        'remind_at': nextRemind?.toUtc().toIso8601String(),
+        'repeat_rule': rule,
+        'starred': current.starred,
+      },
+    );
+  }
+
+  /// 支持的重复规则:DAILY / WEEKLY / MONTHLY / YEARLY。
+  static DateTime? _nextOccurrence(String rule, DateTime? from) {
+    final base = from ?? DateTime.now();
+    switch (rule.toUpperCase()) {
+      case 'DAILY':
+        return base.add(const Duration(days: 1));
+      case 'WEEKLY':
+        return base.add(const Duration(days: 7));
+      case 'MONTHLY':
+        return DateTime(base.year, base.month + 1, base.day, base.hour, base.minute);
+      case 'YEARLY':
+        return DateTime(base.year + 1, base.month, base.day, base.hour, base.minute);
+      default:
+        return null;
+    }
   }
 
   /// 局部更新任务字段。传入 `Value.absent()` 的字段保持不变。
@@ -136,6 +201,13 @@ class TaskRepository {
         payload: payload,
       );
     });
+  }
+
+  /// 监听指定日期范围内有 due_at 的任务(日历视图用)。
+  Stream<List<Task>> watchTasksInRange(DateTime from, DateTime to) {
+    return _watchWith(
+      (t) => t.deletedAt.isNull() & t.dueAt.isBetweenValues(from, to),
+    );
   }
 
   /// 监听所有"待提醒"任务:remind_at 非空,未完成,未软删。
@@ -320,4 +392,11 @@ Stream<int> taskCountForListId(Ref ref, String listId) async* {
     return;
   }
   yield* ref.watch(taskRepositoryProvider).watchCountForList(list);
+}
+
+/// 日历视图:指定月份内有 due_at 的任务流。[monthStart] 为当月 1 日 00:00。
+@riverpod
+Stream<List<Task>> tasksForMonth(Ref ref, DateTime monthStart) {
+  final monthEnd = DateTime(monthStart.year, monthStart.month + 1);
+  return ref.watch(taskRepositoryProvider).watchTasksInRange(monthStart, monthEnd);
 }

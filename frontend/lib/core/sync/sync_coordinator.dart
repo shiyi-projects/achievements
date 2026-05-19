@@ -38,8 +38,11 @@ class SyncCoordinator {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _debounce;
   Timer? _retryTimer;
+  Timer? _pollTimer;
   bool _inFlight = false;
   bool _wasOffline = false;
+
+  static const Duration _kPollInterval = Duration(seconds: 30);
 
   /// 启动触发监听。bootstrap 阶段调用一次。
   void start() {
@@ -55,12 +58,15 @@ class SyncCoordinator {
     _connectivitySub?.cancel();
     _debounce?.cancel();
     _retryTimer?.cancel();
+    _pollTimer?.cancel();
   }
 
   /// 完整同步:pull 增量,再把 outbox 推完。bootstrap / 网络恢复时用。
   Future<void> runFullSync() async {
     _retryTimer?.cancel();
     _retryTimer = null;
+    _pollTimer?.cancel();
+    _pollTimer = null;
     if (_inFlight) return;
     _inFlight = true;
     try {
@@ -73,9 +79,13 @@ class SyncCoordinator {
       }
       final pushResult = await _engine.pushOnce();
       _status.set(pushResult);
-      _scheduleRetry(runFullSync, only: pushResult);
+      if (pushResult == SyncStatus.error || pushResult == SyncStatus.offline) {
+        _scheduleRetry(runFullSync);
+      }
     } finally {
       _inFlight = false;
+      // 无论成功还是失败(错误路径已有 retry),都在 30s 后再轮询
+      if (_retryTimer == null) _schedulePoll();
     }
   }
 
@@ -95,8 +105,12 @@ class SyncCoordinator {
     }
   }
 
-  /// 若 [only] 是 error / offline,30s 后重跑 [callback]。
-  /// [only] 为 null 时无条件调度(用于 pull 失败路径)。
+  void _schedulePoll() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer(_kPollInterval, () => unawaited(runFullSync()));
+  }
+
+  /// error / offline 时 30s 后重跑 [callback]。
   void _scheduleRetry(Future<void> Function() callback, {SyncStatus? only}) {
     final shouldRetry =
         only == null ||

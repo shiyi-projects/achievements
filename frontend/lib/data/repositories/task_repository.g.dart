@@ -355,5 +355,147 @@ class _TaskCountForListIdProviderElement
   @override
   String get listId => (origin as TaskCountForListIdProvider).listId;
 }
+
+String _$tasksForMonthHash() => r'404ec4968fcec8b0ec72abab9aa714371c8c2983';
+
+/// 日历视图:指定月份内有 due_at 的任务流。[monthStart] 为当月 1 日 00:00。
+///
+/// Copied from [tasksForMonth].
+@ProviderFor(tasksForMonth)
+const tasksForMonthProvider = TasksForMonthFamily();
+
+/// 日历视图:指定月份内有 due_at 的任务流。[monthStart] 为当月 1 日 00:00。
+///
+/// Copied from [tasksForMonth].
+class TasksForMonthFamily extends Family<AsyncValue<List<Task>>> {
+  /// 日历视图:指定月份内有 due_at 的任务流。[monthStart] 为当月 1 日 00:00。
+  ///
+  /// Copied from [tasksForMonth].
+  const TasksForMonthFamily();
+
+  /// 日历视图:指定月份内有 due_at 的任务流。[monthStart] 为当月 1 日 00:00。
+  ///
+  /// Copied from [tasksForMonth].
+  TasksForMonthProvider call(
+    DateTime monthStart,
+  ) {
+    return TasksForMonthProvider(
+      monthStart,
+    );
+  }
+
+  @override
+  TasksForMonthProvider getProviderOverride(
+    covariant TasksForMonthProvider provider,
+  ) {
+    return call(
+      provider.monthStart,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'tasksForMonthProvider';
+}
+
+/// 日历视图:指定月份内有 due_at 的任务流。[monthStart] 为当月 1 日 00:00。
+///
+/// Copied from [tasksForMonth].
+class TasksForMonthProvider extends AutoDisposeStreamProvider<List<Task>> {
+  /// 日历视图:指定月份内有 due_at 的任务流。[monthStart] 为当月 1 日 00:00。
+  ///
+  /// Copied from [tasksForMonth].
+  TasksForMonthProvider(
+    DateTime monthStart,
+  ) : this._internal(
+          (ref) => tasksForMonth(
+            ref as TasksForMonthRef,
+            monthStart,
+          ),
+          from: tasksForMonthProvider,
+          name: r'tasksForMonthProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$tasksForMonthHash,
+          dependencies: TasksForMonthFamily._dependencies,
+          allTransitiveDependencies:
+              TasksForMonthFamily._allTransitiveDependencies,
+          monthStart: monthStart,
+        );
+
+  TasksForMonthProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.monthStart,
+  }) : super.internal();
+
+  final DateTime monthStart;
+
+  @override
+  Override overrideWith(
+    Stream<List<Task>> Function(TasksForMonthRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: TasksForMonthProvider._internal(
+        (ref) => create(ref as TasksForMonthRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        monthStart: monthStart,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<List<Task>> createElement() {
+    return _TasksForMonthProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TasksForMonthProvider && other.monthStart == monthStart;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, monthStart.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin TasksForMonthRef on AutoDisposeStreamProviderRef<List<Task>> {
+  /// The parameter `monthStart` of this provider.
+  DateTime get monthStart;
+}
+
+class _TasksForMonthProviderElement
+    extends AutoDisposeStreamProviderElement<List<Task>> with TasksForMonthRef {
+  _TasksForMonthProviderElement(super.provider);
+
+  @override
+  DateTime get monthStart => (origin as TasksForMonthProvider).monthStart;
+}
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

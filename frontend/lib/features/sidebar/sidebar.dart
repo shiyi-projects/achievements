@@ -6,6 +6,7 @@ import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/widgets/name_input_dialog.dart';
+import 'package:achievements/state/current_view.dart';
 import 'package:achievements/state/expanded_folders.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:flutter/material.dart';
@@ -89,6 +90,12 @@ class Sidebar extends ConsumerWidget {
                         ),
                         selected: list.id == currentId,
                       ),
+
+                    // ── Calendar nav entry ──
+                    _CalendarNavTile(
+                      selected: ref.watch(currentViewNotifierProvider) ==
+                          AppView.calendar,
+                    ),
 
                     // ── Separator ──
                     Padding(
@@ -499,6 +506,7 @@ class _SidebarTile extends ConsumerWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(Radii.input),
             onTap: () {
+              ref.read(currentViewNotifierProvider.notifier).showList();
               ref.read(selectedListIdProvider.notifier).select(list.id);
               final scaffold = Scaffold.maybeOf(context);
               if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
@@ -741,6 +749,67 @@ class _SettingsTile extends StatelessWidget {
         onTap: () {
           // Phase 4: navigate to settings
         },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Calendar Nav Tile
+// ─────────────────────────────────────────────────────────────────────
+
+class _CalendarNavTile extends ConsumerWidget {
+  const _CalendarNavTile({required this.selected});
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
+      child: Material(
+        color: selected ? scheme.secondaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(Radii.input),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Radii.input),
+          onTap: () {
+            ref.read(currentViewNotifierProvider.notifier).showCalendar();
+            final scaffold = Scaffold.maybeOf(context);
+            if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
+              Navigator.of(context).pop();
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Spacing.md,
+              vertical: Spacing.sm + 2,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_month_rounded,
+                  size: 20,
+                  color: selected
+                      ? scheme.onSecondaryContainer
+                      : scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: Spacing.md),
+                Text(
+                  '日历',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight:
+                        selected ? FontWeight.w600 : FontWeight.w400,
+                    color: selected
+                        ? scheme.onSecondaryContainer
+                        : scheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
