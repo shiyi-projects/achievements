@@ -193,18 +193,22 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
         color: scheme.onSurface.withValues(alpha: 0.38),
       ),
       dayBorderRadius: BorderRadius.circular(Radii.chip),
-      okButton: FilledButton(
-        onPressed: () {},
-        child: const Text('确定'),
+      // 只传 Text，不能传带 onPressed 的 Button：
+      // 包的 InkWell 负责处理 tap(→ Navigator.pop)，若 child 也有 GestureDetector
+      // 则内层优先消耗 tap，外层 Navigator.pop 永远不触发。
+      okButton: Text(
+        '确定',
+        style: textTheme.labelLarge?.copyWith(color: scheme.primary),
       ),
-      cancelButton: TextButton(
-        onPressed: () {},
-        child: const Text('取消'),
+      cancelButton: Text(
+        '取消',
+        style: textTheme.labelLarge?.copyWith(color: scheme.outline),
       ),
     );
   }
 
   Future<void> _pickDueDate() async {
+    FocusScope.of(context).unfocus();
     final initial = widget.task.dueAt ?? DateTime.now();
     final results = await showCalendarDatePicker2Dialog(
       context: context,
@@ -213,7 +217,9 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
       borderRadius: BorderRadius.circular(Radii.sheet),
       value: [initial],
     );
-    if (results == null || results.isEmpty || results.first == null) return;
+    if (results == null || results.isEmpty || results.first == null || !mounted) {
+      return;
+    }
     final picked = results.first!;
     await _repo.update(
       widget.task.id,
@@ -223,6 +229,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
   }
 
   Future<void> _pickRemind() async {
+    FocusScope.of(context).unfocus();
     final initial =
         widget.task.remindAt ?? DateTime.now().add(const Duration(hours: 1));
     final results = await showCalendarDatePicker2Dialog(
@@ -232,14 +239,18 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
       borderRadius: BorderRadius.circular(Radii.sheet),
       value: [initial],
     );
-    if (results == null || results.isEmpty || results.first == null) return;
-    if (!mounted) return;
+    if (results == null || results.isEmpty || results.first == null || !mounted) {
+      return;
+    }
     final date = results.first!;
+    // 等待日历退场动画结束后再显示时间选择器，避免两个 dialog 动画同时播放
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initial),
     );
-    if (time == null) return;
+    if (time == null || !mounted) return;
     await _repo.update(
       widget.task.id,
       knownVersion: widget.task.version,
