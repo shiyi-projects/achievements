@@ -10,10 +10,12 @@ import 'package:achievements/features/sidebar/sidebar.dart';
 import 'package:achievements/features/statistics/statistics_page.dart';
 import 'package:achievements/features/task_detail/task_detail_panel.dart';
 import 'package:achievements/features/today/today_page.dart';
+import 'package:achievements/platform/windows/command_palette.dart';
 import 'package:achievements/state/current_view.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 响应式应用外壳。
@@ -93,32 +95,41 @@ class AppShell extends ConsumerWidget {
     final scheme = theme.colorScheme;
 
     if (showSidebarInline) {
-      return Scaffold(
-        body: Row(
-          children: [
-            const SizedBox(width: _kSidebarWidth, child: Sidebar()),
-            VerticalDivider(
-              width: 1,
-              thickness: 1,
-              color: scheme.outlineVariant.withValues(alpha: 0.3),
-            ),
-            Expanded(
-              child: Column(
-                children: [
-                  _ModernAppBar(title: title),
-                  Expanded(child: mainBody),
+      return CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+              () => showCommandPalette(context),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            body: Row(
+              children: [
+                const SizedBox(width: _kSidebarWidth, child: Sidebar()),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: scheme.outlineVariant.withValues(alpha: 0.3),
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _ModernAppBar(title: title),
+                      Expanded(child: mainBody),
+                    ],
+                  ),
+                ),
+                if (dockDetail && selectedTaskId != null) ...[
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: scheme.outlineVariant.withValues(alpha: 0.3),
+                  ),
+                  const SizedBox(width: _kDetailWidth, child: TaskDetailPanel()),
                 ],
-              ),
+              ],
             ),
-            if (dockDetail && selectedTaskId != null) ...[
-              VerticalDivider(
-                width: 1,
-                thickness: 1,
-                color: scheme.outlineVariant.withValues(alpha: 0.3),
-              ),
-              const SizedBox(width: _kDetailWidth, child: TaskDetailPanel()),
-            ],
-          ],
+          ),
         ),
       );
     }
