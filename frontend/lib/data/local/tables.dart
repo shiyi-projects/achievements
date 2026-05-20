@@ -127,6 +127,16 @@ class SyncCursors extends Table {
   Set<Column<Object>> get primaryKey => {key};
 }
 
+/// 本地应用偏好设置键值表。key 是稳定字符串常量,value 是 JSON/plain 字符串。
+/// 不进入同步 outbox,仅本地生效。
+class AppPreferences extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
+}
+
 /// 专注会话记录。Phase 3 本地优先,暂不进入 outbox(后续随 /focus-sessions 端点启用)。
 class FocusSessions extends Table {
   /// 客户端生成的 UUIDv7。
