@@ -190,9 +190,29 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
         overlay.size.width - anchor.dx,
         overlay.size.height - anchor.dy,
       ),
-      items: const [
-        PopupMenuItem(value: 'rename', child: Text('重命名')),
-        PopupMenuItem(value: 'delete', child: Text('删除')),
+      items: [
+        const PopupMenuItem(
+          value: 'rename',
+          child: Row(
+            children: [
+              Icon(Icons.edit_rounded, size: 18),
+              SizedBox(width: Spacing.md),
+              Text('重命名'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, size: 18,
+                color: Theme.of(context).colorScheme.error),
+              const SizedBox(width: Spacing.md),
+              Text('删除',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ],
+          ),
+        ),
       ],
     );
     if (!context.mounted) return;
@@ -218,6 +238,11 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
+            icon: Icon(
+              Icons.warning_amber_rounded,
+              color: Theme.of(ctx).colorScheme.error,
+              size: 32,
+            ),
             title: const Text('删除清单?'),
             content: Text('清单"$name"及其任务将被移到回收站。'),
             actions: [
@@ -225,10 +250,10 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('取消'),
               ),
-              FilledButton.tonal(
+              FilledButton(
                 style: FilledButton.styleFrom(
-                  foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
-                  backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
+                  foregroundColor: Theme.of(ctx).colorScheme.onError,
+                  backgroundColor: Theme.of(ctx).colorScheme.error,
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('删除'),

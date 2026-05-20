@@ -94,17 +94,48 @@ class TaskDetailTopBar extends StatelessWidget {
                   onHardDelete();
               }
             },
-            itemBuilder: (_) => [
-              if (!isTrashed)
-                const PopupMenuItem(value: 'del', child: Text('移至回收站'))
-              else ...[
-                const PopupMenuItem(value: 'res', child: Text('恢复')),
-                const PopupMenuItem(
-                  value: 'hdel',
-                  child: Text('永久删除'),
-                ),
-              ],
-            ],
+            itemBuilder: (ctx) {
+              final errColor = Theme.of(ctx).colorScheme.error;
+              return [
+                if (!isTrashed)
+                  PopupMenuItem(
+                    value: 'del',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded, size: 18,
+                          color: errColor),
+                        const SizedBox(width: Spacing.md),
+                        Text('移至回收站',
+                          style: TextStyle(color: errColor)),
+                      ],
+                    ),
+                  )
+                else ...[
+                  const PopupMenuItem(
+                    value: 'res',
+                    child: Row(
+                      children: [
+                        Icon(Icons.restore_rounded, size: 18),
+                        SizedBox(width: Spacing.md),
+                        Text('恢复'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'hdel',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_forever_rounded, size: 18,
+                          color: errColor),
+                        const SizedBox(width: Spacing.md),
+                        Text('永久删除',
+                          style: TextStyle(color: errColor)),
+                      ],
+                    ),
+                  ),
+                ],
+              ];
+            },
           ),
         ],
       ),

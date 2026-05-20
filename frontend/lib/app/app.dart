@@ -6,6 +6,7 @@ import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -33,6 +34,16 @@ class AchievementsApp extends ConsumerWidget {
       theme: buildLightTheme(settings.seedColor),
       darkTheme: buildDarkTheme(settings.seedColor),
       routerConfig: router,
+      locale: const Locale('zh', 'CN'),
+      supportedLocales: const [
+        Locale('zh', 'CN'),
+        Locale('en', 'US'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       builder: (context, child) {
         final bootstrap = ref.watch(appBootstrapProvider);
         return bootstrap.when(
@@ -72,25 +83,9 @@ class _BootstrapSplash extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               // ── Logo ──
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [scheme.primary, scheme.tertiary],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: scheme.primary.withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: AppIcons.svgIcon(AppIcons.achievement, size: 32),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: AppIcons.svgIcon(AppIcons.appIcon, size: 64),
               )
                   .animate()
                   .scale(

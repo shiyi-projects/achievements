@@ -33,6 +33,7 @@ class NewListTile extends ConsumerWidget {
             context,
             title: '新建清单',
             confirm: '创建',
+            icon: Icons.list_alt_rounded,
           );
           if (name == null) return;
           await ref.read(listRepositoryProvider).create(name: name);
@@ -64,6 +65,7 @@ class NewFolderTile extends ConsumerWidget {
             context,
             title: '新建文件夹',
             confirm: '创建',
+            icon: Icons.create_new_folder_rounded,
           );
           if (name == null) return;
           await ref.read(folderRepositoryProvider).create(name: name);

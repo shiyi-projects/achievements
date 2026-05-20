@@ -169,6 +169,26 @@ ThemeData _buildTheme(ColorScheme scheme) {
         borderRadius: BorderRadius.circular(Radii.sheet),
       ),
       elevation: isLight ? 3 : 6,
+      backgroundColor: isLight ? scheme.surface : scheme.surfaceContainerHigh,
+      surfaceTintColor: scheme.surfaceTint,
+      titleTextStyle: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: scheme.onSurface,
+        fontFamily: _kFontFamily,
+        fontFamilyFallback: _kFontFallback,
+      ),
+      contentTextStyle: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: scheme.onSurfaceVariant,
+        height: 1.5,
+        fontFamily: _kFontFamily,
+        fontFamilyFallback: _kFontFallback,
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(
+        Spacing.xl, 0, Spacing.xl, Spacing.lg,
+      ),
     ),
 
     // ── BottomSheet ──
@@ -177,8 +197,110 @@ ThemeData _buildTheme(ColorScheme scheme) {
         borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.sheet)),
       ),
       showDragHandle: true,
-      elevation: isLight ? 1 : 4,
-      backgroundColor: scheme.surface,
+      dragHandleColor: scheme.outlineVariant.withValues(alpha: 0.4),
+      dragHandleSize: const Size(36, 4),
+      elevation: isLight ? 2 : 8,
+      surfaceTintColor: scheme.surfaceTint,
+      backgroundColor: isLight ? scheme.surface : scheme.surfaceContainerHigh,
+    ),
+
+    // ── DatePicker ──
+    datePickerTheme: DatePickerThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.sheet),
+      ),
+      headerBackgroundColor: scheme.primaryContainer,
+      headerForegroundColor: scheme.onPrimaryContainer,
+      surfaceTintColor: scheme.surfaceTint,
+      dayStyle: TextStyle(
+        fontSize: 14,
+        fontFamily: _kFontFamily,
+        fontFamilyFallback: _kFontFallback,
+      ),
+      todayBorder: BorderSide(color: scheme.primary, width: 1.5),
+      todayForegroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return scheme.onPrimary;
+        return scheme.primary;
+      }),
+      dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return scheme.onPrimary;
+        if (states.contains(WidgetState.disabled)) {
+          return scheme.onSurface.withValues(alpha: 0.38);
+        }
+        return scheme.onSurface;
+      }),
+      dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return scheme.primary;
+        return null;
+      }),
+      cancelButtonStyle: TextButton.styleFrom(
+        foregroundColor: scheme.onSurfaceVariant,
+      ),
+      confirmButtonStyle: FilledButton.styleFrom(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Radii.button),
+        ),
+      ),
+    ),
+
+    // ── TimePicker ──
+    timePickerTheme: TimePickerThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.sheet),
+      ),
+      hourMinuteShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.card),
+      ),
+      dayPeriodShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.input),
+      ),
+      dayPeriodBorderSide: BorderSide(color: scheme.outline),
+      hourMinuteColor: WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return scheme.primaryContainer;
+        }
+        return scheme.surfaceContainerHighest;
+      }),
+      hourMinuteTextColor: WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return scheme.onPrimaryContainer;
+        }
+        return scheme.onSurface;
+      }),
+      dialHandColor: scheme.primary,
+      dialBackgroundColor: scheme.surfaceContainerHighest,
+      dialTextColor: WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return scheme.onPrimary;
+        return scheme.onSurface;
+      }),
+      cancelButtonStyle: TextButton.styleFrom(
+        foregroundColor: scheme.onSurfaceVariant,
+      ),
+      confirmButtonStyle: FilledButton.styleFrom(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Radii.button),
+        ),
+      ),
+    ),
+
+    // ── PopupMenu ──
+    popupMenuTheme: PopupMenuThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.card),
+      ),
+      elevation: isLight ? 4 : 8,
+      surfaceTintColor: scheme.surfaceTint,
+      color: isLight ? scheme.surface : scheme.surfaceContainerHigh,
+      textStyle: TextStyle(
+        fontSize: 14,
+        color: scheme.onSurface,
+        fontFamily: _kFontFamily,
+        fontFamilyFallback: _kFontFallback,
+      ),
     ),
 
     // ── Checkbox ──

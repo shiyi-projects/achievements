@@ -27,28 +27,12 @@ class BrandHeader extends StatelessWidget {
       child: Row(
         children: [
           // ── Logo with shimmer ──
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
-              ),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.25),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
             child: SvgPicture.asset(
-              AppIcons.achievement,
-              width: 20,
-              height: 20,
+              AppIcons.appIcon,
+              width: 36,
+              height: 36,
             ),
           )
               .animate(onPlay: (ctrl) => ctrl.stop())
