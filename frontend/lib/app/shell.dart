@@ -5,7 +5,7 @@ import 'package:achievements/features/achievement/achievement_page.dart';
 import 'package:achievements/features/calendar/calendar_page.dart';
 import 'package:achievements/features/focus/focus_page.dart';
 import 'package:achievements/features/list_view/list_page.dart';
-import 'package:achievements/features/search/search_page.dart';
+import 'package:achievements/features/search/providers/search_providers.dart';
 import 'package:achievements/features/sidebar/sidebar.dart';
 import 'package:achievements/features/statistics/statistics_page.dart';
 import 'package:achievements/features/task_detail/task_detail_panel.dart';
@@ -50,12 +50,16 @@ class AppShell extends ConsumerWidget {
       });
     }
 
+    // 切换视图时关闭搜索
+    ref.listen<AppView>(currentViewNotifierProvider, (_, __) {
+      closeSearch(ref);
+    });
+
     final view = ref.watch(currentViewNotifierProvider);
 
     final title = switch (view) {
       AppView.calendar => '日历',
       AppView.focus => '专注',
-      AppView.search => '搜索',
       AppView.statistics => '统计',
       AppView.achievement => '成就',
       AppView.list => currentAsync.maybeWhen(
@@ -67,7 +71,6 @@ class AppShell extends ConsumerWidget {
     final mainBody = switch (view) {
       AppView.calendar => const CalendarPage(),
       AppView.focus => const FocusPage(),
-      AppView.search => const SearchPage(),
       AppView.statistics => const StatisticsPage(),
       AppView.achievement => const AchievementPage(),
       AppView.list => currentAsync.when(
@@ -145,7 +148,6 @@ class AppShell extends ConsumerWidget {
         child: TaskDetailPanel(),
       ),
     );
-    // sheet 关闭后清空选中
     ref.read(selectedTaskIdProvider.notifier).clear();
   }
 }
@@ -163,7 +165,7 @@ class _ModernAppBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final view = ref.watch(currentViewNotifierProvider);
+    final isSearching = ref.watch(searchActiveProvider);
 
     return Container(
       height: 56,
@@ -188,15 +190,20 @@ class _ModernAppBar extends ConsumerWidget {
             ),
           ),
           const _SyncStatusIcon(),
-          // search 视图自带 SearchBarField,这里不再重复入口
-          if (view != AppView.search)
-            IconButton(
-              icon: Icon(Icons.search_rounded, color: scheme.onSurfaceVariant),
-              tooltip: '搜索',
-              onPressed: ref
-                  .read(currentViewNotifierProvider.notifier)
-                  .showSearch,
+          IconButton(
+            icon: Icon(
+              isSearching ? Icons.search_off_rounded : Icons.search_rounded,
+              color: isSearching ? scheme.primary : scheme.onSurfaceVariant,
             ),
+            tooltip: isSearching ? '关闭搜索' : '搜索',
+            onPressed: () {
+              if (isSearching) {
+                closeSearch(ref);
+              } else {
+                ref.read(searchActiveProvider.notifier).state = true;
+              }
+            },
+          ),
         ],
       ),
     );
@@ -207,8 +214,6 @@ class _ModernAppBar extends ConsumerWidget {
 // Sync status indicator
 // ─────────────────────────────────────────────────────────────────────
 
-/// 同步状态小图标。idle 时隐藏;syncing 时显示旋转圈;
-/// offline / error 时显示对应图标 + tooltip。
 class _SyncStatusIcon extends ConsumerWidget {
   const _SyncStatusIcon();
 
@@ -232,11 +237,7 @@ class _SyncStatusIcon extends ConsumerWidget {
       ),
       SyncStatus.offline => Tooltip(
         message: '已离线',
-        child: Icon(
-          Icons.cloud_off_outlined,
-          size: 20,
-          color: scheme.outline,
-        ),
+        child: Icon(Icons.cloud_off_outlined, size: 20, color: scheme.outline),
       ),
       SyncStatus.error => Tooltip(
         message: '同步失败,30 秒后重试',
