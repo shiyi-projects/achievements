@@ -40,11 +40,27 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+
+    final tile = _buildTile(context, theme, scheme);
+    if (widget.list.isSystem) return tile;
+
+    return Draggable<TaskList>(
+      data: widget.list,
+      feedback: _buildFeedback(theme, scheme),
+      childWhenDragging: Opacity(opacity: 0.4, child: tile),
+      child: tile,
+    );
+  }
+
+  Widget _buildTile(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme scheme,
+  ) {
     final isLight = scheme.brightness == Brightness.light;
     final countAsync = ref.watch(taskCountForListIdProvider(widget.list.id));
     final count = countAsync.maybeWhen(data: (n) => n, orElse: () => 0);
 
-    // 背景色：选中 > 悬停 > 透明
     final bgColor = widget.selected
         ? scheme.secondaryContainer
         : _hovering
@@ -168,6 +184,34 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeedback(ThemeData theme, ColorScheme scheme) {
+    return Material(
+      elevation: 6,
+      borderRadius: BorderRadius.circular(Radii.input),
+      color: scheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.md,
+          vertical: Spacing.sm + 2,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 20, height: 20, child: widget.icon),
+            const SizedBox(width: Spacing.md),
+            Text(
+              widget.displayName ?? widget.list.name,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: scheme.onSecondaryContainer,
+              ),
+            ),
+          ],
         ),
       ),
     );

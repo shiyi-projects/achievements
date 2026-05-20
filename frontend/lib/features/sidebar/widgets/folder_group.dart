@@ -2,6 +2,7 @@ import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
+import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/features/sidebar/widgets/sidebar_tile.dart';
 import 'package:achievements/shared/widgets/name_input_dialog.dart';
 import 'package:achievements/state/expanded_folders.dart';
@@ -31,29 +32,63 @@ class FolderGroup extends ConsumerWidget {
     final theme = Theme.of(context);
     return Column(
       children: [
-        GestureDetector(
-          onSecondaryTapDown: (d) => _showMenu(context, ref, d.globalPosition),
-          onLongPress: () => _showMenu(context, ref, null),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-            child: ListTile(
-              dense: true,
-              leading: AppIcons.svgIcon(AppIcons.folder),
-              title: Text(
-                folder.name,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
+        DragTarget<TaskList>(
+          onWillAcceptWithDetails: (details) =>
+              details.data.folderId != folder.id,
+          onAcceptWithDetails: (details) {
+            ref
+                .read(listRepositoryProvider)
+                .setFolder(details.data.id, folder.id);
+            // 拖入后自动展开文件夹
+            if (!isExpanded) {
+              ref.read(expandedFoldersProvider.notifier).toggle(folder.id);
+            }
+          },
+          builder: (ctx, candidateItems, _) {
+            final over = candidateItems.isNotEmpty;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              margin: const EdgeInsets.symmetric(
+                horizontal: Spacing.sm,
+                vertical: 1,
+              ),
+              decoration: BoxDecoration(
+                color: over
+                    ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.5)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(Radii.input),
+                border: over
+                    ? Border.all(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                        width: 1.5,
+                      )
+                    : null,
+              ),
+              child: GestureDetector(
+                onSecondaryTapDown: (d) =>
+                    _showMenu(context, ref, d.globalPosition),
+                onLongPress: () => _showMenu(context, ref, null),
+                child: ListTile(
+                  dense: true,
+                  leading: AppIcons.svgIcon(AppIcons.folder),
+                  title: Text(
+                    folder.name,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  trailing: Icon(
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: theme.colorScheme.outline,
+                  ),
+                  onTap: () => ref
+                      .read(expandedFoldersProvider.notifier)
+                      .toggle(folder.id),
                 ),
               ),
-              trailing: Icon(
-                isExpanded ? Icons.expand_less : Icons.expand_more,
-                size: 18,
-                color: theme.colorScheme.outline,
-              ),
-              onTap: () =>
-                  ref.read(expandedFoldersProvider.notifier).toggle(folder.id),
-            ),
-          ),
+            );
+          },
         ),
         if (isExpanded)
           for (final list in lists)

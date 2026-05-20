@@ -148,17 +148,65 @@ class Sidebar extends ConsumerWidget {
                         currentId: currentId,
                       ),
 
-                    // ── Root lists ──
-                    for (final list in rootLists)
-                      SidebarTile(
-                        list: list,
-                        icon: AppIcons.svgIcon(AppIcons.list),
-                        selected: list.id == currentId,
-                      ),
+                    // ── Root lists — DragTarget 接收从文件夹拖出的清单 ──
+                    DragTarget<TaskList>(
+                      onWillAcceptWithDetails: (details) =>
+                          details.data.folderId != null,
+                      onAcceptWithDetails: (details) {
+                        ref
+                            .read(listRepositoryProvider)
+                            .setFolder(details.data.id, null);
+                      },
+                      builder: (ctx, candidateItems, _) {
+                        final over = candidateItems.isNotEmpty;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          margin: over
+                              ? const EdgeInsets.symmetric(
+                                  horizontal: Spacing.sm,
+                                  vertical: Spacing.xs,
+                                )
+                              : EdgeInsets.zero,
+                          decoration: over
+                              ? BoxDecoration(
+                                  color: theme.colorScheme.secondaryContainer
+                                      .withValues(alpha: 0.35),
+                                  borderRadius:
+                                      BorderRadius.circular(Radii.input),
+                                  border: Border.all(
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.4),
+                                    width: 1.5,
+                                  ),
+                                )
+                              : null,
+                          child: Column(
+                            children: [
+                              for (final list in rootLists)
+                                SidebarTile(
+                                  list: list,
+                                  icon: AppIcons.svgIcon(AppIcons.list),
+                                  selected: list.id == currentId,
+                                ),
+                              if (over && rootLists.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.all(Spacing.sm),
+                                  child: Text(
+                                    '松开移出文件夹',
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
 
                     // ── Create actions ──
-                    const NewListTile(),
-                    const NewFolderTile(),
+                    const NewItemTile(),
 
                     if (folders.isEmpty && rootLists.isEmpty)
                       Padding(

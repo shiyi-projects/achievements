@@ -3,8 +3,6 @@ import 'package:achievements/core/notifications/reminder_checker.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
-import 'package:achievements/data/local/database.dart';
-import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/achievement/achievement_page.dart';
 import 'package:achievements/features/calendar/calendar_page.dart';
 import 'package:achievements/features/focus/focus_page.dart';
@@ -185,16 +183,6 @@ class AppShell extends ConsumerWidget {
       );
     }
 
-    final currentList = currentAsync.maybeWhen(
-      data: (l) => l,
-      orElse: () => null,
-    );
-    final canCreate =
-        view == AppView.list &&
-        currentList != null &&
-        (!currentList.isSystem ||
-            SystemListKind.fromValue(currentList.systemKind) ==
-                SystemListKind.inbox);
 
     final mobileScaffold = Scaffold(
       appBar: AppBar(
@@ -228,12 +216,7 @@ class AppShell extends ConsumerWidget {
         child: KeyedSubtree(key: ValueKey(view), child: mainBody),
       ),
       bottomNavigationBar: _MobileBottomNav(current: view),
-      floatingActionButton: canCreate
-          ? FloatingActionButton(
-              onPressed: () => _openQuickCreate(context, ref, currentList),
-            child: AppIcons.svgIcon(AppIcons.add, size: 24),
-            )
-          : null,
+      floatingActionButton: null,
     );
 
     return ReminderChecker(child: mobileScaffold);
@@ -253,63 +236,7 @@ class AppShell extends ConsumerWidget {
     ref.read(selectedTaskIdProvider.notifier).clear();
   }
 
-  Future<void> _openQuickCreate(
-    BuildContext context,
-    WidgetRef ref,
-    TaskList list,
-  ) async {
-    final controller = TextEditingController();
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(ctx).bottom,
-          left: Spacing.base,
-          right: Spacing.base,
-          top: Spacing.base,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                autofocus: true,
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  hintText: '新建任务…',
-                  border: InputBorder.none,
-                  filled: false,
-                ),
-                onSubmitted: (title) {
-                  if (title.trim().isEmpty) return;
-                  ref.read(taskRepositoryProvider).createTask(
-                    listId: list.id,
-                    title: title.trim(),
-                  );
-                  Navigator.pop(ctx);
-                },
-              ),
-            ),
-            IconButton(
-              icon: AppIcons.svgIcon(AppIcons.send),
-              onPressed: () {
-                final title = controller.text.trim();
-                if (title.isEmpty) return;
-                ref.read(taskRepositoryProvider).createTask(
-                  listId: list.id,
-                  title: title,
-                );
-                Navigator.pop(ctx);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-    controller.dispose();
-  }
+
 }
 
 // ─────────────────────────────────────────────────────────────────────
