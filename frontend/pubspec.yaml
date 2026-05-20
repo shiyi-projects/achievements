@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
 
   # ---- 状态管理 ----
@@ -38,7 +40,6 @@ dependencies:
 
   # ---- 提醒 / 后台 ----
   flutter_local_notifications: ^19.4.2
-  workmanager: ^0.5.2
   timezone: ^0.10.0
   flutter_timezone: ^4.1.1
 
@@ -55,8 +56,9 @@ dependencies:
   hotkey_manager: ^0.2.3
 
   # ---- 国际化 / 格式化 ----
-  intl: ^0.19.0
+  intl: 0.20.2
   connectivity_plus: ^7.1.1
+  calendar_date_picker2: ^3.0.0
 
 dev_dependencies:
   flutter_test:
@@ -92,8 +94,12 @@ flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/app_icon.png"
-  min_sdk_android: 21
+  min_sdk_android: 23
   windows:
     generate: true
     image_path: "assets/app_icon.png"
     icon_size: 48
+
+dependency_overrides:
+  calendar_date_picker2:
+    path: packages/calendar_date_picker2
