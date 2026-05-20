@@ -59,7 +59,7 @@ final inboxListProvider = FutureProvider<TaskList?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef InboxListRef = FutureProviderRef<TaskList?>;
-String _$movableListsHash() => r'018dff18e6bed9606dab64e59093a698aca8d63c';
+String _$movableListsHash() => r'0454a0481547ac68a573d48e0577354d54d2f414';
 
 /// 任务可被移动到的目标清单:Inbox + 全部用户自定义清单。其他系统清单
 /// (today/important/planned 等)是智能过滤,不存储任务,无法作为目标。
