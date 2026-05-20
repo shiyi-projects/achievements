@@ -1,6 +1,7 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
+import 'package:achievements/features/settings/settings_page.dart';
 import 'package:achievements/shared/widgets/name_input_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -107,9 +108,7 @@ class SettingsTile extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        onTap: () {
-          // Phase 4: navigate to settings
-        },
+        onTap: () => showSettingsDialog(context),
       ),
     );
   }

@@ -14,16 +14,14 @@ import 'package:flutter/material.dart';
 ///   - Dialog / BottomSheet 28px 圆角
 ///   - Checkbox 圆形
 ///   - AppBar 无阴影
-const Color _kSeedColor = AppColors.seedTechBlue;
-
-ThemeData buildLightTheme() {
-  final scheme = ColorScheme.fromSeed(seedColor: _kSeedColor);
+ThemeData buildLightTheme([Color seedColor = AppColors.seedTechBlue]) {
+  final scheme = ColorScheme.fromSeed(seedColor: seedColor);
   return _buildTheme(scheme);
 }
 
-ThemeData buildDarkTheme() {
+ThemeData buildDarkTheme([Color seedColor = AppColors.seedTechBlue]) {
   final scheme = ColorScheme.fromSeed(
-    seedColor: _kSeedColor,
+    seedColor: seedColor,
     brightness: Brightness.dark,
   );
   return _buildTheme(scheme);

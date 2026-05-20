@@ -1,6 +1,8 @@
 import 'package:achievements/app/router.dart';
 import 'package:achievements/app/theme.dart';
 import 'package:achievements/data/repositories/bootstrap_provider.dart';
+import 'package:achievements/features/settings/models/app_settings.dart';
+import 'package:achievements/features/settings/providers/settings_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,12 +20,15 @@ class AchievementsApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final settings = ref.watch(settingsNotifierProvider).valueOrNull ??
+        kDefaultSettings;
 
     return MaterialApp.router(
       title: 'Achievements',
       debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(),
-      darkTheme: buildDarkTheme(),
+      themeMode: settings.themeMode,
+      theme: buildLightTheme(settings.seedColor),
+      darkTheme: buildDarkTheme(settings.seedColor),
       routerConfig: router,
       builder: (context, child) {
         final bootstrap = ref.watch(appBootstrapProvider);
