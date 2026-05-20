@@ -74,8 +74,22 @@ dev_dependencies:
   # analyzer_plugin 与 build_runner 当前发布的 analyzer 版本(2026-05)有交叉
   # 不兼容,会导致 build_runner 启动失败。Phase 4 静态分析强化时再补回。
 
+  # ---- 图标生成 ----
+  flutter_launcher_icons: ^0.14.3
+
 flutter:
   uses-material-design: true
 
   assets:
     - assets/app_icon.ico
+    - assets/app_icon.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/app_icon.png"
+  min_sdk_android: 21
+  windows:
+    generate: true
+    image_path: "assets/app_icon.png"
+    icon_size: 48
