@@ -23,6 +23,9 @@ pip-delete-this-directory.txt
 .python-version
 
 # ----- Flutter / Dart -----
+# Vendored local packages: commit lib/ source but skip bundled example apps
+frontend/packages/**/example/
+
 **/.dart_tool/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
