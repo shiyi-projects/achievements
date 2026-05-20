@@ -1,6 +1,8 @@
 import 'package:achievements/core/constants.dart';
+import 'package:achievements/core/notifications/reminder_checker.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/achievement/achievement_page.dart';
@@ -117,7 +119,8 @@ class AppShell extends ConsumerWidget {
     final scheme = theme.colorScheme;
 
     if (showSidebarInline) {
-      return CallbackShortcuts(
+      return ReminderChecker(
+        child: CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.keyK, control: true):
               () => showCommandPalette(context),
@@ -178,6 +181,7 @@ class AppShell extends ConsumerWidget {
             ),
           ),
         ),
+      ),
       );
     }
 
@@ -192,7 +196,7 @@ class AppShell extends ConsumerWidget {
             SystemListKind.fromValue(currentList.systemKind) ==
                 SystemListKind.inbox);
 
-    return Scaffold(
+    final mobileScaffold = Scaffold(
       appBar: AppBar(
         title: AnimatedSwitcher(
           duration: MotionDurations.fast,
@@ -227,10 +231,12 @@ class AppShell extends ConsumerWidget {
       floatingActionButton: canCreate
           ? FloatingActionButton(
               onPressed: () => _openQuickCreate(context, ref, currentList),
-              child: const Icon(Icons.add_rounded),
+            child: AppIcons.svgIcon(AppIcons.add, size: 24),
             )
           : null,
     );
+
+    return ReminderChecker(child: mobileScaffold);
   }
 
   Future<void> _openTaskSheet(BuildContext context, WidgetRef ref) async {
@@ -287,7 +293,7 @@ class AppShell extends ConsumerWidget {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.send_rounded),
+              icon: AppIcons.svgIcon(AppIcons.send),
               onPressed: () {
                 final title = controller.text.trim();
                 if (title.isEmpty) return;
@@ -365,11 +371,7 @@ class _ModernAppBar extends ConsumerWidget {
                 turns: Tween(begin: 0.5, end: 1.0).animate(anim),
                 child: FadeTransition(opacity: anim, child: child),
               ),
-              child: Icon(
-                isSearching ? Icons.search_off_rounded : Icons.search_rounded,
-                key: ValueKey(isSearching),
-                color: isSearching ? scheme.primary : scheme.onSurfaceVariant,
-              ),
+              child: AppIcons.svgIcon(AppIcons.search),
             ),
             tooltip: isSearching ? '关闭搜索' : '搜索',
             onPressed: () {
@@ -421,16 +423,12 @@ class _SyncStatusIcon extends ConsumerWidget {
         SyncStatus.offline => Tooltip(
           key: const ValueKey('offline'),
           message: '已离线',
-          child: Icon(Icons.cloud_off_outlined, size: 20, color: scheme.outline),
+          child: AppIcons.svgIcon(AppIcons.cloudSync, size: 20),
         ),
         SyncStatus.error => Tooltip(
           key: const ValueKey('error'),
           message: '同步失败,30 秒后重试',
-          child: Icon(
-            Icons.sync_problem_outlined,
-            size: 20,
-            color: scheme.error,
-          ),
+          child: AppIcons.svgIcon(AppIcons.sync, size: 20),
         ),
       },
     );
@@ -446,12 +444,12 @@ class _MobileBottomNav extends ConsumerWidget {
 
   final AppView current;
 
-  static const _items = [
-    (icon: Icons.format_list_bulleted_rounded, label: '清单', view: AppView.list),
-    (icon: Icons.calendar_month_rounded, label: '日历', view: AppView.calendar),
-    (icon: Icons.timer_outlined, label: '专注', view: AppView.focus),
-    (icon: Icons.bar_chart_rounded, label: '统计', view: AppView.statistics),
-    (icon: Icons.emoji_events_rounded, label: '成就', view: AppView.achievement),
+  static final _items = [
+    (svgPath: AppIcons.list, label: '清单', view: AppView.list),
+    (svgPath: AppIcons.calendar, label: '日历', view: AppView.calendar),
+    (svgPath: AppIcons.focusTimer, label: '专注', view: AppView.focus),
+    (svgPath: AppIcons.stats, label: '统计', view: AppView.statistics),
+    (svgPath: AppIcons.achievement, label: '成就', view: AppView.achievement),
   ];
 
   @override
@@ -481,7 +479,7 @@ class _MobileBottomNav extends ConsumerWidget {
       destinations: [
         for (final item in _items)
           NavigationDestination(
-            icon: Icon(item.icon),
+            icon: AppIcons.svgIcon(item.svgPath, size: 24),
             label: item.label,
           ),
       ],

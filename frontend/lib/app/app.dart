@@ -1,5 +1,6 @@
 import 'package:achievements/app/router.dart';
 import 'package:achievements/app/theme.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/repositories/bootstrap_provider.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
@@ -89,11 +90,7 @@ class _BootstrapSplash extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Icon(
-                  Icons.emoji_events_rounded,
-                  color: scheme.onPrimary,
-                  size: 32,
-                ),
+                child: AppIcons.svgIcon(AppIcons.achievement, size: 32),
               )
                   .animate()
                   .scale(
