@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/platform/android/haptic.dart';
@@ -11,7 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// - tasks 全为空 -> 渲染 [emptyState]
 /// - 仅 pending -> 直接渲染
 /// - 仅 completed -> 折叠区一开始展开
-/// - 两者都有 -> 上半 pending,下半 ExpansionTile("Completed (N)")
+/// - 两者都有 -> 上半 pending,下半 ExpansionTile("已完成 (N)")
 ///
 /// 在移动端:向右滑动 = 完成/恢复,向左滑动 = 删除(带触觉反馈)。
 class PendingCompletedList extends ConsumerWidget {
@@ -45,7 +46,7 @@ class PendingCompletedList extends ConsumerWidget {
               Spacing.xs,
             ),
             child: Text(
-              'Pending (${pending.length})',
+              '待完成 (${pending.length})',
               style: theme.textTheme.labelMedium?.copyWith(
                 color: scheme.outline,
                 letterSpacing: 0.5,
@@ -73,7 +74,7 @@ class PendingCompletedList extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(Radii.input),
                 ),
                 title: Text(
-                  'Completed (${completed.length})',
+                  '已完成 (${completed.length})',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: scheme.outline,
                     letterSpacing: 0.5,
@@ -93,7 +94,7 @@ class PendingCompletedList extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Swipeable wrapper
+// Swipeable wrapper — 增强的滑动动画
 // ─────────────────────────────────────────────────────────────────────
 
 class _SwipeableTaskTile extends ConsumerWidget {
@@ -112,13 +113,15 @@ class _SwipeableTaskTile extends ConsumerWidget {
       // Right swipe: complete (pending) or restore (completed)
       background: _SwipeBackground(
         color: scheme.primaryContainer,
-        icon: isPending ? Icons.check_circle_rounded : Icons.undo_rounded,
+        icon: isPending ? AppIcons.svgIcon(AppIcons.completedStatus, size: 24) : AppIcons.svgIcon(AppIcons.undo, size: 24),
+        label: isPending ? '完成' : '恢复',
         alignment: Alignment.centerLeft,
       ),
       // Left swipe: delete
       secondaryBackground: _SwipeBackground(
         color: scheme.errorContainer,
-        icon: Icons.delete_rounded,
+        icon: AppIcons.svgIcon(AppIcons.delete, size: 24),
+        label: '删除',
         alignment: Alignment.centerRight,
       ),
       confirmDismiss: (direction) async {
@@ -128,7 +131,7 @@ class _SwipeableTaskTile extends ConsumerWidget {
           await repo.setCompleted(task.id, completed: isPending);
           return false; // the list refreshes reactively; don't remove widget
         } else {
-          // delete — ask for confirmation on desktop, direct on mobile
+          // delete
           await Haptic.heavy();
           await repo.softDelete(task.id);
           return false;
@@ -143,15 +146,21 @@ class _SwipeBackground extends StatelessWidget {
   const _SwipeBackground({
     required this.color,
     required this.icon,
+    required this.label,
     required this.alignment,
   });
 
   final Color color;
-  final IconData icon;
+  final Widget icon;
+  final String label;
   final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isLeft = alignment == Alignment.centerLeft;
+
     return Container(
       margin: const EdgeInsets.symmetric(
         horizontal: Spacing.base,
@@ -163,7 +172,32 @@ class _SwipeBackground extends StatelessWidget {
       ),
       alignment: alignment,
       padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-      child: Icon(icon, color: Theme.of(context).colorScheme.onPrimaryContainer),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!isLeft) ...[
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.onErrorContainer,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: Spacing.sm),
+          ],
+          icon,
+          if (isLeft) ...[
+            const SizedBox(width: Spacing.sm),
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.onPrimaryContainer,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

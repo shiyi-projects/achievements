@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/features/sidebar/widgets/sidebar_tile.dart';
@@ -37,11 +38,7 @@ class FolderGroup extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
             child: ListTile(
               dense: true,
-              leading: Icon(
-                isExpanded ? Icons.folder_open_rounded : Icons.folder_rounded,
-                size: 20,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              leading: AppIcons.svgIcon(AppIcons.folder),
               title: Text(
                 folder.name,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -64,7 +61,7 @@ class FolderGroup extends ConsumerWidget {
               padding: const EdgeInsets.only(left: Spacing.base),
               child: SidebarTile(
                 list: list,
-                icon: Icons.format_list_bulleted_rounded,
+                icon: AppIcons.svgIcon(AppIcons.list),
                 selected: list.id == currentId,
               ),
             ),
@@ -88,9 +85,29 @@ class FolderGroup extends ConsumerWidget {
         overlay.size.width - anchor.dx,
         overlay.size.height - anchor.dy,
       ),
-      items: const [
-        PopupMenuItem(value: 'rename', child: Text('重命名')),
-        PopupMenuItem(value: 'delete', child: Text('删除')),
+      items: [
+        const PopupMenuItem(
+          value: 'rename',
+          child: Row(
+            children: [
+              Icon(Icons.edit_rounded, size: 18),
+              SizedBox(width: Spacing.md),
+              Text('重命名'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, size: 18,
+                color: Theme.of(context).colorScheme.error),
+              const SizedBox(width: Spacing.md),
+              Text('删除',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ],
+          ),
+        ),
       ],
     );
     if (!context.mounted) return;
@@ -100,6 +117,7 @@ class FolderGroup extends ConsumerWidget {
           context,
           title: '重命名文件夹',
           initial: folder.name,
+          icon: Icons.folder_rounded,
         );
         if (name != null && name != folder.name) {
           await ref.read(folderRepositoryProvider).rename(folder.id, name);
@@ -108,6 +126,11 @@ class FolderGroup extends ConsumerWidget {
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
+            icon: Icon(
+              Icons.warning_amber_rounded,
+              color: Theme.of(ctx).colorScheme.error,
+              size: 32,
+            ),
             title: const Text('删除文件夹?'),
             content: Text('文件夹"${folder.name}"将被删除,其中的清单会移到根目录,不会丢失。'),
             actions: [
@@ -115,10 +138,10 @@ class FolderGroup extends ConsumerWidget {
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('取消'),
               ),
-              FilledButton.tonal(
+              FilledButton(
                 style: FilledButton.styleFrom(
-                  foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
-                  backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
+                  foregroundColor: Theme.of(ctx).colorScheme.onError,
+                  backgroundColor: Theme.of(ctx).colorScheme.error,
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('删除'),

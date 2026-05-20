@@ -242,6 +242,24 @@ class TaskRepository {
     );
   }
 
+  /// 查询所有已到期的提醒：remind_at <= now，未完成，未删除。
+  /// [ReminderChecker] 前台轮询时使用。
+  Future<List<Task>> findDueReminders() async {
+    final now = DateTime.now();
+    return (_db.select(_db.tasks)
+          ..where(
+            (t) =>
+                t.remindAt.isNotNull() &
+                t.remindAt.isSmallerOrEqualValue(now) &
+                t.completedAt.isNull() &
+                t.deletedAt.isNull(),
+          )
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.remindAt),
+          ]))
+        .get();
+  }
+
   Future<void> softDelete(String id) async {
     await _db.transaction(() async {
       final current = await (_db.select(

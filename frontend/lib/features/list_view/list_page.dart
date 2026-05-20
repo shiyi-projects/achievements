@@ -1,5 +1,6 @@
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/search/providers/search_providers.dart';
@@ -59,6 +60,11 @@ class _ListPageState extends ConsumerState<ListPage> {
       }
     });
 
+    final isTrash = current != null &&
+        current.isSystem &&
+        SystemListKind.fromValue(current.systemKind) ==
+            SystemListKind.trash;
+
     return Column(
       children: [
         // ── Inline search bar ──
@@ -74,24 +80,25 @@ class _ListPageState extends ConsumerState<ListPage> {
                   error: (e, st) => Center(
                     child: Padding(
                       padding: const EdgeInsets.all(Spacing.xl),
-                      child: Text('Failed to load: $e'),
+                      child: Text('加载失败: $e'),
                     ),
                   ),
-                  data: (tasks) => PendingCompletedList(
-                    tasks: tasks,
-                    emptyState: const EmptyState(
-                      icon: Icons.inbox_rounded,
-                      title: 'No tasks here yet',
-                      subtitle:
-                          'Create from the input below or move tasks from other lists.',
-                    ),
-                  ),
+                  data: (tasks) => isTrash
+                      ? _TrashList(tasks: tasks)
+                      : PendingCompletedList(
+                          tasks: tasks,
+                          emptyState: EmptyState(
+                            icon: AppIcons.svgIcon(AppIcons.inbox, size: 36),
+                            title: '还没有任务',
+                            subtitle: '从下方输入框创建，或从其他清单移入。',
+                          ),
+                        ),
                 ),
         ),
 
         if (canQuickCreate)
           QuickCreateInput(
-            hint: 'Add a task to ${current.name}',
+            hint: '添加任务到「${current.name}」…',
             onSubmit: (title) => ref
                 .read(taskRepositoryProvider)
                 .createTask(listId: current.id, title: title),
@@ -129,12 +136,12 @@ class _SearchBar extends ConsumerWidget {
         style: theme.textTheme.bodyMedium,
         decoration: InputDecoration(
           hintText: '搜索所有任务…',
-          prefixIcon: const Icon(Icons.search_rounded, size: 20),
+          prefixIcon: AppIcons.svgIcon(AppIcons.search, size: 20),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
             builder: (_, value, __) => value.text.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.clear, size: 18),
+                    icon: AppIcons.svgIcon(AppIcons.close, size: 18),
                     onPressed: () {
                       controller.clear();
                       ref.read(searchQueryProvider.notifier).state = '';
@@ -176,8 +183,8 @@ class _SearchResults extends StatelessWidget {
       ),
       data: (tasks) {
         if (tasks.isEmpty) {
-          return const EmptyState(
-            icon: Icons.search_off_rounded,
+          return EmptyState(
+            icon: AppIcons.svgIcon(AppIcons.search, size: 36),
             title: '没有匹配的任务',
             subtitle: '试试其他关键词',
           );
@@ -191,6 +198,94 @@ class _SearchResults extends StatelessWidget {
             endIndent: Spacing.base,
           ),
           itemBuilder: (_, i) => TaskTile(task: tasks[i]),
+        );
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Trash — 扁平列表,不区分已完成/未完成
+// ─────────────────────────────────────────────────────────────────────
+
+class _TrashList extends ConsumerWidget {
+  const _TrashList({required this.tasks});
+  final List<Task> tasks;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (tasks.isEmpty) {
+      return EmptyState(
+        icon: AppIcons.svgIcon(AppIcons.delete, size: 36),
+        title: '回收站是空的',
+        subtitle: '被删除的任务会出现在这里。',
+      );
+    }
+
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: Spacing.sm, bottom: Spacing.sm),
+      itemCount: tasks.length + 1, // +1 for header
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Spacing.xl, Spacing.sm, Spacing.base, Spacing.xs,
+            ),
+            child: Text(
+              '已删除 (${tasks.length})',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.outline,
+                letterSpacing: 0.5,
+              ),
+            ),
+          );
+        }
+        final task = tasks[index - 1];
+        return Dismissible(
+          key: ValueKey('trash-${task.id}'),
+          // 右滑: 恢复
+          background: Container(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
+            color: scheme.primaryContainer,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIcons.svgIcon(AppIcons.undo, size: 20),
+                const SizedBox(width: Spacing.xs),
+                Text('恢复', style: TextStyle(color: scheme.onPrimaryContainer)),
+              ],
+            ),
+          ),
+          // 左滑: 永久删除
+          secondaryBackground: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
+            color: scheme.errorContainer,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('永久删除', style: TextStyle(color: scheme.onErrorContainer)),
+                const SizedBox(width: Spacing.xs),
+                AppIcons.svgIcon(AppIcons.delete, size: 20),
+              ],
+            ),
+          ),
+          confirmDismiss: (direction) async {
+            if (direction == DismissDirection.startToEnd) {
+              // 恢复
+              await ref.read(taskRepositoryProvider).restore(task.id);
+              return false; // 流会自动更新列表
+            } else {
+              // 永久删除
+              await ref.read(taskRepositoryProvider).hardDelete(task.id);
+              return false;
+            }
+          },
+          child: TaskTile(task: task),
         );
       },
     );

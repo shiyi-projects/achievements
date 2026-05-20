@@ -2,6 +2,7 @@ import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:achievements/shared/widgets/name_input_dialog.dart';
 import 'package:achievements/state/current_view.dart';
 import 'package:achievements/state/selected_list.dart';
@@ -9,10 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ─────────────────────────────────────────────────────────────────────
-// Sidebar Tile
+// Sidebar Tile — 带动画指示条和悬停效果
 // ─────────────────────────────────────────────────────────────────────
 
-class SidebarTile extends ConsumerWidget {
+class SidebarTile extends ConsumerStatefulWidget {
   const SidebarTile({
     required this.list,
     required this.icon,
@@ -22,93 +23,148 @@ class SidebarTile extends ConsumerWidget {
   });
 
   final TaskList list;
-  final IconData icon;
+  final Widget icon;
   final bool selected;
 
   /// UI 层覆写显示名(用于系统清单中文化)。为 null 时回退到 `list.name`。
   final String? displayName;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SidebarTile> createState() => _SidebarTileState();
+}
+
+class _SidebarTileState extends ConsumerState<SidebarTile> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final countAsync = ref.watch(taskCountForListIdProvider(list.id));
+    final isLight = scheme.brightness == Brightness.light;
+    final countAsync = ref.watch(taskCountForListIdProvider(widget.list.id));
     final count = countAsync.maybeWhen(data: (n) => n, orElse: () => 0);
+
+    // 背景色：选中 > 悬停 > 透明
+    final bgColor = widget.selected
+        ? scheme.secondaryContainer
+        : _hovering
+            ? (isLight
+                ? scheme.surfaceContainerHigh.withValues(alpha: 0.5)
+                : scheme.surfaceContainerHigh.withValues(alpha: 0.3))
+            : Colors.transparent;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
       child: GestureDetector(
-        onSecondaryTapDown: (d) => _showMenu(context, ref, d.globalPosition),
+        onSecondaryTapDown: (d) =>
+            _showMenu(context, ref, d.globalPosition),
         onLongPress: () => _showMenu(context, ref, null),
-        child: Material(
-          color: selected ? scheme.secondaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(Radii.input),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(Radii.input),
-            onTap: () {
-              ref.read(currentViewNotifierProvider.notifier).showList();
-              ref.read(selectedListIdProvider.notifier).select(list.id);
-              final scaffold = Scaffold.maybeOf(context);
-              if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
-                Navigator.of(context).pop();
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: Spacing.md,
-                vertical: Spacing.sm + 2,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    icon,
-                    size: 20,
-                    color: selected
-                        ? scheme.onSecondaryContainer
-                        : scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: Spacing.md),
-                  Expanded(
-                    child: Text(
-                      displayName ?? list.name,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                        color: selected
-                            ? scheme.onSecondaryContainer
-                            : scheme.onSurface,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (count > 0)
-                    Container(
-                      constraints: const BoxConstraints(minWidth: 22),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hovering = true),
+          onExit: (_) => setState(() => _hovering = false),
+          child: AnimatedContainer(
+            duration: MotionDurations.fast,
+            curve: MotionCurves.gentleSpring,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(Radii.input),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(Radii.input),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(Radii.input),
+                onTap: () {
+                  ref.read(currentViewNotifierProvider.notifier).showList();
+                  ref.read(selectedListIdProvider.notifier).select(widget.list.id);
+                  final scaffold = Scaffold.maybeOf(context);
+                  if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
+                    Navigator.of(context).pop();
+                  }
+                },
+                child: Row(
+                  children: [
+                    // ── 左侧指示条 ──
+                    AnimatedContainer(
+                      duration: MotionDurations.fast,
+                      curve: MotionCurves.emphasizedDecelerate,
+                      width: widget.selected ? 3 : 0,
+                      height: 20,
                       decoration: BoxDecoration(
-                        color: selected
-                            ? scheme.onSecondaryContainer.withValues(
-                                alpha: 0.12,
-                              )
-                            : scheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(Radii.circle),
+                        color: scheme.primary,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      child: Text(
-                        '$count',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: selected
-                              ? scheme.onSecondaryContainer
-                              : scheme.outline,
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          widget.selected ? Spacing.sm : Spacing.md,
+                          Spacing.sm + 2,
+                          Spacing.md,
+                          Spacing.sm + 2,
+                        ),
+                        child: Row(
+                          children: [
+                            AnimatedScale(
+                              scale: widget.selected ? 1.08 : 1.0,
+                              duration: MotionDurations.fast,
+                              curve: MotionCurves.bouncySpring,
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: widget.icon,
+                              ),
+                            ),
+                            const SizedBox(width: Spacing.md),
+                            Expanded(
+                              child: Text(
+                                widget.displayName ?? widget.list.name,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: widget.selected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  color: widget.selected
+                                      ? scheme.onSecondaryContainer
+                                      : scheme.onSurface,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (count > 0)
+                              AnimatedContainer(
+                                duration: MotionDurations.fast,
+                                curve: MotionCurves.gentleSpring,
+                                constraints: const BoxConstraints(minWidth: 22),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: widget.selected
+                                      ? scheme.onSecondaryContainer.withValues(
+                                          alpha: 0.12,
+                                        )
+                                      : scheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(Radii.circle),
+                                ),
+                                child: Text(
+                                  '$count',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: widget.selected
+                                        ? scheme.onSecondaryContainer
+                                        : scheme.outline,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -122,7 +178,7 @@ class SidebarTile extends ConsumerWidget {
     WidgetRef ref,
     Offset? position,
   ) async {
-    if (list.isSystem) return;
+    if (widget.list.isSystem) return;
     final overlay =
         Overlay.of(context).context.findRenderObject()! as RenderBox;
     final anchor = position ?? overlay.localToGlobal(Offset.zero);
@@ -134,9 +190,29 @@ class SidebarTile extends ConsumerWidget {
         overlay.size.width - anchor.dx,
         overlay.size.height - anchor.dy,
       ),
-      items: const [
-        PopupMenuItem(value: 'rename', child: Text('重命名')),
-        PopupMenuItem(value: 'delete', child: Text('删除')),
+      items: [
+        const PopupMenuItem(
+          value: 'rename',
+          child: Row(
+            children: [
+              Icon(Icons.edit_rounded, size: 18),
+              SizedBox(width: Spacing.md),
+              Text('重命名'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, size: 18,
+                color: Theme.of(context).colorScheme.error),
+              const SizedBox(width: Spacing.md),
+              Text('删除',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ],
+          ),
+        ),
       ],
     );
     if (!context.mounted) return;
@@ -145,15 +221,15 @@ class SidebarTile extends ConsumerWidget {
         final name = await showNameInputDialog(
           context,
           title: '重命名清单',
-          initial: list.name,
+          initial: widget.list.name,
         );
-        if (name != null && name != list.name) {
-          await ref.read(listRepositoryProvider).rename(list.id, name);
+        if (name != null && name != widget.list.name) {
+          await ref.read(listRepositoryProvider).rename(widget.list.id, name);
         }
       case 'delete':
-        final confirmed = await _confirmDelete(context, list.name);
+        final confirmed = await _confirmDelete(context, widget.list.name);
         if (confirmed) {
-          await ref.read(listRepositoryProvider).softDelete(list);
+          await ref.read(listRepositoryProvider).softDelete(widget.list);
         }
     }
   }
@@ -162,6 +238,11 @@ class SidebarTile extends ConsumerWidget {
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
+            icon: Icon(
+              Icons.warning_amber_rounded,
+              color: Theme.of(ctx).colorScheme.error,
+              size: 32,
+            ),
             title: const Text('删除清单?'),
             content: Text('清单"$name"及其任务将被移到回收站。'),
             actions: [
@@ -169,10 +250,10 @@ class SidebarTile extends ConsumerWidget {
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('取消'),
               ),
-              FilledButton.tonal(
+              FilledButton(
                 style: FilledButton.styleFrom(
-                  foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
-                  backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
+                  foregroundColor: Theme.of(ctx).colorScheme.onError,
+                  backgroundColor: Theme.of(ctx).colorScheme.error,
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('删除'),

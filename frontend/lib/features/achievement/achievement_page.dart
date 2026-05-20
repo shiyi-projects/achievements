@@ -1,3 +1,5 @@
+import 'package:achievements/shared/animations/animated_list_item.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:achievements/features/achievement/models/achievement_def.dart';
 import 'package:achievements/features/achievement/providers/achievement_providers.dart';
 import 'package:achievements/features/achievement/widgets/achievement_card.dart';
@@ -13,7 +15,7 @@ class AchievementPage extends ConsumerWidget {
 
     return statusAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('错误: $e')),
+      error: (e, _) => Center(child: Text('加载失败: $e')),
       data: (status) {
         final unlocked = kAchievementDefs.where((d) => status[d.code] ?? false).toList();
         final locked = kAchievementDefs.where((d) => !(status[d.code] ?? false)).toList();
@@ -58,9 +60,14 @@ class _SummaryBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final progress = unlocked / total;
+    final scheme = theme.colorScheme;
+    final isLight = scheme.brightness == Brightness.light;
+    final progress = total > 0 ? unlocked / total : 0.0;
+
     return Card(
-      color: theme.colorScheme.primaryContainer,
+      color: isLight
+          ? scheme.primaryContainer
+          : scheme.primaryContainer.withValues(alpha: 0.4),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -73,17 +80,28 @@ class _SummaryBanner extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '$unlocked / $total 个成就',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onPrimaryContainer,
-                      ),
+                    Row(
+                      children: [
+                        AnimatedCounter(
+                          value: unlocked,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: scheme.onPrimaryContainer,
+                          ),
+                        ),
+                        Text(
+                          ' / $total 个成就',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: scheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       '${(progress * 100).round()}% 已解锁',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.75),
+                        color: scheme.onPrimaryContainer.withValues(alpha: 0.75),
                       ),
                     ),
                   ],
@@ -93,12 +111,19 @@ class _SummaryBanner extends StatelessWidget {
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor:
-                    theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.12),
-                valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: progress),
+                duration: MotionDurations.celebration,
+                curve: MotionCurves.emphasizedDecelerate,
+                builder: (context, value, _) {
+                  return LinearProgressIndicator(
+                    value: value,
+                    minHeight: 8,
+                    backgroundColor:
+                        scheme.onPrimaryContainer.withValues(alpha: 0.12),
+                    valueColor: AlwaysStoppedAnimation(scheme.primary),
+                  );
+                },
               ),
             ),
           ],

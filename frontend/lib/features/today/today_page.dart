@@ -1,7 +1,9 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:achievements/shared/widgets/empty_state.dart';
 import 'package:achievements/shared/widgets/quick_create_input.dart';
 import 'package:achievements/shared/widgets/task_tile.dart';
@@ -27,14 +29,14 @@ class TodayPage extends ConsumerWidget {
             error: (e, st) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(Spacing.xl),
-                child: Text('Failed to load: $e'),
+                child: Text('加载失败: $e'),
               ),
             ),
             data: (tasks) => _TodayBody(tasks: tasks, now: DateTime.now()),
           ),
         ),
         QuickCreateInput(
-          hint: 'Add a task for today',
+          hint: '添加今日任务…',
           onSubmit: (title) => _createForToday(ref, title),
         ),
       ],
@@ -78,18 +80,18 @@ class _TodayBody extends StatelessWidget {
 
         // ── Task List (as native slivers — no nested scrollable) ──
         if (tasks.isEmpty)
-          const SliverFillRemaining(
+          SliverFillRemaining(
             hasScrollBody: false,
             child: EmptyState(
-              icon: Icons.task_alt_rounded,
-              title: 'Nothing on today',
-              subtitle: 'Create your first task from the input below.',
+              icon: AppIcons.svgIcon(AppIcons.completed, size: 36),
+              title: '今天还没有任务',
+              subtitle: '从下方输入框创建你的第一个任务吧。',
             ),
           )
         else ...[
           if (pending.isNotEmpty) ...[
             SliverToBoxAdapter(
-              child: _SectionHeader('Pending (${pending.length})'),
+              child: _SectionHeader('待完成 (${pending.length})'),
             ),
             SliverList.builder(
               itemCount: pending.length,
@@ -164,7 +166,7 @@ class _CompletedSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(Radii.input),
           ),
           title: Text(
-            'Completed (${tasks.length})',
+            '已完成 (${tasks.length})',
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.outline,
               letterSpacing: 0.5,
@@ -179,7 +181,7 @@ class _CompletedSection extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Welcome Card
+// Welcome Card — 带动画进度条和动态 Emoji
 // ─────────────────────────────────────────────────────────────────────
 
 class _WelcomeCard extends StatelessWidget {
@@ -199,9 +201,11 @@ class _WelcomeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final dateLabel = DateFormat.yMMMMEEEEd().format(date);
+    final isLight = scheme.brightness == Brightness.light;
+    final dateLabel = DateFormat.yMMMMEEEEd('zh_CN').format(date);
     final pending = total - completed;
     final progress = total > 0 ? completed / total : 0.0;
+    final emoji = _greetingEmoji(hour);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -215,24 +219,45 @@ class _WelcomeCard extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              scheme.primaryContainer,
-              scheme.primaryContainer.withValues(alpha: 0.6),
-            ],
+            colors: isLight
+                ? [
+                    scheme.primaryContainer,
+                    scheme.primaryContainer.withValues(alpha: 0.6),
+                  ]
+                : [
+                    scheme.primaryContainer.withValues(alpha: 0.4),
+                    scheme.primaryContainer.withValues(alpha: 0.15),
+                  ],
           ),
           borderRadius: BorderRadius.circular(Radii.card),
+          border: isLight
+              ? null
+              : Border.all(
+                  color: scheme.primaryContainer.withValues(alpha: 0.3),
+                ),
         ),
         padding: const EdgeInsets.all(Spacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Greeting ──
-            Text(
-              _greeting(hour),
-              style: theme.textTheme.headlineMedium?.copyWith(
-                color: scheme.onPrimaryContainer,
-                fontWeight: FontWeight.w700,
-              ),
+            Row(
+              children: [
+                Text(
+                  emoji,
+                  style: const TextStyle(fontSize: 28),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: Text(
+                    _greeting(hour),
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: scheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: Spacing.xs),
             Text(
@@ -244,29 +269,43 @@ class _WelcomeCard extends StatelessWidget {
 
             const SizedBox(height: Spacing.base),
 
-            // ── Progress ──
+            // ── Animated Progress ──
             Row(
               children: [
                 Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(Radii.circle),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 6,
-                      backgroundColor: scheme.onPrimaryContainer.withValues(
-                        alpha: 0.12,
-                      ),
-                      valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: progress),
+                      duration: MotionDurations.celebration,
+                      curve: MotionCurves.emphasizedDecelerate,
+                      builder: (context, value, _) {
+                        return LinearProgressIndicator(
+                          value: value,
+                          minHeight: 6,
+                          backgroundColor: scheme.onPrimaryContainer.withValues(
+                            alpha: 0.12,
+                          ),
+                          valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                        );
+                      },
                     ),
                   ),
                 ),
                 const SizedBox(width: Spacing.md),
-                Text(
-                  '$completed / $total',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                    fontWeight: FontWeight.w600,
-                  ),
+                TweenAnimationBuilder<int>(
+                  tween: IntTween(begin: 0, end: completed),
+                  duration: MotionDurations.bouncy,
+                  curve: MotionCurves.emphasizedDecelerate,
+                  builder: (context, val, _) {
+                    return Text(
+                      '$val / $total',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: scheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -276,8 +315,8 @@ class _WelcomeCard extends StatelessWidget {
             // ── Summary ──
             Text(
               total == 0
-                  ? 'No tasks due today'
-                  : '$pending pending · $completed completed',
+                  ? '今天没有待办任务'
+                  : '$pending 个待完成 · $completed 个已完成',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.onPrimaryContainer.withValues(alpha: 0.7),
               ),
@@ -289,9 +328,16 @@ class _WelcomeCard extends StatelessWidget {
   }
 
   String _greeting(int hour) {
-    if (hour < 5) return 'Still up?';
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 5) return '夜深了';
+    if (hour < 12) return '早上好';
+    if (hour < 18) return '下午好';
+    return '晚上好';
+  }
+
+  String _greetingEmoji(int hour) {
+    if (hour < 5) return '🦉';
+    if (hour < 12) return '🌅';
+    if (hour < 18) return '☀️';
+    return '🌙';
   }
 }

@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
 import 'package:flutter/material.dart';
@@ -65,7 +66,7 @@ class SettingsPage extends ConsumerWidget {
         actions: [
           if (showCloseButton)
             IconButton(
-              icon: const Icon(Icons.close),
+              icon: AppIcons.svgIcon(AppIcons.close),
               onPressed: () => Navigator.of(context).pop(),
             ),
         ],
@@ -225,7 +226,7 @@ class _ColorSection extends ConsumerWidget {
                           : null,
                     ),
                     child: isSelected
-                        ? const Icon(Icons.check, color: Colors.white, size: 20)
+                        ? AppIcons.svgIcon(AppIcons.check, size: 20)
                         : null,
                   ),
                 ),
@@ -251,7 +252,7 @@ class _AboutSection extends StatelessWidget {
     return Column(
       children: [
         ListTile(
-          leading: const Icon(Icons.info_outline_rounded),
+          leading: AppIcons.svgIcon(AppIcons.info),
           title: const Text('版本'),
           trailing: Text(
             '0.0.1',

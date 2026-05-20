@@ -1,4 +1,5 @@
 import 'package:achievements/core/constants.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
@@ -97,25 +98,25 @@ class Sidebar extends ConsumerWidget {
 
                     // ── Top-level view nav entries ──
                     ViewNavTile(
-                      icon: Icons.calendar_month_rounded,
+                      icon: AppIcons.svgIcon(AppIcons.calendar),
                       label: '日历',
                       selected: currentView == AppView.calendar,
                       onTap: viewNotifier.showCalendar,
                     ),
                     ViewNavTile(
-                      icon: Icons.timer_outlined,
+                      icon: AppIcons.svgIcon(AppIcons.focusTimer),
                       label: '专注',
                       selected: currentView == AppView.focus,
                       onTap: viewNotifier.showFocus,
                     ),
                     ViewNavTile(
-                      icon: Icons.bar_chart_rounded,
+                      icon: AppIcons.svgIcon(AppIcons.stats),
                       label: '统计',
                       selected: currentView == AppView.statistics,
                       onTap: viewNotifier.showStatistics,
                     ),
                     ViewNavTile(
-                      icon: Icons.emoji_events_rounded,
+                      icon: AppIcons.svgIcon(AppIcons.achievement),
                       label: '成就',
                       selected: currentView == AppView.achievement,
                       onTap: viewNotifier.showAchievement,
@@ -151,7 +152,7 @@ class Sidebar extends ConsumerWidget {
                     for (final list in rootLists)
                       SidebarTile(
                         list: list,
-                        icon: Icons.format_list_bulleted_rounded,
+                        icon: AppIcons.svgIcon(AppIcons.list),
                         selected: list.id == currentId,
                       ),
 
@@ -190,25 +191,18 @@ class Sidebar extends ConsumerWidget {
     );
   }
 
-  IconData _systemIcon(SystemListKind? kind) {
-    switch (kind) {
-      case SystemListKind.inbox:
-        return Icons.inbox_rounded;
-      case SystemListKind.today:
-        return Icons.today_rounded;
-      case SystemListKind.important:
-        return Icons.star_rounded;
-      case SystemListKind.planned:
-        return Icons.event_rounded;
-      case SystemListKind.all:
-        return Icons.checklist_rounded;
-      case SystemListKind.completed:
-        return Icons.task_alt_rounded;
-      case SystemListKind.trash:
-        return Icons.delete_outline_rounded;
-      case null:
-        return Icons.list_alt_rounded;
-    }
+  Widget _systemIcon(SystemListKind? kind) {
+    final path = switch (kind) {
+      SystemListKind.inbox => AppIcons.inbox,
+      SystemListKind.today => AppIcons.today,
+      SystemListKind.important => AppIcons.important,
+      SystemListKind.planned => AppIcons.planned,
+      SystemListKind.all => AppIcons.allTasks,
+      SystemListKind.completed => AppIcons.completed,
+      SystemListKind.trash => AppIcons.delete,
+      null => AppIcons.list,
+    };
+    return AppIcons.svgIcon(path);
   }
 
   /// 系统清单的中文显示名。数据库里 seed 出的英文(Inbox / Today / …)是给同步

@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/state/current_view.dart';
@@ -146,11 +147,7 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.search_rounded,
-                      size: 20,
-                      color: scheme.onSurfaceVariant,
-                    ),
+                    AppIcons.svgIcon(AppIcons.search),
                     const SizedBox(width: Spacing.sm),
                     Expanded(
                       child: TextField(
@@ -227,13 +224,7 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
                               ),
                               child: Row(
                                 children: [
-                                  Icon(
-                                    entry.icon,
-                                    size: 18,
-                                    color: isSelected
-                                        ? scheme.primary
-                                        : scheme.onSurfaceVariant,
-                                  ),
+                                  entry.icon,
                                   const SizedBox(width: Spacing.md),
                                   Expanded(
                                     child: Text(
@@ -299,7 +290,7 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
 
     final navEntries = <_PaletteEntry>[
       _PaletteEntry(
-        icon: Icons.today_rounded,
+        icon: AppIcons.svgIcon(AppIcons.today, size: 18),
         label: '今天',
         category: '导航',
         action: (ctx, ref) {
@@ -314,28 +305,28 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
         },
       ),
       _PaletteEntry(
-        icon: Icons.calendar_month_rounded,
+        icon: AppIcons.svgIcon(AppIcons.calendar, size: 18),
         label: '日历',
         category: '导航',
         action: (_, ref) =>
             ref.read(currentViewNotifierProvider.notifier).showCalendar(),
       ),
       _PaletteEntry(
-        icon: Icons.timer_outlined,
+        icon: AppIcons.svgIcon(AppIcons.focusTimer, size: 18),
         label: '专注',
         category: '导航',
         action: (_, ref) =>
             ref.read(currentViewNotifierProvider.notifier).showFocus(),
       ),
       _PaletteEntry(
-        icon: Icons.bar_chart_rounded,
+        icon: AppIcons.svgIcon(AppIcons.stats, size: 18),
         label: '统计',
         category: '导航',
         action: (_, ref) =>
             ref.read(currentViewNotifierProvider.notifier).showStatistics(),
       ),
       _PaletteEntry(
-        icon: Icons.emoji_events_rounded,
+        icon: AppIcons.svgIcon(AppIcons.achievement, size: 18),
         label: '成就',
         category: '导航',
         action: (_, ref) =>
@@ -347,7 +338,7 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
         .where((l) => !l.isSystem)
         .map(
           (l) => _PaletteEntry(
-            icon: Icons.format_list_bulleted_rounded,
+            icon: AppIcons.svgIcon(AppIcons.list, size: 18),
             label: l.name,
             category: '清单',
             action: (_, ref) {
@@ -379,7 +370,7 @@ class _PaletteEntry {
     required this.action,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String label;
   final String category;
   final void Function(BuildContext context, WidgetRef ref) action;

@@ -8,7 +8,7 @@ import 'package:drift/drift.dart';
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Folders, TaskLists, Tasks, Tags, TaskTags, Outbox, SyncCursors, FocusSessions, AppPreferences],
+  tables: [Folders, TaskLists, Tasks, Tags, TaskTags, Outbox, SyncCursors, FocusSessions, AppPreferences, TaskSteps],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openLocalConnection());
@@ -17,7 +17,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -50,6 +50,10 @@ class AppDatabase extends _$AppDatabase {
         // v5 -> v6:新增本地偏好设置表(Phase 4)。
         if (from < 6) {
           await m.createTable(appPreferences);
+        }
+        // v6 -> v7:新增任务步骤表。
+        if (from < 7) {
+          await m.createTable(taskSteps);
         }
       },
     );

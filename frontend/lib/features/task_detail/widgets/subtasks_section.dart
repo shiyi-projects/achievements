@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/state/selected_task.dart';
@@ -58,7 +59,7 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
         subtasksAsync.when(
           loading: () => Row(
             children: [
-              Icon(Icons.account_tree_rounded, size: 18, color: scheme.outline),
+              AppIcons.svgIcon(AppIcons.subtask, size: 18),
               const SizedBox(width: Spacing.sm),
               Text('子任务', style: theme.textTheme.labelLarge),
             ],
@@ -69,8 +70,7 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
             final done = subs.where((s) => s.completedAt != null).length;
             return Row(
               children: [
-                Icon(Icons.account_tree_rounded,
-                    size: 18, color: scheme.outline),
+                AppIcons.svgIcon(AppIcons.subtask, size: 18),
                 const SizedBox(width: Spacing.sm),
                 Text('子任务', style: theme.textTheme.labelLarge),
                 if (total > 0) ...[
@@ -127,7 +127,7 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
           padding: const EdgeInsets.only(top: Spacing.sm),
           child: Row(
             children: [
-              Icon(Icons.add_rounded, size: 18, color: scheme.primary),
+              AppIcons.svgIcon(AppIcons.add, size: 18),
               const SizedBox(width: Spacing.md),
               Expanded(
                 child: TextField(
@@ -199,11 +199,7 @@ class _SubtaskRow extends ConsumerWidget {
                   ),
                 ),
                 child: done
-                    ? const Icon(
-                        Icons.check_rounded,
-                        size: 14,
-                        color: Colors.white,
-                      )
+                    ? AppIcons.svgIcon(AppIcons.check, size: 14)
                     : null,
               ),
             ),

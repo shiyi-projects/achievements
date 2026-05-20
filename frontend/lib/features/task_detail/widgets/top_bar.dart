@@ -1,4 +1,6 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -45,27 +47,42 @@ class TaskDetailTopBar extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.close_rounded),
+            icon: AppIcons.svgIcon(AppIcons.close),
             tooltip: '关闭',
             onPressed: onClose,
           ),
           const Spacer(),
-          // ── 完成切换 ──
+          // ── 完成切换（带弹性动画） ──
           AnimatedCompleteButton(
             completed: completed,
             onTap: onToggleComplete,
           ),
           const SizedBox(width: Spacing.xs),
+          // ── 星标（带旋转缩放） ──
           IconButton(
-            icon: Icon(
-              starred ? Icons.star_rounded : Icons.star_outline_rounded,
-              color: starred ? scheme.tertiary : null,
+            icon: AnimatedSwitcher(
+              duration: MotionDurations.fast,
+              transitionBuilder: (child, anim) {
+                return RotationTransition(
+                  turns: Tween(begin: 0.8, end: 1.0).animate(
+                    CurvedAnimation(
+                      parent: anim,
+                      curve: MotionCurves.bouncySpring,
+                    ),
+                  ),
+                  child: ScaleTransition(
+                    scale: anim,
+                    child: child,
+                  ),
+                );
+              },
+              child: AppIcons.svgIcon(AppIcons.important),
             ),
             tooltip: starred ? '取消星标' : '添加星标',
             onPressed: onToggleStar,
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded),
+            icon: AppIcons.svgIcon(AppIcons.more),
             tooltip: '更多',
             onSelected: (v) {
               switch (v) {
@@ -77,17 +94,48 @@ class TaskDetailTopBar extends StatelessWidget {
                   onHardDelete();
               }
             },
-            itemBuilder: (_) => [
-              if (!isTrashed)
-                const PopupMenuItem(value: 'del', child: Text('移至回收站'))
-              else ...[
-                const PopupMenuItem(value: 'res', child: Text('恢复')),
-                const PopupMenuItem(
-                  value: 'hdel',
-                  child: Text('永久删除'),
-                ),
-              ],
-            ],
+            itemBuilder: (ctx) {
+              final errColor = Theme.of(ctx).colorScheme.error;
+              return [
+                if (!isTrashed)
+                  PopupMenuItem(
+                    value: 'del',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded, size: 18,
+                          color: errColor),
+                        const SizedBox(width: Spacing.md),
+                        Text('移至回收站',
+                          style: TextStyle(color: errColor)),
+                      ],
+                    ),
+                  )
+                else ...[
+                  const PopupMenuItem(
+                    value: 'res',
+                    child: Row(
+                      children: [
+                        Icon(Icons.restore_rounded, size: 18),
+                        SizedBox(width: Spacing.md),
+                        Text('恢复'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'hdel',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_forever_rounded, size: 18,
+                          color: errColor),
+                        const SizedBox(width: Spacing.md),
+                        Text('永久删除',
+                          style: TextStyle(color: errColor)),
+                      ],
+                    ),
+                  ),
+                ],
+              ];
+            },
           ),
         ],
       ),
@@ -96,7 +144,7 @@ class TaskDetailTopBar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 带动画的完成按钮
+// 带动画的完成按钮 — 弹性缩放 + 颜色过渡
 // ─────────────────────────────────────────────────────────────────────
 
 class AnimatedCompleteButton extends StatelessWidget {
@@ -119,23 +167,42 @@ class AnimatedCompleteButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(Spacing.sm),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutBack,
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: completed ? scheme.primary : Colors.transparent,
-              border: Border.all(
-                color: completed ? scheme.primary : scheme.outline,
-                width: 2,
+          child: AnimatedScale(
+            scale: completed ? 1.0 : 1.0,
+            duration: MotionDurations.fast,
+            curve: MotionCurves.bouncySpring,
+            child: AnimatedContainer(
+              duration: MotionDurations.normal,
+              curve: MotionCurves.bouncySpring,
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: completed ? scheme.primary : Colors.transparent,
+                border: Border.all(
+                  color: completed ? scheme.primary : scheme.outline,
+                  width: 2,
+                ),
+              ),
+              child: AnimatedSwitcher(
+                duration: MotionDurations.fast,
+                transitionBuilder: (child, anim) => ScaleTransition(
+                  scale: CurvedAnimation(
+                    parent: anim,
+                    curve: MotionCurves.bouncySpring,
+                  ),
+                  child: child,
+                ),
+                child: completed
+                    ? SizedBox(
+                        key: const ValueKey('done'),
+                        width: 14,
+                        height: 14,
+                        child: AppIcons.svgIcon(AppIcons.check, size: 14),
+                      )
+                    : const SizedBox.shrink(key: ValueKey('undone')),
               ),
             ),
-            child: completed
-                ? const Icon(Icons.check_rounded,
-                    size: 14, color: Colors.white)
-                : null,
           ),
         ),
       ),

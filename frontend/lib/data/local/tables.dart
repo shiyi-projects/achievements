@@ -117,6 +117,19 @@ class Outbox extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
+/// 任务步骤。轻量级有序清单项,不走 outbox,仅本地存储。
+class TaskSteps extends Table {
+  TextColumn get id => text()();
+  TextColumn get taskId => text()();
+  TextColumn get title => text().withLength(min: 1, max: 500)();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 /// 同步游标键值表。已知 key:`last_pulled_at`(ISO datetime,服务端回的
 /// SyncPullResponse.cursor)。
 class SyncCursors extends Table {

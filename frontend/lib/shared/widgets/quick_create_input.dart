@@ -1,4 +1,6 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
 
 /// 底部快速创建任务输入框。
@@ -10,10 +12,15 @@ import 'package:flutter/material.dart';
 ///   - surfaceContainerHigh 背景
 ///   - add_circle_outline 前缀图标
 ///   - 16px 圆角
+///
+/// 美化:
+///   - 获取焦点时容器上浮(translateY) + 阴影增加
+///   - 发送按钮有/无文字时颜色过渡
+///   - 提交成功后短暂 ✓ 反馈
 class QuickCreateInput extends StatefulWidget {
   const QuickCreateInput({
     required this.onSubmit,
-    this.hint = 'Add a task',
+    this.hint = '添加任务…',
     super.key,
   });
 
@@ -24,16 +31,38 @@ class QuickCreateInput extends StatefulWidget {
   State<QuickCreateInput> createState() => _QuickCreateInputState();
 }
 
-class _QuickCreateInputState extends State<QuickCreateInput> {
+class _QuickCreateInputState extends State<QuickCreateInput>
+    with SingleTickerProviderStateMixin {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   bool _submitting = false;
+  bool _showSuccess = false;
+  bool _hasFocus = false;
+  bool _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChange);
+    _controller.addListener(_onTextChange);
+  }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _controller.removeListener(_onTextChange);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onFocusChange() {
+    setState(() => _hasFocus = _focusNode.hasFocus);
+  }
+
+  void _onTextChange() {
+    final has = _controller.text.trim().isNotEmpty;
+    if (has != _hasText) setState(() => _hasText = has);
   }
 
   Future<void> _submit() async {
@@ -43,7 +72,13 @@ class _QuickCreateInputState extends State<QuickCreateInput> {
     try {
       await widget.onSubmit(raw);
       _controller.clear();
-      _focusNode.requestFocus();
+      // 短暂显示成功反馈
+      setState(() => _showSuccess = true);
+      await Future<void>.delayed(MotionDurations.bouncy);
+      if (mounted) {
+        setState(() => _showSuccess = false);
+        _focusNode.requestFocus();
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -53,13 +88,30 @@ class _QuickCreateInputState extends State<QuickCreateInput> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isLight = scheme.brightness == Brightness.light;
 
-    return Container(
+    return AnimatedContainer(
+      duration: MotionDurations.fast,
+      curve: MotionCurves.emphasizedDecelerate,
+      transform: Matrix4.translationValues(0, _hasFocus ? -2 : 0, 0),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHigh,
         border: Border(
-          top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3)),
+          top: BorderSide(
+            color: _hasFocus
+                ? scheme.primary.withValues(alpha: 0.3)
+                : scheme.outlineVariant.withValues(alpha: 0.3),
+          ),
         ),
+        boxShadow: _hasFocus
+            ? [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: isLight ? 0.08 : 0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, -4),
+                ),
+              ]
+            : null,
       ),
       child: SafeArea(
         top: false,
@@ -80,10 +132,11 @@ class _QuickCreateInputState extends State<QuickCreateInput> {
               children: [
                 Padding(
                   padding: const EdgeInsets.only(left: Spacing.sm),
-                  child: Icon(
-                    Icons.add_circle_outline_rounded,
-                    size: 22,
-                    color: scheme.primary,
+                  child: AnimatedRotation(
+                    turns: _hasFocus ? 0.125 : 0, // 45° 旋转
+                    duration: MotionDurations.fast,
+                    curve: MotionCurves.bouncySpring,
+                    child: AppIcons.svgIcon(AppIcons.add, size: 22),
                   ),
                 ),
                 const SizedBox(width: Spacing.sm),
@@ -121,20 +174,38 @@ class _QuickCreateInputState extends State<QuickCreateInput> {
                     ),
                   )
                 else
-                  IconButton(
-                    icon: Icon(
-                      Icons.arrow_upward_rounded,
-                      size: 20,
-                      color: scheme.primary,
+                  AnimatedSwitcher(
+                    duration: MotionDurations.fast,
+                    transitionBuilder: (child, anim) => ScaleTransition(
+                      scale: anim,
+                      child: child,
                     ),
-                    onPressed: _submit,
-                    tooltip: 'Create',
-                    style: IconButton.styleFrom(
-                      backgroundColor: scheme.primaryContainer,
-                      shape: const CircleBorder(),
-                      padding: const EdgeInsets.all(Spacing.sm),
-                      minimumSize: const Size(34, 34),
-                    ),
+                    child: _showSuccess
+                        ? IconButton(
+                            key: const ValueKey('success'),
+                            icon: AppIcons.svgIcon(AppIcons.completedStatus, size: 20),
+                            onPressed: null,
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.green.shade400.withValues(alpha: 0.15),
+                              shape: const CircleBorder(),
+                              padding: const EdgeInsets.all(Spacing.sm),
+                              minimumSize: const Size(34, 34),
+                            ),
+                          )
+                        : IconButton(
+                            key: const ValueKey('send'),
+                            icon: AppIcons.svgIcon(AppIcons.send, size: 20),
+                            onPressed: _submit,
+                            tooltip: '创建',
+                            style: IconButton.styleFrom(
+                              backgroundColor: _hasText
+                                  ? scheme.primaryContainer
+                                  : Colors.transparent,
+                              shape: const CircleBorder(),
+                              padding: const EdgeInsets.all(Spacing.sm),
+                              minimumSize: const Size(34, 34),
+                            ),
+                          ),
                   ),
               ],
             ),

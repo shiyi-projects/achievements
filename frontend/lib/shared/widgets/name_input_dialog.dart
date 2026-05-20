@@ -1,3 +1,4 @@
+import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:flutter/material.dart';
 
 /// 通用 "名称输入" 对话框。
@@ -10,16 +11,26 @@ Future<String?> showNameInputDialog(
   String? initial,
   String hint = '名称',
   String confirm = '保存',
+  IconData icon = Icons.edit_rounded,
 }) async {
   final controller = TextEditingController(text: initial);
+  final scheme = Theme.of(context).colorScheme;
+
   final result = await showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
+      icon: Icon(icon, color: scheme.primary, size: 28),
       title: Text(title),
       content: TextField(
         controller: controller,
         autofocus: true,
-        decoration: InputDecoration(hintText: hint),
+        decoration: InputDecoration(
+          hintText: hint,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: Spacing.base,
+            vertical: Spacing.md,
+          ),
+        ),
         onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
       ),
       actions: [

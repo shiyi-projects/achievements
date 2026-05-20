@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
 
   # ---- 状态管理 ----
@@ -38,7 +40,6 @@ dependencies:
 
   # ---- 提醒 / 后台 ----
   flutter_local_notifications: ^19.4.2
-  workmanager: ^0.5.2
   timezone: ^0.10.0
   flutter_timezone: ^4.1.1
 
@@ -46,14 +47,18 @@ dependencies:
   fl_chart: ^0.69.0
   flutter_animate: ^4.5.2
 
+  # ---- SVG 图标 ----
+  flutter_svg: ^2.0.17
+
   # ---- 桌面端增强(Windows)----
   window_manager: ^0.4.3
   tray_manager: ^0.2.4
   hotkey_manager: ^0.2.3
 
   # ---- 国际化 / 格式化 ----
-  intl: ^0.19.0
+  intl: 0.20.2
   connectivity_plus: ^7.1.1
+  calendar_date_picker2: ^3.0.0
 
 dev_dependencies:
   flutter_test:
@@ -74,8 +79,27 @@ dev_dependencies:
   # analyzer_plugin 与 build_runner 当前发布的 analyzer 版本(2026-05)有交叉
   # 不兼容,会导致 build_runner 启动失败。Phase 4 静态分析强化时再补回。
 
+  # ---- 图标生成 ----
+  flutter_launcher_icons: ^0.14.3
+
 flutter:
   uses-material-design: true
 
   assets:
     - assets/app_icon.ico
+    - assets/app_icon.png
+    - assets/icons/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/app_icon.png"
+  min_sdk_android: 23
+  windows:
+    generate: true
+    image_path: "assets/app_icon.png"
+    icon_size: 48
+
+dependency_overrides:
+  calendar_date_picker2:
+    path: packages/calendar_date_picker2
