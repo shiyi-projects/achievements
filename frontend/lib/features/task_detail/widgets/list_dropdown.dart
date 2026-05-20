@@ -140,7 +140,7 @@ class ListDropdown extends ConsumerWidget {
               color: scheme.onSurfaceVariant,
             ),
             const SizedBox(width: Spacing.md),
-            Expanded(child: Text(l.name)),
+            Flexible(child: Text(l.name, overflow: TextOverflow.ellipsis)),
             if (l.id == currentListId)
               Icon(Icons.check_rounded, size: 18, color: scheme.primary),
           ],

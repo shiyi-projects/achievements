@@ -51,94 +51,89 @@ class CalendarTaskTile extends ConsumerWidget {
           borderRadius: BorderRadius.circular(Radii.input),
           onTap: () =>
               ref.read(selectedTaskIdProvider.notifier).select(task.id),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // — Priority color strip —
-                if (priority != TaskPriority.none)
-                  Container(width: 3, color: priorityColor),
-
-                // — Main content —
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      priority != TaskPriority.none ? Spacing.sm : Spacing.md,
-                      Spacing.sm,
-                      Spacing.md,
-                      Spacing.sm,
+          child: Container(
+            decoration: priority != TaskPriority.none
+                ? BoxDecoration(
+                    border: Border(
+                      left: BorderSide(color: priorityColor, width: 3),
                     ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final showTrailing = constraints.maxWidth > 180;
-                        return Row(
-                          children: [
-                            // Checkbox
-                            _RoundCheckbox(
-                              checked: done,
-                              color: done ? scheme.primary : scheme.outline,
-                              onTap: () => ref
-                                  .read(taskRepositoryProvider)
-                                  .setCompleted(task.id, completed: !done),
-                            ),
-                            const SizedBox(width: Spacing.md),
+                  )
+                : null,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                priority != TaskPriority.none ? Spacing.sm : Spacing.md,
+                Spacing.sm,
+                Spacing.md,
+                Spacing.sm,
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final showTrailing = constraints.maxWidth > 180;
+                  return Row(
+                    children: [
+                      // Checkbox
+                      _RoundCheckbox(
+                        checked: done,
+                        color: done ? scheme.primary : scheme.outline,
+                        onTap: () => ref
+                            .read(taskRepositoryProvider)
+                            .setCompleted(task.id, completed: !done),
+                      ),
+                      const SizedBox(width: Spacing.md),
 
-                            // Title + time
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    task.title,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      decoration: done
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                      color: done ? scheme.outline : null,
-                                      decorationColor: scheme.outline,
-                                      fontWeight:
-                                          done ? FontWeight.w400 : FontWeight.w500,
+                      // Title + time
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              task.title,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                decoration: done
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: done ? scheme.outline : null,
+                                decorationColor: scheme.outline,
+                                fontWeight:
+                                    done ? FontWeight.w400 : FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (timeLabel != null)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.only(top: Spacing.xs),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.schedule_rounded,
+                                      size: 12,
+                                      color: scheme.outline,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  if (timeLabel != null)
-                                    Padding(
-                                      padding:
-                                          const EdgeInsets.only(top: Spacing.xs),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.schedule_rounded,
-                                            size: 12,
-                                            color: scheme.outline,
-                                          ),
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            timeLabel,
-                                            style: theme.textTheme.labelSmall
-                                                ?.copyWith(
-                                              color: scheme.outline,
-                                            ),
-                                          ),
-                                        ],
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      timeLabel,
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                        color: scheme.outline,
                                       ),
                                     ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-
-                            // Trailing indicators
-                            if (showTrailing)
-                              ..._buildTrailing(scheme, priority, hasFutureReminder),
                           ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
+                        ),
+                      ),
+
+                      // Trailing indicators
+                      if (showTrailing)
+                        ..._buildTrailing(scheme, priority, hasFutureReminder),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),

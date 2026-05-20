@@ -66,7 +66,7 @@ String _$movableListsHash() => r'018dff18e6bed9606dab64e59093a698aca8d63c';
 ///
 /// Copied from [movableLists].
 @ProviderFor(movableLists)
-final movableListsProvider = AutoDisposeProvider<List<TaskList>>.internal(
+final movableListsProvider = Provider<List<TaskList>>.internal(
   movableLists,
   name: r'movableListsProvider',
   debugGetCreateSourceHash:
@@ -77,6 +77,6 @@ final movableListsProvider = AutoDisposeProvider<List<TaskList>>.internal(
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef MovableListsRef = AutoDisposeProviderRef<List<TaskList>>;
+typedef MovableListsRef = ProviderRef<List<TaskList>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

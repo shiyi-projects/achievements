@@ -52,7 +52,7 @@
 | 缓存 | **Redis** | 同步增量游标、限流、提醒队列 |
 | 校验 | Pydantic v2 | |
 | 认证 | **占位**(MVP 期固定 `local-user` 单用户;预留 JWT 接口与中间件骨架,后续启用 Argon2 + JWT) | |
-| 实时推送 | **WebSocket**(FastAPI 原生) | 多端变更广播,降级为轮询 |
+| 实时同步 | **HTTP 轮询**（定时 pull + push） | 增量同步,已放弃 WebSocket |
 | 任务队列 | **APScheduler**(MVP 阶段足够,后期可换 Celery) | 提醒触发、统计聚合 |
 | 文件存储 | **本地磁盘**(`./storage/attachments/{user_id}/{yyyy}/{mm}/`),抽象 `StorageBackend` 接口,后续切 OSS 仅替换实现 | 任务图片附件 |
 | 测试 | pytest + httpx.AsyncClient + pytest-asyncio | |
@@ -88,7 +88,7 @@ Achievements/
 │   │   ├── services/                   # 业务逻辑层
 │   │   ├── storage/                    # StorageBackend 抽象 + LocalDisk 实现(OSS 实现后续追加)
 │   │   ├── sync/                       # 同步引擎(增量游标、冲突解决)
-│   │   ├── ws/                         # WebSocket 管理
+
 │   │   └── workers/                    # APScheduler 任务
 │   └── tests/
 ├── frontend/                           # Flutter 应用
@@ -142,14 +142,13 @@ Achievements/
 │  ├ Drift (本地 SQLite)   │                │  ├ Drift                │
 │  └ Outbox 变更队列        │                │  └ Outbox               │
 └──────────┬──────────────┘                └────────────┬────────────┘
-           │ 增量同步 (HTTP + WebSocket)                │
+           │ 增量同步 (HTTP 轮询)                       │
            └────────────┬─────────────────────────┬─────┘
                         ▼                         ▼
               ┌─────────────────────────────────────────┐
               │  FastAPI                                 │
               │  ├ /sync/pull  (since=<cursor>)          │
               │  ├ /sync/push  (mutations[])             │
-              │  ├ /ws         (变更广播)                 │
               │  └ Postgres + Redis                      │
               └─────────────────────────────────────────┘
 ```
@@ -157,7 +156,7 @@ Achievements/
 **核心原则**:
 - UI **永远只读写本地 Drift**,保证离线即时响应。
 - 所有写操作进入 **Outbox 表**(待同步队列),由同步引擎异步推送。
-- 同步引擎维护 `lastPulledAt` 游标,定期 `pull` + 实时 `WebSocket` 推送变更。
+- 同步引擎维护 `lastPulledAt` 游标,定期 `pull` 拉取变更。
 - 冲突解决采用 **LWW(Last-Write-Wins by `updated_at`)**,每条记录带 `version` 字段防丢失更新;附件等不可合并字段服务端为准。
 - 离线状态通过本地网络连通性 + 同步队列长度计算,对应 PRD「离线状态提示」与「多端同步状态显示」。
 
@@ -165,7 +164,7 @@ Achievements/
 
 | PRD 章节 | Flutter 模块 | 后端接口/服务 |
 |---|---|---|
-| 1 全局 | `app/`、`shared/` | `/auth/*`、`/sync/*`、`/ws` |
+| 1 全局 | `app/`、`shared/` | `/auth/*`、`/sync/*` |
 | 2 Today | `features/today` | `/tasks?scope=today` |
 | 3 Sidebar | `features/sidebar` | `/lists`、`/folders` |
 | 4 任务 | `features/task` | `/tasks`、`/tasks/{id}/subtasks` |
@@ -212,7 +211,7 @@ Achievements/
 
 ## 5. API 契约(主干)
 
-全部 `/api/v1` 前缀,JWT Bearer。WebSocket: `/ws?token=`。
+全部 `/api/v1` 前缀,JWT Bearer。
 
 ```
 POST   /auth/register
@@ -222,7 +221,7 @@ POST   /auth/logout
 
 GET    /sync/pull?since=<cursor>          → { tasks[], lists[], folders[], tags[], reminders[], cursor }
 POST   /sync/push                          ← { mutations: [{entity, op, payload, version}] }
-WS     /ws                                 ← 服务端推 { type, entity, id }
+
 
 CRUD   /tasks, /tasks/{id}, /tasks/{id}/subtasks, /tasks/{id}/complete
 CRUD   /lists, /folders, /tags
@@ -276,11 +275,10 @@ POST   /export, POST /import
 
 后端:
 - `/sync/pull` + `/sync/push` 增量协议、LWW 冲突解决、`updated_at`/`version` 字段。
-- WebSocket `/ws` 变更广播。
 - `/reminders` CRUD + APScheduler 触发 + 服务端推送通道。
 
 前端:
-- 同步引擎(Outbox、游标、WS 监听、网络变化触发)、登录态、设备注册。
+- 同步引擎(Outbox、游标、定时 pull、网络变化触发)、登录态、设备注册。
 - 多端同步状态指示器、离线提示(1)。
 - **提醒系统**(7):本地通知通道、稍后提醒、重复规则、声音/震动、紧急模式、权限引导;Windows 用 toast + 兜底窗口,Android 用 `flutter_local_notifications` + AlarmManager。
 - **日历**(8):月/周/时间轴视图,日期任务数量、预览、拖拽改期、快速创建。
@@ -327,7 +325,7 @@ POST   /export, POST /import
 ### 7.1 同步引擎(Phase 2 重点)
 
 - 写路径:UI → Repository → Drift 事务(主表 + Outbox)→ 立刻返回 → 后台 worker 出队 → `POST /sync/push` → 成功后删除 outbox 行,失败指数退避(最多 5 次)。
-- 读路径:启动时 `GET /sync/pull?since=cursor`,合并到本地;WebSocket 收到 `{entity, id}` 时拉单条更新。
+- 读路径:启动时及定时(30s)`GET /sync/pull?since=cursor`,合并到本地。
 - 冲突:本地 `version != server.version` 时,按 `updated_at` 较大者胜,落败方进入 `activities` 表留痕,以便后续查看。
 - 删除:软删,`deleted_at` 字段同步;客户端 30 天清扫真删。
 
@@ -363,7 +361,7 @@ POST   /export, POST /import
    - Windows 桌面端 + Android 真机/模拟器同账号登录。
    - 在 Windows 新建任务 → Android 在 ≤2s 内可见。
    - Android 断网 → 修改任务 → 联网 → Windows 看到更新且 `version` 递增,无重复。
-   - 设定提醒 → 关闭 App → 到点收到本地通知;再断网杀进程 → 服务端 WebSocket 离线后台兜底,联网后补推。
+   - 设定提醒 → 关闭 App → 到点收到本地通知;联网后通过定时 pull 同步最新状态。
 4. **离线场景**:断网启动 App,所有读操作正常;新建/编辑落入 outbox;联网恢复后队列清空。
 5. **打包验证**:Windows 双击 MSIX 安装可运行;Android Release APK 安装后冷启动 < 2s。
 
