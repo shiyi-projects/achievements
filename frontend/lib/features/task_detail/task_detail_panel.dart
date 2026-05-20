@@ -6,6 +6,7 @@ import 'package:achievements/core/theme/app_icons.dart';
 import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:achievements/features/focus/providers/focus_plan_service.dart';
 import 'package:achievements/features/task_detail/widgets/collapsible_meta.dart';
 import 'package:achievements/features/task_detail/widgets/date_chip.dart';
 import 'package:achievements/features/task_detail/widgets/list_dropdown.dart';
@@ -444,6 +445,25 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: Spacing.sm),
+                  // ── 预估时长 ──
+                  _EstimatedDurationRow(
+                    estimatedMinutes: task.estimatedMinutes,
+                    onChanged: (minutes) async {
+                      await _repo.update(
+                        task.id,
+                        knownVersion: task.version,
+                        estimatedMinutes: Value(minutes),
+                      );
+                      // 触发自动规划
+                      if (minutes != null) {
+                        final updatedTask = task;
+                        ref.read(focusPlanServiceProvider).generatePlans(
+                              updatedTask,
+                            );
+                      }
+                    },
+                  ),
 
                   const SizedBox(height: Spacing.lg),
                   StepsSection(taskId: task.id),
@@ -461,5 +481,112 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
         ),
       ),
     );
+  }
+}
+
+/// 预估时长属性行。
+class _EstimatedDurationRow extends StatelessWidget {
+  const _EstimatedDurationRow({
+    required this.estimatedMinutes,
+    required this.onChanged,
+  });
+
+  final int? estimatedMinutes;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasValue = estimatedMinutes != null;
+    final label = hasValue ? _formatMinutes(estimatedMinutes!) : '预估时长';
+
+    return ActionChip(
+      avatar: Icon(
+        Icons.timer_outlined,
+        size: 16,
+        color: hasValue ? scheme.primary : scheme.outline,
+      ),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: hasValue ? scheme.primary : scheme.outline,
+        ),
+      ),
+      onPressed: () => _showPicker(context),
+      side: BorderSide(
+        color: hasValue
+            ? scheme.primary.withValues(alpha: 0.3)
+            : scheme.outlineVariant,
+      ),
+      backgroundColor: hasValue
+          ? scheme.primary.withValues(alpha: 0.06)
+          : Colors.transparent,
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    final presets = [15, 30, 60, 120, 180, 240, 360, 480];
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.base),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: Spacing.md),
+                child: Row(
+                  children: [
+                    const Text(
+                      '预估专注时长',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (estimatedMinutes != null)
+                      TextButton(
+                        onPressed: () {
+                          onChanged(null);
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('清除'),
+                      ),
+                  ],
+                ),
+              ),
+              Wrap(
+                spacing: Spacing.sm,
+                runSpacing: Spacing.sm,
+                children: presets.map((m) {
+                  return ChoiceChip(
+                    label: Text(_formatMinutes(m)),
+                    selected: estimatedMinutes == m,
+                    onSelected: (_) {
+                      onChanged(m);
+                      Navigator.pop(ctx);
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: Spacing.md),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _formatMinutes(int minutes) {
+    if (minutes >= 60) {
+      final h = minutes ~/ 60;
+      final m = minutes % 60;
+      return m > 0 ? '${h}小时${m}分钟' : '$h小时';
+    }
+    return '$minutes分钟';
   }
 }

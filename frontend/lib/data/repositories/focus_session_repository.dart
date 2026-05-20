@@ -69,6 +69,52 @@ class FocusSessionRepository {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
   }
+
+  /// 今日完成的番茄数（completed = true 的会话条数）。
+  Future<int> todayCompletedCount() async {
+    final start = _startOfToday();
+    final end = start.add(const Duration(days: 1));
+    final rows = await (_db.select(_db.focusSessions)
+          ..where(
+            (s) =>
+                s.startedAt.isBetweenValues(start, end) &
+                s.completed.equals(true),
+          ))
+        .get();
+    return rows.length;
+  }
+
+  /// 今日最长单次专注时长（秒）。无记录时返回 0。
+  Future<int> todayLongestSession() async {
+    final start = _startOfToday();
+    final end = start.add(const Duration(days: 1));
+    final rows = await (_db.select(_db.focusSessions)
+          ..where(
+            (s) =>
+                s.startedAt.isBetweenValues(start, end) &
+                s.durationSeconds.isNotNull(),
+          ))
+        .get();
+    if (rows.isEmpty) return 0;
+    return rows
+        .map((r) => r.durationSeconds ?? 0)
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  /// 流式监听今日会话列表，按开始时间倒序。
+  Stream<List<FocusSession>> watchTodaySessions() {
+    final start = _startOfToday();
+    final end = start.add(const Duration(days: 1));
+    return (_db.select(_db.focusSessions)
+          ..where((s) => s.startedAt.isBetweenValues(start, end))
+          ..orderBy([
+            (s) => OrderingTerm(
+                  expression: s.startedAt,
+                  mode: OrderingMode.desc,
+                ),
+          ]))
+        .watch();
+  }
 }
 
 @Riverpod(keepAlive: true)

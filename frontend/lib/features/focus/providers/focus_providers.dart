@@ -1,6 +1,11 @@
 import 'dart:async';
 
+import 'package:achievements/data/local/database.dart';
+import 'package:achievements/data/repositories/focus_plan_repository.dart';
 import 'package:achievements/data/repositories/focus_session_repository.dart';
+import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:achievements/features/focus/providers/focus_plan_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'focus_providers.g.dart';
@@ -137,13 +142,68 @@ class FocusTimer extends _$FocusTimer {
     );
   }
 
+  /// 设置工作时长（仅在 idle 阶段有效）。
+  void setWorkDuration(Duration duration) {
+    if (state.phase != FocusPhase.idle) return;
+    state = state.copyWith(
+      workDuration: duration,
+      remaining: duration,
+    );
+  }
+
+  /// 设置休息时长（仅在 idle 阶段有效）。
+  void setBreakDuration(Duration duration) {
+    if (state.phase != FocusPhase.idle) return;
+    state = state.copyWith(breakDuration: duration);
+  }
+
   /// 设置关联任务 ID（null 表示解除关联）。
+  ///
+  /// 专注中（working / shortBreak）不允许切换任务。
+  /// 若当前为番茄钟模式 + idle 阶段，尝试根据任务的
+  /// [estimatedMinutes] 和 [dueAt] 智能计算每日专注时长。
   void setTask(String? taskId) {
+    // 专注中锁定，不允许切换
+    if (state.phase == FocusPhase.working ||
+        state.phase == FocusPhase.shortBreak) {
+      return;
+    }
+
     if (taskId == null) {
       state = state.copyWith(clearTaskId: true);
     } else {
       state = state.copyWith(taskId: taskId);
+      // 智能调整番茄钟时长
+      if (state.mode == FocusMode.pomodoro && state.phase == FocusPhase.idle) {
+        _autoAdjustDuration(taskId);
+      }
     }
+  }
+
+  /// 根据任务的预估时长、已专注时长、截止日自动设置 workDuration。
+  Future<void> _autoAdjustDuration(String taskId) async {
+    final task = await ref.read(taskRepositoryProvider).getById(taskId);
+    if (task == null) return;
+
+    final estimated = task.estimatedMinutes;
+    if (estimated == null || estimated <= 0) return;
+
+    // 剩余工作量（分钟）
+    final focusedMinutes = (task.focusedSeconds / 60).floor();
+    final remainingMinutes = (estimated - focusedMinutes).clamp(1, estimated);
+
+    int dailyMinutes;
+    final dueAt = task.dueAt;
+    if (dueAt != null) {
+      // 有截止日：剩余量 ÷ 剩余天数
+      final remainingDays = dueAt.difference(DateTime.now()).inDays.clamp(1, 365);
+      dailyMinutes = (remainingMinutes / remainingDays).ceil().clamp(5, 90);
+    } else {
+      // 无截止日：取剩余量和 45 分钟的较小值
+      dailyMinutes = remainingMinutes.clamp(5, 45);
+    }
+
+    setWorkDuration(Duration(minutes: dailyMinutes));
   }
 
   /// 开始 / 继续计时。
@@ -308,5 +368,28 @@ class FocusTimer extends _$FocusTimer {
       mode: state.mode == FocusMode.pomodoro ? 'pomodoro' : 'free',
       completed: completed,
     );
+
+    // 联动专注计划：累加实际时长
+    final planService = ref.read(focusPlanServiceProvider);
+    await planService.onSessionComplete(
+      taskId: state.taskId,
+      durationSeconds: durationSeconds,
+    );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plan-related providers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 今日专注计划列表。
+@riverpod
+Stream<List<FocusPlan>> todayFocusPlans(Ref ref) {
+  return ref.watch(focusPlanRepositoryProvider).watchTodayPlans();
+}
+
+/// 过期未完成计划（近 7 天）。
+@riverpod
+Stream<List<FocusPlan>> overdueFocusPlans(Ref ref) {
+  return ref.watch(focusPlanRepositoryProvider).watchOverduePlans();
 }

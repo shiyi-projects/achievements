@@ -26,6 +26,7 @@ class TaskRepository {
     String? parentId,
     DateTime? dueAt,
     bool starred = false,
+    int? estimatedMinutes,
   }) async {
     final id = newId();
     return _db.transaction(() async {
@@ -40,6 +41,7 @@ class TaskRepository {
               parentId: Value(parentId),
               dueAt: Value(dueAt),
               starred: Value(starred),
+              estimatedMinutes: Value(estimatedMinutes),
             ),
           );
       await _outbox.enqueue(
@@ -53,6 +55,7 @@ class TaskRepository {
           'parent_id': parentId,
           'due_at': dueAt?.toUtc().toIso8601String(),
           'starred': starred,
+          'estimated_minutes': estimatedMinutes,
         },
       );
       return id;
@@ -164,6 +167,7 @@ class TaskRepository {
     Value<bool> starred = const Value.absent(),
     Value<int> priority = const Value.absent(),
     Value<String> listId = const Value.absent(),
+    Value<int?> estimatedMinutes = const Value.absent(),
   }) async {
     await _db.transaction(() async {
       final version =
@@ -180,6 +184,7 @@ class TaskRepository {
           starred: starred,
           priority: priority,
           listId: listId,
+          estimatedMinutes: estimatedMinutes,
         ),
       );
       final payload = <String, dynamic>{
@@ -191,6 +196,8 @@ class TaskRepository {
         if (starred.present) 'starred': starred.value,
         if (priority.present) 'priority': priority.value,
         if (listId.present) 'list_id': listId.value,
+        if (estimatedMinutes.present)
+          'estimated_minutes': estimatedMinutes.value,
       };
       if (payload.isEmpty) return;
       await _outbox.enqueue(
@@ -393,6 +400,22 @@ class TaskRepository {
   static DateTime _startOfToday() {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
+  }
+
+  /// 根据 ID 获取单个任务。
+  Future<Task?> getById(String taskId) {
+    return (_db.select(_db.tasks)..where((t) => t.id.equals(taskId)))
+        .getSingleOrNull();
+  }
+
+  /// 累加任务的专注时长（秒）。
+  Future<void> addFocusedSeconds(String taskId, int seconds) async {
+    final task = await getById(taskId);
+    if (task == null || seconds <= 0) return;
+    await (_db.update(_db.tasks)..where((t) => t.id.equals(taskId)))
+        .write(TasksCompanion(
+      focusedSeconds: Value(task.focusedSeconds + seconds),
+    ));
   }
 }
 

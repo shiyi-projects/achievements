@@ -8,7 +8,7 @@ import 'package:drift/drift.dart';
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Folders, TaskLists, Tasks, Tags, TaskTags, Outbox, SyncCursors, FocusSessions, AppPreferences, TaskSteps],
+  tables: [Folders, TaskLists, Tasks, Tags, TaskTags, Outbox, SyncCursors, FocusSessions, AppPreferences, TaskSteps, FocusPlans],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openLocalConnection());
@@ -17,7 +17,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -54,6 +54,25 @@ class AppDatabase extends _$AppDatabase {
         // v6 -> v7:新增任务步骤表。
         if (from < 7) {
           await m.createTable(taskSteps);
+        }
+        // v7 -> v8：Tasks 增加预估时长列 + 新增专注计划表。
+        if (from < 8) {
+          await customStatement(
+            'ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER',
+          );
+          await m.createTable(focusPlans);
+        }
+        // v8 → v9：FocusPlans 秒级精度 + Tasks 累计专注时长。
+        if (from < 9) {
+          await customStatement(
+            'ALTER TABLE focus_plans RENAME COLUMN actual_minutes TO actual_seconds',
+          );
+          await customStatement(
+            'UPDATE focus_plans SET actual_seconds = actual_seconds * 60',
+          );
+          await customStatement(
+            'ALTER TABLE tasks ADD COLUMN focused_seconds INTEGER NOT NULL DEFAULT 0',
+          );
         }
       },
     );

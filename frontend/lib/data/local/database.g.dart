@@ -1184,6 +1184,20 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("starred" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _estimatedMinutesMeta =
+      const VerificationMeta('estimatedMinutes');
+  @override
+  late final GeneratedColumn<int> estimatedMinutes = GeneratedColumn<int>(
+      'estimated_minutes', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _focusedSecondsMeta =
+      const VerificationMeta('focusedSeconds');
+  @override
+  late final GeneratedColumn<int> focusedSeconds = GeneratedColumn<int>(
+      'focused_seconds', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1204,7 +1218,9 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         sortOrder,
         completedAt,
         archivedAt,
-        starred
+        starred,
+        estimatedMinutes,
+        focusedSeconds
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1305,6 +1321,18 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
       context.handle(_starredMeta,
           starred.isAcceptableOrUnknown(data['starred']!, _starredMeta));
     }
+    if (data.containsKey('estimated_minutes')) {
+      context.handle(
+          _estimatedMinutesMeta,
+          estimatedMinutes.isAcceptableOrUnknown(
+              data['estimated_minutes']!, _estimatedMinutesMeta));
+    }
+    if (data.containsKey('focused_seconds')) {
+      context.handle(
+          _focusedSecondsMeta,
+          focusedSeconds.isAcceptableOrUnknown(
+              data['focused_seconds']!, _focusedSecondsMeta));
+    }
     return context;
   }
 
@@ -1352,6 +1380,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
           .read(DriftSqlType.dateTime, data['${effectivePrefix}archived_at']),
       starred: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}starred'])!,
+      estimatedMinutes: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}estimated_minutes']),
+      focusedSeconds: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}focused_seconds'])!,
     );
   }
 
@@ -1392,6 +1424,12 @@ class Task extends DataClass implements Insertable<Task> {
   final DateTime? completedAt;
   final DateTime? archivedAt;
   final bool starred;
+
+  /// 预估总工时（分钟）。用于智能专注规划自动按天拆分。
+  final int? estimatedMinutes;
+
+  /// 累计专注时长（秒）。每次专注结束后自动累加。
+  final int focusedSeconds;
   const Task(
       {required this.id,
       required this.userId,
@@ -1411,7 +1449,9 @@ class Task extends DataClass implements Insertable<Task> {
       required this.sortOrder,
       this.completedAt,
       this.archivedAt,
-      required this.starred});
+      required this.starred,
+      this.estimatedMinutes,
+      required this.focusedSeconds});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1452,6 +1492,10 @@ class Task extends DataClass implements Insertable<Task> {
       map['archived_at'] = Variable<DateTime>(archivedAt);
     }
     map['starred'] = Variable<bool>(starred);
+    if (!nullToAbsent || estimatedMinutes != null) {
+      map['estimated_minutes'] = Variable<int>(estimatedMinutes);
+    }
+    map['focused_seconds'] = Variable<int>(focusedSeconds);
     return map;
   }
 
@@ -1491,6 +1535,10 @@ class Task extends DataClass implements Insertable<Task> {
           ? const Value.absent()
           : Value(archivedAt),
       starred: Value(starred),
+      estimatedMinutes: estimatedMinutes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(estimatedMinutes),
+      focusedSeconds: Value(focusedSeconds),
     );
   }
 
@@ -1517,6 +1565,8 @@ class Task extends DataClass implements Insertable<Task> {
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
       archivedAt: serializer.fromJson<DateTime?>(json['archivedAt']),
       starred: serializer.fromJson<bool>(json['starred']),
+      estimatedMinutes: serializer.fromJson<int?>(json['estimatedMinutes']),
+      focusedSeconds: serializer.fromJson<int>(json['focusedSeconds']),
     );
   }
   @override
@@ -1542,6 +1592,8 @@ class Task extends DataClass implements Insertable<Task> {
       'completedAt': serializer.toJson<DateTime?>(completedAt),
       'archivedAt': serializer.toJson<DateTime?>(archivedAt),
       'starred': serializer.toJson<bool>(starred),
+      'estimatedMinutes': serializer.toJson<int?>(estimatedMinutes),
+      'focusedSeconds': serializer.toJson<int>(focusedSeconds),
     };
   }
 
@@ -1564,7 +1616,9 @@ class Task extends DataClass implements Insertable<Task> {
           int? sortOrder,
           Value<DateTime?> completedAt = const Value.absent(),
           Value<DateTime?> archivedAt = const Value.absent(),
-          bool? starred}) =>
+          bool? starred,
+          Value<int?> estimatedMinutes = const Value.absent(),
+          int? focusedSeconds}) =>
       Task(
         id: id ?? this.id,
         userId: userId ?? this.userId,
@@ -1585,6 +1639,10 @@ class Task extends DataClass implements Insertable<Task> {
         completedAt: completedAt.present ? completedAt.value : this.completedAt,
         archivedAt: archivedAt.present ? archivedAt.value : this.archivedAt,
         starred: starred ?? this.starred,
+        estimatedMinutes: estimatedMinutes.present
+            ? estimatedMinutes.value
+            : this.estimatedMinutes,
+        focusedSeconds: focusedSeconds ?? this.focusedSeconds,
       );
   Task copyWithCompanion(TasksCompanion data) {
     return Task(
@@ -1610,6 +1668,12 @@ class Task extends DataClass implements Insertable<Task> {
       archivedAt:
           data.archivedAt.present ? data.archivedAt.value : this.archivedAt,
       starred: data.starred.present ? data.starred.value : this.starred,
+      estimatedMinutes: data.estimatedMinutes.present
+          ? data.estimatedMinutes.value
+          : this.estimatedMinutes,
+      focusedSeconds: data.focusedSeconds.present
+          ? data.focusedSeconds.value
+          : this.focusedSeconds,
     );
   }
 
@@ -1634,32 +1698,37 @@ class Task extends DataClass implements Insertable<Task> {
           ..write('sortOrder: $sortOrder, ')
           ..write('completedAt: $completedAt, ')
           ..write('archivedAt: $archivedAt, ')
-          ..write('starred: $starred')
+          ..write('starred: $starred, ')
+          ..write('estimatedMinutes: $estimatedMinutes, ')
+          ..write('focusedSeconds: $focusedSeconds')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      userId,
-      createdAt,
-      updatedAt,
-      deletedAt,
-      version,
-      listId,
-      parentId,
-      title,
-      notes,
-      priority,
-      dueAt,
-      remindAt,
-      repeatRule,
-      color,
-      sortOrder,
-      completedAt,
-      archivedAt,
-      starred);
+  int get hashCode => Object.hashAll([
+        id,
+        userId,
+        createdAt,
+        updatedAt,
+        deletedAt,
+        version,
+        listId,
+        parentId,
+        title,
+        notes,
+        priority,
+        dueAt,
+        remindAt,
+        repeatRule,
+        color,
+        sortOrder,
+        completedAt,
+        archivedAt,
+        starred,
+        estimatedMinutes,
+        focusedSeconds
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1682,7 +1751,9 @@ class Task extends DataClass implements Insertable<Task> {
           other.sortOrder == this.sortOrder &&
           other.completedAt == this.completedAt &&
           other.archivedAt == this.archivedAt &&
-          other.starred == this.starred);
+          other.starred == this.starred &&
+          other.estimatedMinutes == this.estimatedMinutes &&
+          other.focusedSeconds == this.focusedSeconds);
 }
 
 class TasksCompanion extends UpdateCompanion<Task> {
@@ -1705,6 +1776,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
   final Value<DateTime?> completedAt;
   final Value<DateTime?> archivedAt;
   final Value<bool> starred;
+  final Value<int?> estimatedMinutes;
+  final Value<int> focusedSeconds;
   final Value<int> rowid;
   const TasksCompanion({
     this.id = const Value.absent(),
@@ -1726,6 +1799,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.completedAt = const Value.absent(),
     this.archivedAt = const Value.absent(),
     this.starred = const Value.absent(),
+    this.estimatedMinutes = const Value.absent(),
+    this.focusedSeconds = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TasksCompanion.insert({
@@ -1748,6 +1823,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.completedAt = const Value.absent(),
     this.archivedAt = const Value.absent(),
     this.starred = const Value.absent(),
+    this.estimatedMinutes = const Value.absent(),
+    this.focusedSeconds = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         userId = Value(userId),
@@ -1773,6 +1850,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Expression<DateTime>? completedAt,
     Expression<DateTime>? archivedAt,
     Expression<bool>? starred,
+    Expression<int>? estimatedMinutes,
+    Expression<int>? focusedSeconds,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1795,6 +1874,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
       if (completedAt != null) 'completed_at': completedAt,
       if (archivedAt != null) 'archived_at': archivedAt,
       if (starred != null) 'starred': starred,
+      if (estimatedMinutes != null) 'estimated_minutes': estimatedMinutes,
+      if (focusedSeconds != null) 'focused_seconds': focusedSeconds,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1819,6 +1900,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
       Value<DateTime?>? completedAt,
       Value<DateTime?>? archivedAt,
       Value<bool>? starred,
+      Value<int?>? estimatedMinutes,
+      Value<int>? focusedSeconds,
       Value<int>? rowid}) {
     return TasksCompanion(
       id: id ?? this.id,
@@ -1840,6 +1923,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
       completedAt: completedAt ?? this.completedAt,
       archivedAt: archivedAt ?? this.archivedAt,
       starred: starred ?? this.starred,
+      estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
+      focusedSeconds: focusedSeconds ?? this.focusedSeconds,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1904,6 +1989,12 @@ class TasksCompanion extends UpdateCompanion<Task> {
     if (starred.present) {
       map['starred'] = Variable<bool>(starred.value);
     }
+    if (estimatedMinutes.present) {
+      map['estimated_minutes'] = Variable<int>(estimatedMinutes.value);
+    }
+    if (focusedSeconds.present) {
+      map['focused_seconds'] = Variable<int>(focusedSeconds.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1932,6 +2023,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
           ..write('completedAt: $completedAt, ')
           ..write('archivedAt: $archivedAt, ')
           ..write('starred: $starred, ')
+          ..write('estimatedMinutes: $estimatedMinutes, ')
+          ..write('focusedSeconds: $focusedSeconds, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4230,6 +4323,404 @@ class TaskStepsCompanion extends UpdateCompanion<TaskStep> {
   }
 }
 
+class $FocusPlansTable extends FocusPlans
+    with TableInfo<$FocusPlansTable, FocusPlan> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FocusPlansTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _taskIdMeta = const VerificationMeta('taskId');
+  @override
+  late final GeneratedColumn<String> taskId = GeneratedColumn<String>(
+      'task_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+      'date', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _plannedMinutesMeta =
+      const VerificationMeta('plannedMinutes');
+  @override
+  late final GeneratedColumn<int> plannedMinutes = GeneratedColumn<int>(
+      'planned_minutes', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _actualSecondsMeta =
+      const VerificationMeta('actualSeconds');
+  @override
+  late final GeneratedColumn<int> actualSeconds = GeneratedColumn<int>(
+      'actual_seconds', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _sortOrderMeta =
+      const VerificationMeta('sortOrder');
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+      'sort_order', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, taskId, date, plannedMinutes, actualSeconds, sortOrder, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'focus_plans';
+  @override
+  VerificationContext validateIntegrity(Insertable<FocusPlan> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('task_id')) {
+      context.handle(_taskIdMeta,
+          taskId.isAcceptableOrUnknown(data['task_id']!, _taskIdMeta));
+    } else if (isInserting) {
+      context.missing(_taskIdMeta);
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+          _dateMeta, date.isAcceptableOrUnknown(data['date']!, _dateMeta));
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('planned_minutes')) {
+      context.handle(
+          _plannedMinutesMeta,
+          plannedMinutes.isAcceptableOrUnknown(
+              data['planned_minutes']!, _plannedMinutesMeta));
+    } else if (isInserting) {
+      context.missing(_plannedMinutesMeta);
+    }
+    if (data.containsKey('actual_seconds')) {
+      context.handle(
+          _actualSecondsMeta,
+          actualSeconds.isAcceptableOrUnknown(
+              data['actual_seconds']!, _actualSecondsMeta));
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(_sortOrderMeta,
+          sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FocusPlan map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FocusPlan(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      taskId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}task_id'])!,
+      date: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}date'])!,
+      plannedMinutes: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}planned_minutes'])!,
+      actualSeconds: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}actual_seconds'])!,
+      sortOrder: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sort_order'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $FocusPlansTable createAlias(String alias) {
+    return $FocusPlansTable(attachedDatabase, alias);
+  }
+}
+
+class FocusPlan extends DataClass implements Insertable<FocusPlan> {
+  /// 客户端生成的 UUIDv7。
+  final String id;
+
+  /// 关联的任务 ID。
+  final String taskId;
+
+  /// 计划日期（当日 00:00）。一个任务一天最多一条计划。
+  final DateTime date;
+
+  /// 该日计划专注时长（分钟）。
+  final int plannedMinutes;
+
+  /// 已完成的实际专注时长（秒）。计时结束时自动累加。
+  final int actualSeconds;
+
+  /// 当日内排序顺序。
+  final int sortOrder;
+  final DateTime createdAt;
+  const FocusPlan(
+      {required this.id,
+      required this.taskId,
+      required this.date,
+      required this.plannedMinutes,
+      required this.actualSeconds,
+      required this.sortOrder,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['task_id'] = Variable<String>(taskId);
+    map['date'] = Variable<DateTime>(date);
+    map['planned_minutes'] = Variable<int>(plannedMinutes);
+    map['actual_seconds'] = Variable<int>(actualSeconds);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  FocusPlansCompanion toCompanion(bool nullToAbsent) {
+    return FocusPlansCompanion(
+      id: Value(id),
+      taskId: Value(taskId),
+      date: Value(date),
+      plannedMinutes: Value(plannedMinutes),
+      actualSeconds: Value(actualSeconds),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory FocusPlan.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FocusPlan(
+      id: serializer.fromJson<String>(json['id']),
+      taskId: serializer.fromJson<String>(json['taskId']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      plannedMinutes: serializer.fromJson<int>(json['plannedMinutes']),
+      actualSeconds: serializer.fromJson<int>(json['actualSeconds']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'taskId': serializer.toJson<String>(taskId),
+      'date': serializer.toJson<DateTime>(date),
+      'plannedMinutes': serializer.toJson<int>(plannedMinutes),
+      'actualSeconds': serializer.toJson<int>(actualSeconds),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  FocusPlan copyWith(
+          {String? id,
+          String? taskId,
+          DateTime? date,
+          int? plannedMinutes,
+          int? actualSeconds,
+          int? sortOrder,
+          DateTime? createdAt}) =>
+      FocusPlan(
+        id: id ?? this.id,
+        taskId: taskId ?? this.taskId,
+        date: date ?? this.date,
+        plannedMinutes: plannedMinutes ?? this.plannedMinutes,
+        actualSeconds: actualSeconds ?? this.actualSeconds,
+        sortOrder: sortOrder ?? this.sortOrder,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  FocusPlan copyWithCompanion(FocusPlansCompanion data) {
+    return FocusPlan(
+      id: data.id.present ? data.id.value : this.id,
+      taskId: data.taskId.present ? data.taskId.value : this.taskId,
+      date: data.date.present ? data.date.value : this.date,
+      plannedMinutes: data.plannedMinutes.present
+          ? data.plannedMinutes.value
+          : this.plannedMinutes,
+      actualSeconds: data.actualSeconds.present
+          ? data.actualSeconds.value
+          : this.actualSeconds,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FocusPlan(')
+          ..write('id: $id, ')
+          ..write('taskId: $taskId, ')
+          ..write('date: $date, ')
+          ..write('plannedMinutes: $plannedMinutes, ')
+          ..write('actualSeconds: $actualSeconds, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id, taskId, date, plannedMinutes, actualSeconds, sortOrder, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FocusPlan &&
+          other.id == this.id &&
+          other.taskId == this.taskId &&
+          other.date == this.date &&
+          other.plannedMinutes == this.plannedMinutes &&
+          other.actualSeconds == this.actualSeconds &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt);
+}
+
+class FocusPlansCompanion extends UpdateCompanion<FocusPlan> {
+  final Value<String> id;
+  final Value<String> taskId;
+  final Value<DateTime> date;
+  final Value<int> plannedMinutes;
+  final Value<int> actualSeconds;
+  final Value<int> sortOrder;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const FocusPlansCompanion({
+    this.id = const Value.absent(),
+    this.taskId = const Value.absent(),
+    this.date = const Value.absent(),
+    this.plannedMinutes = const Value.absent(),
+    this.actualSeconds = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FocusPlansCompanion.insert({
+    required String id,
+    required String taskId,
+    required DateTime date,
+    required int plannedMinutes,
+    this.actualSeconds = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        taskId = Value(taskId),
+        date = Value(date),
+        plannedMinutes = Value(plannedMinutes);
+  static Insertable<FocusPlan> custom({
+    Expression<String>? id,
+    Expression<String>? taskId,
+    Expression<DateTime>? date,
+    Expression<int>? plannedMinutes,
+    Expression<int>? actualSeconds,
+    Expression<int>? sortOrder,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (taskId != null) 'task_id': taskId,
+      if (date != null) 'date': date,
+      if (plannedMinutes != null) 'planned_minutes': plannedMinutes,
+      if (actualSeconds != null) 'actual_seconds': actualSeconds,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FocusPlansCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? taskId,
+      Value<DateTime>? date,
+      Value<int>? plannedMinutes,
+      Value<int>? actualSeconds,
+      Value<int>? sortOrder,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return FocusPlansCompanion(
+      id: id ?? this.id,
+      taskId: taskId ?? this.taskId,
+      date: date ?? this.date,
+      plannedMinutes: plannedMinutes ?? this.plannedMinutes,
+      actualSeconds: actualSeconds ?? this.actualSeconds,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (taskId.present) {
+      map['task_id'] = Variable<String>(taskId.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (plannedMinutes.present) {
+      map['planned_minutes'] = Variable<int>(plannedMinutes.value);
+    }
+    if (actualSeconds.present) {
+      map['actual_seconds'] = Variable<int>(actualSeconds.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FocusPlansCompanion(')
+          ..write('id: $id, ')
+          ..write('taskId: $taskId, ')
+          ..write('date: $date, ')
+          ..write('plannedMinutes: $plannedMinutes, ')
+          ..write('actualSeconds: $actualSeconds, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4243,6 +4734,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $FocusSessionsTable focusSessions = $FocusSessionsTable(this);
   late final $AppPreferencesTable appPreferences = $AppPreferencesTable(this);
   late final $TaskStepsTable taskSteps = $TaskStepsTable(this);
+  late final $FocusPlansTable focusPlans = $FocusPlansTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4257,7 +4749,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         syncCursors,
         focusSessions,
         appPreferences,
-        taskSteps
+        taskSteps,
+        focusPlans
       ];
 }
 
@@ -4776,6 +5269,8 @@ typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
   Value<DateTime?> completedAt,
   Value<DateTime?> archivedAt,
   Value<bool> starred,
+  Value<int?> estimatedMinutes,
+  Value<int> focusedSeconds,
   Value<int> rowid,
 });
 typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
@@ -4798,6 +5293,8 @@ typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
   Value<DateTime?> completedAt,
   Value<DateTime?> archivedAt,
   Value<bool> starred,
+  Value<int?> estimatedMinutes,
+  Value<int> focusedSeconds,
   Value<int> rowid,
 });
 
@@ -4865,6 +5362,14 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<bool> get starred => $composableBuilder(
       column: $table.starred, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get estimatedMinutes => $composableBuilder(
+      column: $table.estimatedMinutes,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get focusedSeconds => $composableBuilder(
+      column: $table.focusedSeconds,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$TasksTableOrderingComposer
@@ -4932,6 +5437,14 @@ class $$TasksTableOrderingComposer
 
   ColumnOrderings<bool> get starred => $composableBuilder(
       column: $table.starred, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get estimatedMinutes => $composableBuilder(
+      column: $table.estimatedMinutes,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get focusedSeconds => $composableBuilder(
+      column: $table.focusedSeconds,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$TasksTableAnnotationComposer
@@ -4999,6 +5512,12 @@ class $$TasksTableAnnotationComposer
 
   GeneratedColumn<bool> get starred =>
       $composableBuilder(column: $table.starred, builder: (column) => column);
+
+  GeneratedColumn<int> get estimatedMinutes => $composableBuilder(
+      column: $table.estimatedMinutes, builder: (column) => column);
+
+  GeneratedColumn<int> get focusedSeconds => $composableBuilder(
+      column: $table.focusedSeconds, builder: (column) => column);
 }
 
 class $$TasksTableTableManager extends RootTableManager<
@@ -5043,6 +5562,8 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<DateTime?> completedAt = const Value.absent(),
             Value<DateTime?> archivedAt = const Value.absent(),
             Value<bool> starred = const Value.absent(),
+            Value<int?> estimatedMinutes = const Value.absent(),
+            Value<int> focusedSeconds = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TasksCompanion(
@@ -5065,6 +5586,8 @@ class $$TasksTableTableManager extends RootTableManager<
             completedAt: completedAt,
             archivedAt: archivedAt,
             starred: starred,
+            estimatedMinutes: estimatedMinutes,
+            focusedSeconds: focusedSeconds,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -5087,6 +5610,8 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<DateTime?> completedAt = const Value.absent(),
             Value<DateTime?> archivedAt = const Value.absent(),
             Value<bool> starred = const Value.absent(),
+            Value<int?> estimatedMinutes = const Value.absent(),
+            Value<int> focusedSeconds = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TasksCompanion.insert(
@@ -5109,6 +5634,8 @@ class $$TasksTableTableManager extends RootTableManager<
             completedAt: completedAt,
             archivedAt: archivedAt,
             starred: starred,
+            estimatedMinutes: estimatedMinutes,
+            focusedSeconds: focusedSeconds,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -6343,6 +6870,204 @@ typedef $$TaskStepsTableProcessedTableManager = ProcessedTableManager<
     (TaskStep, BaseReferences<_$AppDatabase, $TaskStepsTable, TaskStep>),
     TaskStep,
     PrefetchHooks Function()>;
+typedef $$FocusPlansTableCreateCompanionBuilder = FocusPlansCompanion Function({
+  required String id,
+  required String taskId,
+  required DateTime date,
+  required int plannedMinutes,
+  Value<int> actualSeconds,
+  Value<int> sortOrder,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$FocusPlansTableUpdateCompanionBuilder = FocusPlansCompanion Function({
+  Value<String> id,
+  Value<String> taskId,
+  Value<DateTime> date,
+  Value<int> plannedMinutes,
+  Value<int> actualSeconds,
+  Value<int> sortOrder,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$FocusPlansTableFilterComposer
+    extends Composer<_$AppDatabase, $FocusPlansTable> {
+  $$FocusPlansTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get taskId => $composableBuilder(
+      column: $table.taskId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+      column: $table.date, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get plannedMinutes => $composableBuilder(
+      column: $table.plannedMinutes,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get actualSeconds => $composableBuilder(
+      column: $table.actualSeconds, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+      column: $table.sortOrder, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$FocusPlansTableOrderingComposer
+    extends Composer<_$AppDatabase, $FocusPlansTable> {
+  $$FocusPlansTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get taskId => $composableBuilder(
+      column: $table.taskId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+      column: $table.date, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get plannedMinutes => $composableBuilder(
+      column: $table.plannedMinutes,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get actualSeconds => $composableBuilder(
+      column: $table.actualSeconds,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+      column: $table.sortOrder, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$FocusPlansTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FocusPlansTable> {
+  $$FocusPlansTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get taskId =>
+      $composableBuilder(column: $table.taskId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<int> get plannedMinutes => $composableBuilder(
+      column: $table.plannedMinutes, builder: (column) => column);
+
+  GeneratedColumn<int> get actualSeconds => $composableBuilder(
+      column: $table.actualSeconds, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$FocusPlansTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $FocusPlansTable,
+    FocusPlan,
+    $$FocusPlansTableFilterComposer,
+    $$FocusPlansTableOrderingComposer,
+    $$FocusPlansTableAnnotationComposer,
+    $$FocusPlansTableCreateCompanionBuilder,
+    $$FocusPlansTableUpdateCompanionBuilder,
+    (FocusPlan, BaseReferences<_$AppDatabase, $FocusPlansTable, FocusPlan>),
+    FocusPlan,
+    PrefetchHooks Function()> {
+  $$FocusPlansTableTableManager(_$AppDatabase db, $FocusPlansTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FocusPlansTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FocusPlansTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FocusPlansTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> taskId = const Value.absent(),
+            Value<DateTime> date = const Value.absent(),
+            Value<int> plannedMinutes = const Value.absent(),
+            Value<int> actualSeconds = const Value.absent(),
+            Value<int> sortOrder = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              FocusPlansCompanion(
+            id: id,
+            taskId: taskId,
+            date: date,
+            plannedMinutes: plannedMinutes,
+            actualSeconds: actualSeconds,
+            sortOrder: sortOrder,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String taskId,
+            required DateTime date,
+            required int plannedMinutes,
+            Value<int> actualSeconds = const Value.absent(),
+            Value<int> sortOrder = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              FocusPlansCompanion.insert(
+            id: id,
+            taskId: taskId,
+            date: date,
+            plannedMinutes: plannedMinutes,
+            actualSeconds: actualSeconds,
+            sortOrder: sortOrder,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$FocusPlansTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $FocusPlansTable,
+    FocusPlan,
+    $$FocusPlansTableFilterComposer,
+    $$FocusPlansTableOrderingComposer,
+    $$FocusPlansTableAnnotationComposer,
+    $$FocusPlansTableCreateCompanionBuilder,
+    $$FocusPlansTableUpdateCompanionBuilder,
+    (FocusPlan, BaseReferences<_$AppDatabase, $FocusPlansTable, FocusPlan>),
+    FocusPlan,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6366,4 +7091,6 @@ class $AppDatabaseManager {
       $$AppPreferencesTableTableManager(_db, _db.appPreferences);
   $$TaskStepsTableTableManager get taskSteps =>
       $$TaskStepsTableTableManager(_db, _db.taskSteps);
+  $$FocusPlansTableTableManager get focusPlans =>
+      $$FocusPlansTableTableManager(_db, _db.focusPlans);
 }

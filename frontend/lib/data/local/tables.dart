@@ -67,6 +67,44 @@ class Tasks extends Table with SyncableMixin {
   DateTimeColumn get archivedAt => dateTime().nullable()();
   BoolColumn get starred => boolean().withDefault(const Constant(false))();
 
+  /// 预估总工时（分钟）。用于智能专注规划自动按天拆分。
+  IntColumn get estimatedMinutes => integer().nullable()();
+
+  /// 累计专注时长（秒）。每次专注结束后自动累加。
+  IntColumn get focusedSeconds => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// 每日专注计划条目。
+///
+/// 一行代表"某任务在某天计划专注 X 分钟"。可由规划引擎自动生成，
+/// 也可由用户手动创建。不走 Outbox，本地优先。
+class FocusPlans extends Table {
+  /// 客户端生成的 UUIDv7。
+  TextColumn get id => text()();
+
+  /// 关联的任务 ID。
+  TextColumn get taskId => text()();
+
+  /// 计划日期（当日 00:00）。一个任务一天最多一条计划。
+  DateTimeColumn get date => dateTime()();
+
+  /// 该日计划专注时长（分钟）。
+  IntColumn get plannedMinutes => integer()();
+
+  /// 已完成的实际专注时长（秒）。计时结束时自动累加。
+  IntColumn get actualSeconds =>
+      integer().withDefault(const Constant(0))();
+
+  /// 当日内排序顺序。
+  IntColumn get sortOrder =>
+      integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get createdAt =>
+      dateTime().withDefault(currentDateAndTime)();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
