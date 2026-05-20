@@ -14,6 +14,12 @@ import 'package:flutter/material.dart';
 ///   - Dialog / BottomSheet 28px 圆角
 ///   - Checkbox 圆形
 ///   - AppBar 无阴影
+///
+/// 暗色模式单独调优:
+///   - 表面色更暗以增加深度感
+///   - 卡片与容器增加微弱边框提升层次
+///   - 阴影改为高亮边框策略(暗色下阴影不可见)
+///   - splash/highlight 更明亮以增强触觉反馈
 ThemeData buildLightTheme([Color seedColor = AppColors.seedTechBlue]) {
   final scheme = ColorScheme.fromSeed(seedColor: seedColor);
   return _buildTheme(scheme);
@@ -27,17 +33,38 @@ ThemeData buildDarkTheme([Color seedColor = AppColors.seedTechBlue]) {
   return _buildTheme(scheme);
 }
 
+/// 全局字体族：Windows 优先使用 "Microsoft YaHei UI"（微软雅黑 UI 变体）,
+/// 该字体在各字重下渲染更均匀、字间距更紧凑,中英混排一致性好。
+/// 回退列表覆盖 macOS (PingFang) / Linux (Noto Sans SC) / Android。
+const _kFontFamily = 'Microsoft YaHei UI';
+const _kFontFallback = [
+  'Microsoft YaHei',
+  'PingFang SC',
+  'Noto Sans SC',
+  'Segoe UI',
+  'sans-serif',
+];
+
 ThemeData _buildTheme(ColorScheme scheme) {
   final isLight = scheme.brightness == Brightness.light;
 
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
+    fontFamily: _kFontFamily,
+    fontFamilyFallback: _kFontFallback,
     visualDensity: VisualDensity.adaptivePlatformDensity,
 
+    // ── 页面过渡统一为淡入上移 ──
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      },
+    ),
+
     // ── 字体 ──
-    // 使用系统默认字体 + 精确字重/字号(ui_design_spec §3)。
-    // 若后续需要 Inter 字体,引入 google_fonts 包并在此配置。
     textTheme: _buildTextTheme(scheme),
 
     // ── AppBar ──
@@ -55,13 +82,18 @@ ThemeData _buildTheme(ColorScheme scheme) {
       ),
     ),
 
-    // ── Card ──
+    // ── Card ── 暗色模式增加微弱边框
     cardTheme: CardThemeData(
-      elevation: 0,
+      elevation: isLight ? 0 : 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Radii.card),
+        side: isLight
+            ? BorderSide.none
+            : BorderSide(
+                color: scheme.outlineVariant.withValues(alpha: 0.15),
+              ),
       ),
-      color: scheme.surfaceContainerLow,
+      color: isLight ? scheme.surfaceContainerLow : scheme.surfaceContainer,
       margin: const EdgeInsets.symmetric(
         horizontal: Spacing.base,
         vertical: Spacing.xs,
@@ -99,17 +131,27 @@ ThemeData _buildTheme(ColorScheme scheme) {
       ),
     ),
 
-    // ── Input ──
+    // ── Input ── 暗色加微弱边框
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      fillColor: isLight
+          ? scheme.surfaceContainerHighest.withValues(alpha: 0.5)
+          : scheme.surfaceContainerHigh.withValues(alpha: 0.6),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(Radii.input),
-        borderSide: BorderSide.none,
+        borderSide: isLight
+            ? BorderSide.none
+            : BorderSide(
+                color: scheme.outlineVariant.withValues(alpha: 0.1),
+              ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(Radii.input),
-        borderSide: BorderSide.none,
+        borderSide: isLight
+            ? BorderSide.none
+            : BorderSide(
+                color: scheme.outlineVariant.withValues(alpha: 0.1),
+              ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(Radii.input),
@@ -126,7 +168,7 @@ ThemeData _buildTheme(ColorScheme scheme) {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Radii.sheet),
       ),
-      elevation: 3,
+      elevation: isLight ? 3 : 6,
     ),
 
     // ── BottomSheet ──
@@ -135,7 +177,7 @@ ThemeData _buildTheme(ColorScheme scheme) {
         borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.sheet)),
       ),
       showDragHandle: true,
-      elevation: 1,
+      elevation: isLight ? 1 : 4,
       backgroundColor: scheme.surface,
     ),
 
@@ -160,17 +202,17 @@ ThemeData _buildTheme(ColorScheme scheme) {
       contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.base),
     ),
 
-    // ── NavigationBar ──
+    // ── NavigationBar ── 暗色底部导航增加分隔线
     navigationBarTheme: NavigationBarThemeData(
       indicatorColor: scheme.secondaryContainer,
       labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
       elevation: 0,
-      backgroundColor: scheme.surface,
+      backgroundColor: isLight ? scheme.surface : scheme.surfaceContainer,
     ),
 
     // ── Divider ──
     dividerTheme: DividerThemeData(
-      color: scheme.outlineVariant.withValues(alpha: 0.5),
+      color: scheme.outlineVariant.withValues(alpha: isLight ? 0.5 : 0.3),
       thickness: 1,
       space: 1,
     ),
@@ -197,7 +239,7 @@ ThemeData _buildTheme(ColorScheme scheme) {
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: scheme.primaryContainer,
       foregroundColor: scheme.onPrimaryContainer,
-      elevation: 2,
+      elevation: isLight ? 2 : 4,
       shape: const CircleBorder(),
     ),
 
@@ -209,11 +251,27 @@ ThemeData _buildTheme(ColorScheme scheme) {
       ),
     ),
 
-    // ── 杂项 ──
+    // ── Tooltip — 暗色模式下更明亮 ──
+    tooltipTheme: TooltipThemeData(
+      decoration: BoxDecoration(
+        color: isLight
+            ? scheme.inverseSurface
+            : scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(Radii.chip),
+      ),
+      textStyle: TextStyle(
+        color: isLight ? scheme.onInverseSurface : scheme.onSurface,
+        fontSize: 12,
+      ),
+    ),
+
+    // ── 杂项 ── 暗色模式下 splash 更明亮
     splashColor: isLight
         ? scheme.primary.withValues(alpha: 0.08)
-        : scheme.primary.withValues(alpha: 0.12),
-    highlightColor: scheme.primary.withValues(alpha: 0.05),
+        : scheme.primary.withValues(alpha: 0.16),
+    highlightColor: isLight
+        ? scheme.primary.withValues(alpha: 0.05)
+        : scheme.primary.withValues(alpha: 0.10),
   );
 }
 
@@ -309,5 +367,7 @@ TextTheme _buildTextTheme(ColorScheme scheme) {
   return base.apply(
     bodyColor: scheme.onSurface,
     displayColor: scheme.onSurface,
+    fontFamily: _kFontFamily,
+    fontFamilyFallback: _kFontFallback,
   );
 }
