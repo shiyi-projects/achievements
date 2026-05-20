@@ -7,7 +7,7 @@ part of 'current_view.dart';
 // **************************************************************************
 
 String _$currentViewNotifierHash() =>
-    r'9bb64893323ceaf36dd7fc217a86921a4421190c';
+    r'44e8b5321b5dab2752f79c9a75d37228b563c001';
 
 /// See also [CurrentViewNotifier].
 @ProviderFor(CurrentViewNotifier)

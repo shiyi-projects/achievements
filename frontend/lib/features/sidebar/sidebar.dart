@@ -109,12 +109,6 @@ class Sidebar extends ConsumerWidget {
                       onTap: viewNotifier.showFocus,
                     ),
                     ViewNavTile(
-                      icon: Icons.search_rounded,
-                      label: '搜索',
-                      selected: currentView == AppView.search,
-                      onTap: viewNotifier.showSearch,
-                    ),
-                    ViewNavTile(
                       icon: Icons.bar_chart_rounded,
                       label: '统计',
                       selected: currentView == AppView.statistics,
