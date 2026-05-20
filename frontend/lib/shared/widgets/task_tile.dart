@@ -4,10 +4,12 @@ import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/tag_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:achievements/shared/widgets/priority_chip.dart';
 import 'package:achievements/shared/widgets/tags_row.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 任务行,Today / ListPage 共用。
@@ -138,7 +140,14 @@ class TaskTile extends ConsumerWidget {
           ),
         ),
       ),
-    );
+    )
+        .animate()
+        .fadeIn(duration: MotionDurations.fast)
+        .slideX(
+          begin: 0.03,
+          duration: MotionDurations.normal,
+          curve: MotionCurves.decelerate,
+        );
   }
 
   List<Widget> _buildTrailing(
@@ -194,10 +203,10 @@ class TaskTile extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Round Checkbox
+// Round Checkbox (animated)
 // ─────────────────────────────────────────────────────────────────────
 
-class _RoundCheckbox extends StatelessWidget {
+class _RoundCheckbox extends StatefulWidget {
   const _RoundCheckbox({
     required this.checked,
     required this.color,
@@ -209,22 +218,69 @@ class _RoundCheckbox extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_RoundCheckbox> createState() => _RoundCheckboxState();
+}
+
+class _RoundCheckboxState extends State<_RoundCheckbox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: MotionDurations.fast,
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1, end: 1.35), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.35, end: 1), weight: 60),
+    ]).animate(CurvedAnimation(parent: _ctrl, curve: MotionCurves.decelerate));
+  }
+
+  @override
+  void didUpdateWidget(_RoundCheckbox old) {
+    super.didUpdateWidget(old);
+    if (!old.checked && widget.checked) {
+      _ctrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutBack,
-        width: 24,
-        height: 24,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: checked ? color : Colors.transparent,
-          border: Border.all(color: color, width: 2),
+      onTap: widget.onTap,
+      child: ScaleTransition(
+        scale: _scale,
+        child: AnimatedContainer(
+          duration: MotionDurations.fast,
+          curve: MotionCurves.spring,
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: widget.checked ? widget.color : Colors.transparent,
+            border: Border.all(color: widget.color, width: 2),
+          ),
+          child: AnimatedSwitcher(
+            duration: MotionDurations.fast,
+            child: widget.checked
+                ? const Icon(
+                    Icons.check_rounded,
+                    key: ValueKey('check'),
+                    size: 16,
+                    color: Colors.white,
+                  )
+                : const SizedBox.shrink(key: ValueKey('empty')),
+          ),
         ),
-        child: checked
-            ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
-            : null,
       ),
     );
   }

@@ -11,6 +11,7 @@ import 'package:achievements/features/statistics/statistics_page.dart';
 import 'package:achievements/features/task_detail/task_detail_panel.dart';
 import 'package:achievements/features/today/today_page.dart';
 import 'package:achievements/platform/windows/command_palette.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:achievements/state/current_view.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:achievements/state/selected_task.dart';
@@ -115,7 +116,27 @@ class AppShell extends ConsumerWidget {
                   child: Column(
                     children: [
                       _ModernAppBar(title: title),
-                      Expanded(child: mainBody),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: MotionDurations.normal,
+                          switchInCurve: MotionCurves.decelerate,
+                          switchOutCurve: MotionCurves.accelerate,
+                          transitionBuilder: (child, anim) => FadeTransition(
+                            opacity: anim,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.03),
+                                end: Offset.zero,
+                              ).animate(anim),
+                              child: child,
+                            ),
+                          ),
+                          child: KeyedSubtree(
+                            key: ValueKey(view),
+                            child: mainBody,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
