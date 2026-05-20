@@ -1,10 +1,12 @@
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ─────────────────────────────────────────────────────────────────────
-// Brand Header
+// Brand Header — 带入场动画和 shimmer Logo
 // ─────────────────────────────────────────────────────────────────────
 
 class BrandHeader extends StatelessWidget {
@@ -22,6 +24,7 @@ class BrandHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // ── Logo with shimmer ──
           Container(
             width: 36,
             height: 36,
@@ -32,13 +35,38 @@ class BrandHeader extends StatelessWidget {
                 colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
               ),
               borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Icon(
               Icons.emoji_events_rounded,
               color: theme.colorScheme.onPrimary,
               size: 20,
             ),
-          ),
+          )
+              .animate(onPlay: (ctrl) => ctrl.stop())
+              .scale(
+                begin: const Offset(0.5, 0.5),
+                end: const Offset(1.0, 1.0),
+                duration: MotionDurations.bouncy,
+                curve: MotionCurves.bouncySpring,
+              )
+              .rotate(
+                begin: -0.1,
+                end: 0,
+                duration: MotionDurations.bouncy,
+                curve: MotionCurves.bouncySpring,
+              )
+              .shimmer(
+                delay: 800.ms,
+                duration: 1200.ms,
+                color: theme.colorScheme.onPrimary.withValues(alpha: 0.3),
+              ),
           const SizedBox(width: Spacing.md),
           Expanded(
             child: Text(

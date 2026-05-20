@@ -62,9 +62,9 @@ class _IdleButtons extends StatelessWidget {
       width: double.infinity,
       child: FilledButton(
         onPressed: notifier.start,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(vertical: Spacing.sm),
-          child: Text('开始专注', style: TextStyle(fontSize: 16)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+          child: Text('开始专注', style: Theme.of(context).textTheme.bodyLarge),
         ),
       ),
     );
@@ -211,9 +211,9 @@ class _FreeDoneButtons extends StatelessWidget {
       width: double.infinity,
       child: FilledButton(
         onPressed: notifier.reset,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(vertical: Spacing.sm),
-          child: Text('再来一轮', style: TextStyle(fontSize: 16)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+          child: Text('再来一轮', style: Theme.of(context).textTheme.bodyLarge),
         ),
       ),
     );

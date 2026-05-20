@@ -1,6 +1,10 @@
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 /// GitHub-style contribution heatmap for the last [days] days.
+///
+/// 美化: 列从左到右交错淡入,带微弱的缩放效果。
 class ActivityHeatmap extends StatelessWidget {
   const ActivityHeatmap({
     required this.data,
@@ -38,6 +42,10 @@ class ActivityHeatmap extends StatelessWidget {
     final weeks = (totalCells / 7).ceil();
 
     final baseColor = theme.colorScheme.primary;
+    final isLight = theme.colorScheme.brightness == Brightness.light;
+    final emptyColor = isLight
+        ? theme.colorScheme.surfaceContainerHighest
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -62,7 +70,7 @@ class ActivityHeatmap extends StatelessWidget {
                           : (cell.count / maxCount).clamp(0.1, 1.0);
                       final filled = cell.count > 0;
                       return Tooltip(
-                        message: '${_formatDate(cell.date)}: ${cell.count}',
+                        message: '${_formatDate(cell.date)}: ${cell.count} 个任务',
                         child: Container(
                           width: 11,
                           height: 11,
@@ -70,15 +78,26 @@ class ActivityHeatmap extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: filled
                                 ? baseColor.withValues(alpha: opacity)
-                                : theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(2),
+                                : emptyColor,
+                            borderRadius: BorderRadius.circular(2.5),
                           ),
                         ),
                       );
                     }(),
                 ],
               ),
-            ),
+            )
+                .animate()
+                .fadeIn(
+                  duration: MotionDurations.fast,
+                  delay: Duration(milliseconds: (w * 8).clamp(0, 300)),
+                )
+                .scaleY(
+                  begin: 0.8,
+                  duration: MotionDurations.fast,
+                  delay: Duration(milliseconds: (w * 8).clamp(0, 300)),
+                  curve: MotionCurves.emphasizedDecelerate,
+                ),
         ],
       ),
     );

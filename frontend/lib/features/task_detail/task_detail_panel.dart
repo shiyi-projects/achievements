@@ -26,7 +26,7 @@ class TaskDetailPanel extends ConsumerWidget {
     final taskAsync = ref.watch(currentTaskProvider);
     return taskAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, st) => Center(child: Text('Failed to load: $e')),
+      error: (e, st) => Center(child: Text('加载失败: $e')),
       data: (task) {
         if (task == null) return const _EmptySelection();
         return _TaskDetailForm(task: task);
@@ -59,7 +59,7 @@ class _EmptySelection extends StatelessWidget {
           ),
           const SizedBox(height: Spacing.base),
           Text(
-            'Select a task to view details',
+            '选择一个任务查看详情',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
@@ -210,12 +210,12 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete forever?'),
-        content: Text('"${widget.task.title}" will be permanently deleted.'),
+        title: const Text('永久删除?'),
+        content: Text('「${widget.task.title}」将被永久删除，无法恢复。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: const Text('取消'),
           ),
           FilledButton.tonal(
             style: FilledButton.styleFrom(
@@ -223,7 +223,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
               backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: const Text('删除'),
           ),
         ],
       ),

@@ -1,8 +1,12 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
 
-/// 通用顶部导航条目(日历 / 专注 / 搜索)。对应 AppView 切换,而不是清单切换。
-class ViewNavTile extends StatelessWidget {
+/// 通用顶部导航条目(日历 / 专注 / 统计 / 成就)。
+/// 对应 AppView 切换,而不是清单切换。
+///
+/// 带动画选中指示条 + 悬停效果 + 图标缩放弹性。
+class ViewNavTile extends StatefulWidget {
   const ViewNavTile({
     required this.icon,
     required this.label,
@@ -17,49 +21,103 @@ class ViewNavTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<ViewNavTile> createState() => _ViewNavTileState();
+}
+
+class _ViewNavTileState extends State<ViewNavTile> {
+  bool _hovering = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isLight = scheme.brightness == Brightness.light;
+
+    final bgColor = widget.selected
+        ? scheme.secondaryContainer
+        : _hovering
+            ? (isLight
+                ? scheme.surfaceContainerHigh.withValues(alpha: 0.5)
+                : scheme.surfaceContainerHigh.withValues(alpha: 0.3))
+            : Colors.transparent;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
-      child: Material(
-        color: selected ? scheme.secondaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(Radii.input),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Radii.input),
-          onTap: () {
-            onTap();
-            final scaffold = Scaffold.maybeOf(context);
-            if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
-              Navigator.of(context).pop();
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Spacing.md,
-              vertical: Spacing.sm + 2,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  size: 20,
-                  color: selected
-                      ? scheme.onSecondaryContainer
-                      : scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: Spacing.md),
-                Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    color: selected
-                        ? scheme.onSecondaryContainer
-                        : scheme.onSurface,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovering = true),
+        onExit: (_) => setState(() => _hovering = false),
+        child: AnimatedContainer(
+          duration: MotionDurations.fast,
+          curve: MotionCurves.gentleSpring,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(Radii.input),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(Radii.input),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(Radii.input),
+              onTap: () {
+                widget.onTap();
+                final scaffold = Scaffold.maybeOf(context);
+                if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Row(
+                children: [
+                  // ── 左侧指示条 ──
+                  AnimatedContainer(
+                    duration: MotionDurations.fast,
+                    curve: MotionCurves.emphasizedDecelerate,
+                    width: widget.selected ? 3 : 0,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        widget.selected ? Spacing.sm : Spacing.md,
+                        Spacing.sm + 2,
+                        Spacing.md,
+                        Spacing.sm + 2,
+                      ),
+                      child: Row(
+                        children: [
+                          AnimatedScale(
+                            scale: widget.selected ? 1.08 : 1.0,
+                            duration: MotionDurations.fast,
+                            curve: MotionCurves.bouncySpring,
+                            child: Icon(
+                              widget.icon,
+                              size: 20,
+                              color: widget.selected
+                                  ? scheme.onSecondaryContainer
+                                  : scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(width: Spacing.md),
+                          Text(
+                            widget.label,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight:
+                                  widget.selected ? FontWeight.w600 : FontWeight.w400,
+                              color: widget.selected
+                                  ? scheme.onSecondaryContainer
+                                  : scheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

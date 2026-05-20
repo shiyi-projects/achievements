@@ -74,16 +74,15 @@ class _ListPageState extends ConsumerState<ListPage> {
                   error: (e, st) => Center(
                     child: Padding(
                       padding: const EdgeInsets.all(Spacing.xl),
-                      child: Text('Failed to load: $e'),
+                      child: Text('加载失败: $e'),
                     ),
                   ),
                   data: (tasks) => PendingCompletedList(
                     tasks: tasks,
                     emptyState: const EmptyState(
                       icon: Icons.inbox_rounded,
-                      title: 'No tasks here yet',
-                      subtitle:
-                          'Create from the input below or move tasks from other lists.',
+                      title: '还没有任务',
+                      subtitle: '从下方输入框创建，或从其他清单移入。',
                     ),
                   ),
                 ),
@@ -91,7 +90,7 @@ class _ListPageState extends ConsumerState<ListPage> {
 
         if (canQuickCreate)
           QuickCreateInput(
-            hint: 'Add a task to ${current.name}',
+            hint: '添加任务到「${current.name}」…',
             onSubmit: (title) => ref
                 .read(taskRepositoryProvider)
                 .createTask(listId: current.id, title: title),

@@ -1,4 +1,7 @@
+import 'package:achievements/shared/animations/animated_list_item.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class OverviewCards extends StatelessWidget {
   const OverviewCards({
@@ -16,6 +19,7 @@ class OverviewCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -25,28 +29,34 @@ class OverviewCards extends StatelessWidget {
       childAspectRatio: 1.6,
       children: [
         _StatCard(
+          index: 0,
           icon: Icons.task_alt_rounded,
           label: '累计完成',
-          value: '$totalCompleted',
-          color: Colors.green,
+          value: totalCompleted,
+          color: scheme.primary,
         ),
         _StatCard(
+          index: 1,
           icon: Icons.today_rounded,
           label: '今日完成',
-          value: '$todayCompleted',
-          color: Colors.blue,
+          value: todayCompleted,
+          color: scheme.secondary,
         ),
         _StatCard(
+          index: 2,
           icon: Icons.local_fire_department_rounded,
           label: '连续天数',
-          value: '$streakDays 天',
-          color: Colors.orange,
+          value: streakDays,
+          suffix: ' 天',
+          color: scheme.tertiary,
         ),
         _StatCard(
+          index: 3,
           icon: Icons.timer_rounded,
           label: '累计专注',
-          value: '${totalFocusMinutes ~/ 60}h ${totalFocusMinutes % 60}m',
-          color: Colors.purple,
+          value: totalFocusMinutes,
+          formatter: (v) => '${v ~/ 60}h ${v % 60}m',
+          color: scheme.primary,
         ),
       ],
     );
@@ -55,44 +65,83 @@ class OverviewCards extends StatelessWidget {
 
 class _StatCard extends StatelessWidget {
   const _StatCard({
+    required this.index,
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
+    this.suffix = '',
+    this.formatter,
   });
 
+  final int index;
   final IconData icon;
   final String label;
-  final String value;
+  final int value;
   final Color color;
+  final String suffix;
+  final String Function(int)? formatter;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isLight = scheme.brightness == Brightness.light;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 20),
-            const Spacer(),
-            Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: isLight ? 0.12 : 0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
+              child: Icon(icon, color: color, size: 18),
             ),
+            const Spacer(),
+            // ── Animated counter ──
+            formatter != null
+                ? AnimatedCounter(
+                    value: value,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    prefix: '',
+                    suffix: '',
+                  )
+                : AnimatedCounter(
+                    value: value,
+                    suffix: suffix,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
             const SizedBox(height: 2),
             Text(
               label,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.outline,
+                color: scheme.outline,
               ),
             ),
           ],
         ),
       ),
-    );
+    )
+        .animate()
+        .fadeIn(
+          duration: MotionDurations.normal,
+          delay: Duration(milliseconds: 100 * index),
+        )
+        .slideY(
+          begin: 0.05,
+          duration: MotionDurations.normal,
+          delay: Duration(milliseconds: 100 * index),
+          curve: MotionCurves.emphasizedDecelerate,
+        );
   }
 }
