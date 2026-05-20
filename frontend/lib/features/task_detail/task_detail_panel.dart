@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
+import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/task_detail/widgets/collapsible_meta.dart';
 import 'package:achievements/features/task_detail/widgets/date_chip.dart';
 import 'package:achievements/features/task_detail/widgets/list_dropdown.dart';
 import 'package:achievements/features/task_detail/widgets/priority_chips.dart';
+import 'package:achievements/features/task_detail/widgets/steps_section.dart';
 import 'package:achievements/features/task_detail/widgets/subtasks_section.dart';
 import 'package:achievements/features/task_detail/widgets/tag_editor.dart';
 import 'package:achievements/features/task_detail/widgets/top_bar.dart';
@@ -157,15 +159,62 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     if (nav != null && nav.canPop()) nav.pop();
   }
 
-  Future<void> _pickDueDate() async {
-    final initial = widget.task.dueAt ?? DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
+  CalendarDatePicker2WithActionButtonsConfig _calendarConfig() {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return CalendarDatePicker2WithActionButtonsConfig(
+      calendarType: CalendarDatePicker2Type.single,
+      firstDayOfWeek: 1,
+      centerAlignModePicker: true,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      selectedDayHighlightColor: scheme.primary,
+      weekdayLabels: const ['日', '一', '二', '三', '四', '五', '六'],
+      weekdayLabelTextStyle: textTheme.labelSmall?.copyWith(
+        color: scheme.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+      ),
+      controlsTextStyle: textTheme.titleSmall?.copyWith(
+        color: scheme.onSurface,
+        fontWeight: FontWeight.w600,
+      ),
+      dayTextStyle: textTheme.bodyMedium?.copyWith(
+        color: scheme.onSurface,
+      ),
+      selectedDayTextStyle: textTheme.bodyMedium?.copyWith(
+        color: scheme.onPrimary,
+        fontWeight: FontWeight.w600,
+      ),
+      todayTextStyle: textTheme.bodyMedium?.copyWith(
+        color: scheme.primary,
+        fontWeight: FontWeight.w600,
+      ),
+      disabledDayTextStyle: textTheme.bodyMedium?.copyWith(
+        color: scheme.onSurface.withValues(alpha: 0.38),
+      ),
+      dayBorderRadius: BorderRadius.circular(Radii.chip),
+      okButton: FilledButton(
+        onPressed: () {},
+        child: const Text('确定'),
+      ),
+      cancelButton: TextButton(
+        onPressed: () {},
+        child: const Text('取消'),
+      ),
     );
-    if (picked == null) return;
+  }
+
+  Future<void> _pickDueDate() async {
+    final initial = widget.task.dueAt ?? DateTime.now();
+    final results = await showCalendarDatePicker2Dialog(
+      context: context,
+      config: _calendarConfig(),
+      dialogSize: const Size(340, 400),
+      borderRadius: BorderRadius.circular(Radii.sheet),
+      value: [initial],
+    );
+    if (results == null || results.isEmpty || results.first == null) return;
+    final picked = results.first!;
     await _repo.update(
       widget.task.id,
       knownVersion: widget.task.version,
@@ -176,13 +225,16 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
   Future<void> _pickRemind() async {
     final initial =
         widget.task.remindAt ?? DateTime.now().add(const Duration(hours: 1));
-    final date = await showDatePicker(
+    final results = await showCalendarDatePicker2Dialog(
       context: context,
-      initialDate: initial,
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      config: _calendarConfig(),
+      dialogSize: const Size(340, 400),
+      borderRadius: BorderRadius.circular(Radii.sheet),
+      value: [initial],
     );
-    if (date == null || !mounted) return;
+    if (results == null || results.isEmpty || results.first == null) return;
+    if (!mounted) return;
+    final date = results.first!;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initial),
@@ -211,6 +263,11 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        icon: Icon(
+          Icons.delete_forever_rounded,
+          color: Theme.of(ctx).colorScheme.error,
+          size: 32,
+        ),
         title: const Text('永久删除?'),
         content: Text('「${widget.task.title}」将被永久删除，无法恢复。'),
         actions: [
@@ -218,10 +275,10 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('取消'),
           ),
-          FilledButton.tonal(
+          FilledButton(
             style: FilledButton.styleFrom(
-              foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
-              backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+              backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('删除'),
@@ -376,6 +433,9 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                       ),
                     ],
                   ),
+
+                  const SizedBox(height: Spacing.lg),
+                  StepsSection(taskId: task.id),
 
                   const SizedBox(height: Spacing.lg),
                   SubtasksSection(parent: task),

@@ -5,6 +5,7 @@ import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
+import 'package:achievements/data/repositories/step_repository.dart';
 import 'package:achievements/data/repositories/tag_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/platform/android/haptic.dart';
@@ -74,6 +75,7 @@ class _TaskTileState extends ConsumerState<TaskTile>
     );
     final hasFutureReminder =
         task.remindAt != null && task.remindAt!.isAfter(DateTime.now());
+    final stepProgress = ref.watch(stepCountProvider(task.id));
 
     final priorityColor = _priorityColor(priority);
     final isHighPriority = priority == TaskPriority.high;
@@ -182,6 +184,47 @@ class _TaskTileState extends ConsumerState<TaskTile>
                                       ),
                                       child: TagsRow(tags: tags),
                                     ),
+                                  if (stepProgress.total > 0)
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: Spacing.xs,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                Radii.circle,
+                                              ),
+                                              child: LinearProgressIndicator(
+                                                value: stepProgress.total == 0
+                                                    ? 0
+                                                    : stepProgress.done /
+                                                        stepProgress.total,
+                                                minHeight: 3,
+                                                backgroundColor: scheme
+                                                    .surfaceContainerHighest
+                                                    .withValues(alpha: 0.6),
+                                                valueColor:
+                                                    AlwaysStoppedAnimation(
+                                                  scheme.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: Spacing.xs),
+                                          Text(
+                                            '${stepProgress.done}/${stepProgress.total}',
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                              color: scheme.outline,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -271,43 +314,94 @@ class _TaskTileState extends ConsumerState<TaskTile>
   void _showContextMenu(BuildContext context, WidgetRef ref) {
     final done = widget.task.completedAt != null;
     final repo = ref.read(taskRepositoryProvider);
+    final scheme = Theme.of(context).colorScheme;
 
     showModalBottomSheet<void>(
       context: context,
       builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: AppIcons.svgIcon(
-                done ? AppIcons.undo : AppIcons.incomplete,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.sm,
+            vertical: Spacing.sm,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(Radii.chip),
+                  ),
+                  child: Center(
+                    child: AppIcons.svgIcon(
+                      done ? AppIcons.undo : AppIcons.incomplete,
+                      size: 18,
+                    ),
+                  ),
+                ),
+                title: Text(done ? '标记为未完成' : '标记为完成'),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Radii.input),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Haptic.light();
+                  repo.setCompleted(widget.task.id, completed: !done);
+                },
               ),
-              title: Text(done ? '标记为未完成' : '标记为完成'),
-              onTap: () {
-                Navigator.pop(context);
-                Haptic.light();
-                repo.setCompleted(widget.task.id, completed: !done);
-              },
-            ),
-            ListTile(
-              leading: AppIcons.svgIcon(AppIcons.important),
-              title: Text(widget.task.starred ? '取消星标' : '加星标'),
-              onTap: () {
-                Navigator.pop(context);
-                Haptic.light();
-                repo.update(widget.task.id, starred: Value(!widget.task.starred));
-              },
-            ),
-            ListTile(
-              leading: AppIcons.svgIcon(AppIcons.delete),
-              title: const Text('移到回收站'),
-              onTap: () {
-                Navigator.pop(context);
-                Haptic.medium();
-                repo.softDelete(widget.task.id);
-              },
-            ),
-          ],
+              ListTile(
+                leading: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: scheme.tertiary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(Radii.chip),
+                  ),
+                  child: Center(
+                    child: AppIcons.svgIcon(AppIcons.important, size: 18),
+                  ),
+                ),
+                title: Text(widget.task.starred ? '取消星标' : '加星标'),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Radii.input),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Haptic.light();
+                  repo.update(widget.task.id, starred: Value(!widget.task.starred));
+                },
+              ),
+              const Divider(height: Spacing.sm),
+              ListTile(
+                leading: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: scheme.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(Radii.chip),
+                  ),
+                  child: Center(
+                    child: AppIcons.svgIcon(AppIcons.delete, size: 18),
+                  ),
+                ),
+                title: Text(
+                  '移到回收站',
+                  style: TextStyle(color: scheme.error),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Radii.input),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Haptic.medium();
+                  repo.softDelete(widget.task.id);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
