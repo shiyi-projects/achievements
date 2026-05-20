@@ -1,15 +1,17 @@
 import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
+import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
 
 /// 日历网格中的单日格子。
 ///
 /// 视觉特性:
-/// - 选中态: 主色填充 + 阴影 + 微缩放
-/// - 今日: primaryContainer 描边 + 脉冲动画
-/// - 底部热力条: 任务密度色阶 (0=无, 1-2=浅, 3-4=中, 5+=深)
-/// - 优先级最高任务颜色作为热力条色相
+/// - 选中态: 主色实心圆 + bouncySpring 缩放弹入 + 底部阴影
+/// - 今日态: primaryContainer 填充 + 粗体 + 底部小圆点标记
+/// - 任务指示器: 1-3 小圆点,按最高优先级取色
+/// - 悬停态(桌面): 淡色背景
+/// - InkWell 水波纹触摸反馈
 class DayCell extends StatefulWidget {
   const DayCell({
     required this.day,
@@ -30,50 +32,17 @@ class DayCell extends StatefulWidget {
   State<DayCell> createState() => _DayCellState();
 }
 
-class _DayCellState extends State<DayCell> with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseCtrl;
-  late final Animation<double> _pulseAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    );
-    _pulseAnim = Tween<double>(begin: 0.35, end: 0.7).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
-    if (widget.isToday && !widget.isSelected) {
-      _pulseCtrl.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant DayCell oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isToday && !widget.isSelected) {
-      if (!_pulseCtrl.isAnimating) _pulseCtrl.repeat(reverse: true);
-    } else {
-      _pulseCtrl
-        ..stop()
-        ..value = 0.35;
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulseCtrl.dispose();
-    super.dispose();
-  }
+class _DayCellState extends State<DayCell> {
+  bool _hovering = false;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isLight = scheme.brightness == Brightness.light;
     final hasTasks = widget.tasks.isNotEmpty;
     final taskCount = widget.tasks.length;
 
-    // — Colors —
+    // ── Colors ──
     Color bgColor;
     Color fgColor;
 
@@ -81,120 +50,107 @@ class _DayCellState extends State<DayCell> with SingleTickerProviderStateMixin {
       bgColor = scheme.primary;
       fgColor = scheme.onPrimary;
     } else if (widget.isToday) {
-      bgColor = scheme.primaryContainer.withValues(alpha: 0.3);
+      bgColor = scheme.primaryContainer.withValues(alpha: isLight ? 0.45 : 0.3);
       fgColor = scheme.onPrimaryContainer;
+    } else if (_hovering) {
+      bgColor = scheme.surfaceContainerHigh.withValues(alpha: isLight ? 0.6 : 0.3);
+      fgColor = scheme.onSurface;
     } else {
       bgColor = Colors.transparent;
       fgColor = scheme.onSurface;
     }
 
-    // — Heat strip color —
-    final heatColor = _heatColor(scheme, taskCount);
+    // ── Task indicator dots ──
     final highestPriority = _highestPriority(widget.tasks);
-    final priorityAccent = _priorityAccent(highestPriority);
+    final dotColor = widget.isSelected
+        ? scheme.onPrimary.withValues(alpha: 0.7)
+        : _priorityDotColor(highestPriority, scheme);
 
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: widget.isSelected ? 1.05 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutBack,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.all(1.5),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(Radii.chip),
-            border: priorityAccent != null && !widget.isSelected
-                ? Border.all(
-                    color: priorityAccent.withValues(alpha: 0.3),
-                  )
-                : null,
-            boxShadow: widget.isSelected
-                ? [
-                    BoxShadow(
-                      color: scheme.primary.withValues(alpha: 0.35),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Day number
-                  Text(
-                    '${widget.day}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: widget.isToday || widget.isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w400,
-                      color: fgColor,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  // Heat strip
-                  if (hasTasks)
-                    _HeatStrip(
-                      color: heatColor,
-                      isSelected: widget.isSelected,
-                      count: taskCount,
-                    )
-                  else
-                    const SizedBox(height: 4),
-                ],
-              ),
-              if (widget.isToday && !widget.isSelected)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: AnimatedBuilder(
-                      animation: _pulseAnim,
-                      builder: (context, _) {
-                        return Container(
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: widget.isSelected ? 1.08 : 1.0,
+          duration: MotionDurations.fast,
+          curve: MotionCurves.bouncySpring,
+          child: AnimatedContainer(
+            duration: MotionDurations.fast,
+            curve: MotionCurves.emphasizedDecelerate,
+            margin: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(Radii.chip),
+              boxShadow: widget.isSelected
+                  ? [
+                      BoxShadow(
+                        color: scheme.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(Radii.chip),
+                onTap: widget.onTap,
+                splashColor: scheme.primary.withValues(alpha: 0.12),
+                highlightColor: scheme.primary.withValues(alpha: 0.06),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ── Day number ──
+                      Text(
+                        '${widget.day}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: widget.isToday || widget.isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: fgColor,
+                          height: 1.2,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      // ── Task dots or today marker ──
+                      if (hasTasks)
+                        _TaskDots(
+                          count: taskCount,
+                          color: dotColor,
+                        )
+                      else if (widget.isToday && !widget.isSelected)
+                        Container(
+                          width: 4,
+                          height: 4,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(Radii.chip),
-                            border: Border.all(
-                              color: scheme.primary.withValues(alpha: _pulseAnim.value),
-                              width: 1.5,
-                            ),
+                            color: scheme.primary,
+                            shape: BoxShape.circle,
                           ),
-                        );
-                      },
-                    ),
+                        )
+                      else
+                        const SizedBox(height: 4),
+                    ],
                   ),
                 ),
-            ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// 任务密度 → 热力条颜色。
-  Color _heatColor(ColorScheme scheme, int count) {
-    if (count == 0) return Colors.transparent;
-    final baseColor = scheme.primary;
-    if (count <= 2) return baseColor.withValues(alpha: 0.3);
-    if (count <= 4) return baseColor.withValues(alpha: 0.55);
-    return baseColor.withValues(alpha: 0.85);
-  }
-
-  /// 取任务列表中最高优先级。
   int _highestPriority(List<Task> tasks) {
     if (tasks.isEmpty) return 0;
     return tasks.fold<int>(0, (max, t) => t.priority > max ? t.priority : max);
   }
 
-  /// 优先级 → 强调色。
-  Color? _priorityAccent(int priority) {
+  Color _priorityDotColor(int priority, ColorScheme scheme) {
     switch (priority) {
       case 3:
         return AppColors.urgent;
@@ -203,36 +159,22 @@ class _DayCellState extends State<DayCell> with SingleTickerProviderStateMixin {
       case 1:
         return AppColors.low;
       default:
-        return null;
+        return scheme.primary.withValues(alpha: 0.5);
     }
   }
 }
 
-
-/// 热力条组件。
-class _HeatStrip extends StatelessWidget {
-  const _HeatStrip({
-    required this.color,
-    required this.isSelected,
-    required this.count,
-  });
-
-  final Color color;
-  final bool isSelected;
+/// 任务数量指示圆点 (1-3 dots, 4+ 显示条)。
+class _TaskDots extends StatelessWidget {
+  const _TaskDots({required this.count, required this.color});
   final int count;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final displayColor = isSelected
-        ? scheme.onPrimary.withValues(alpha: 0.6)
-        : color;
-
     if (count <= 3) {
-      // Dots for low count
       return Row(
         mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(
           count.clamp(0, 3),
           (i) => Container(
@@ -240,20 +182,18 @@ class _HeatStrip extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.symmetric(horizontal: 0.5),
             decoration: BoxDecoration(
-              color: displayColor,
+              color: color,
               shape: BoxShape.circle,
             ),
           ),
         ),
       );
     }
-
-    // Strip for higher counts
     return Container(
-      width: 18,
+      width: 16,
       height: 4,
       decoration: BoxDecoration(
-        color: displayColor,
+        color: color,
         borderRadius: BorderRadius.circular(Radii.circle),
       ),
     );
