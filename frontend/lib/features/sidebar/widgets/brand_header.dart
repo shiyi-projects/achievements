@@ -1,9 +1,11 @@
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 // ─────────────────────────────────────────────────────────────────────
 // Brand Header — 带入场动画和 shimmer Logo
@@ -43,10 +45,10 @@ class BrandHeader extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(
-              Icons.emoji_events_rounded,
-              color: theme.colorScheme.onPrimary,
-              size: 20,
+            child: SvgPicture.asset(
+              AppIcons.achievement,
+              width: 20,
+              height: 20,
             ),
           )
               .animate(onPlay: (ctrl) => ctrl.stop())
@@ -125,30 +127,35 @@ class _SyncStatusIndicatorState extends ConsumerState<SyncStatusIndicator>
       if (_spin.isAnimating) _spin.stop();
     }
 
-    final (icon, color, tooltip) = switch (status) {
+    final (iconPath, color, tooltip) = switch (status) {
       SyncStatus.idle => (
-        Icons.cloud_done_rounded,
+        AppIcons.cloudSync,
         theme.colorScheme.outline.withValues(alpha: 0.6),
         '已同步',
       ),
       SyncStatus.syncing => (
-        Icons.sync_rounded,
+        AppIcons.sync,
         theme.colorScheme.primary,
         '同步中…',
       ),
       SyncStatus.error => (
-        Icons.sync_problem_rounded,
+        AppIcons.sync,
         theme.colorScheme.error,
         '同步失败',
       ),
       SyncStatus.offline => (
-        Icons.cloud_off_rounded,
+        AppIcons.cloudSync,
         theme.colorScheme.outline,
-        '离线,暂存本地',
+        '离线，暂存本地',
       ),
     };
 
-    final iconWidget = Icon(icon, size: 18, color: color);
+    final iconWidget = SvgPicture.asset(
+      iconPath,
+      width: 18,
+      height: 18,
+      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+    );
     return Tooltip(
       message: tooltip,
       child: SizedBox(

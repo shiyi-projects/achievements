@@ -23,7 +23,7 @@ class SidebarTile extends ConsumerStatefulWidget {
   });
 
   final TaskList list;
-  final IconData icon;
+  final Widget icon;
   final bool selected;
 
   /// UI 层覆写显示名(用于系统清单中文化)。为 null 时回退到 `list.name`。
@@ -110,12 +110,10 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
                               scale: widget.selected ? 1.08 : 1.0,
                               duration: MotionDurations.fast,
                               curve: MotionCurves.bouncySpring,
-                              child: Icon(
-                                widget.icon,
-                                size: 20,
-                                color: widget.selected
-                                    ? scheme.onSecondaryContainer
-                                    : scheme.onSurfaceVariant,
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: widget.icon,
                               ),
                             ),
                             const SizedBox(width: Spacing.md),

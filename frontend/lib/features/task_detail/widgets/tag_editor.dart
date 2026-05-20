@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/repositories/tag_repository.dart';
 import 'package:achievements/shared/widgets/name_input_dialog.dart';
 import 'package:flutter/material.dart';
@@ -37,11 +38,7 @@ class TagEditor extends ConsumerWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.label_rounded,
-                size: 20,
-                color: scheme.onSurfaceVariant,
-              ),
+              AppIcons.svgIcon(AppIcons.tag),
               const SizedBox(width: Spacing.base),
               Expanded(
                 child: Wrap(
@@ -66,11 +63,7 @@ class TagEditor extends ConsumerWidget {
                         },
                       ),
                     ActionChip(
-                      avatar: Icon(
-                        Icons.add_rounded,
-                        size: 16,
-                        color: scheme.primary,
-                      ),
+                      avatar: AppIcons.svgIcon(AppIcons.add, size: 16),
                       label: Text(
                         'New',
                         style: theme.textTheme.labelMedium?.copyWith(

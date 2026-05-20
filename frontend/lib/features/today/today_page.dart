@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
@@ -79,10 +80,10 @@ class _TodayBody extends StatelessWidget {
 
         // ── Task List (as native slivers — no nested scrollable) ──
         if (tasks.isEmpty)
-          const SliverFillRemaining(
+          SliverFillRemaining(
             hasScrollBody: false,
             child: EmptyState(
-              icon: Icons.task_alt_rounded,
+              icon: AppIcons.svgIcon(AppIcons.completed, size: 36),
               title: '今天还没有任务',
               subtitle: '从下方输入框创建你的第一个任务吧。',
             ),

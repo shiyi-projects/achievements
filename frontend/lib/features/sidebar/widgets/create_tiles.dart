@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/features/settings/settings_page.dart';
@@ -20,11 +21,7 @@ class NewListTile extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
       child: ListTile(
         dense: true,
-        leading: Icon(
-          Icons.add_rounded,
-          size: 20,
-          color: theme.colorScheme.primary,
-        ),
+        leading: AppIcons.svgIcon(AppIcons.add),
         title: Text(
           '新建清单',
           style: theme.textTheme.bodyMedium?.copyWith(
@@ -55,11 +52,7 @@ class NewFolderTile extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
       child: ListTile(
         dense: true,
-        leading: Icon(
-          Icons.create_new_folder_outlined,
-          size: 20,
-          color: theme.colorScheme.primary,
-        ),
+        leading: AppIcons.svgIcon(AppIcons.newFolder),
         title: Text(
           '新建文件夹',
           style: theme.textTheme.bodyMedium?.copyWith(
@@ -97,11 +90,7 @@ class SettingsTile extends StatelessWidget {
       ),
       child: ListTile(
         dense: true,
-        leading: Icon(
-          Icons.settings_rounded,
-          size: 20,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
+        leading: AppIcons.svgIcon(AppIcons.settings),
         title: Text(
           '设置',
           style: theme.textTheme.bodyMedium?.copyWith(

@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/platform/android/haptic.dart';
@@ -112,14 +113,14 @@ class _SwipeableTaskTile extends ConsumerWidget {
       // Right swipe: complete (pending) or restore (completed)
       background: _SwipeBackground(
         color: scheme.primaryContainer,
-        icon: isPending ? Icons.check_circle_rounded : Icons.undo_rounded,
+        icon: isPending ? AppIcons.svgIcon(AppIcons.completedStatus, size: 24) : AppIcons.svgIcon(AppIcons.undo, size: 24),
         label: isPending ? '完成' : '恢复',
         alignment: Alignment.centerLeft,
       ),
       // Left swipe: delete
       secondaryBackground: _SwipeBackground(
         color: scheme.errorContainer,
-        icon: Icons.delete_rounded,
+        icon: AppIcons.svgIcon(AppIcons.delete, size: 24),
         label: '删除',
         alignment: Alignment.centerRight,
       ),
@@ -150,7 +151,7 @@ class _SwipeBackground extends StatelessWidget {
   });
 
   final Color color;
-  final IconData icon;
+  final Widget icon;
   final String label;
   final Alignment alignment;
 
@@ -184,12 +185,7 @@ class _SwipeBackground extends StatelessWidget {
             ),
             const SizedBox(width: Spacing.sm),
           ],
-          Icon(
-            icon,
-            color: isLeft
-                ? scheme.onPrimaryContainer
-                : scheme.onErrorContainer,
-          ),
+          icon,
           if (isLeft) ...[
             const SizedBox(width: Spacing.sm),
             Text(

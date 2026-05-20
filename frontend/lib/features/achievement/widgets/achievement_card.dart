@@ -1,3 +1,4 @@
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:achievements/features/achievement/models/achievement_def.dart';
 import 'package:flutter/material.dart';
@@ -51,11 +52,7 @@ class _AchievementCardState extends State<AchievementCard> {
                     Text(widget.def.icon, style: const TextStyle(fontSize: 24)),
                     const Spacer(),
                     if (!widget.unlocked)
-                      Icon(
-                        Icons.lock_outline_rounded,
-                        size: 14,
-                        color: colorScheme.outline,
-                      )
+                      AppIcons.svgIcon(AppIcons.lock, size: 14)
                           .animate(
                             onPlay: (ctrl) => ctrl.repeat(reverse: true),
                           )

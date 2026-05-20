@@ -1,5 +1,6 @@
 import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/features/task_detail/widgets/date_helpers.dart';
 import 'package:flutter/material.dart';
 
@@ -20,7 +21,7 @@ class DateChip extends StatelessWidget {
     super.key,
   });
   final DateTime? date;
-  final IconData icon;
+  final Widget icon;
   final String emptyLabel;
   final VoidCallback onTap;
   final VoidCallback? onClear;
@@ -34,7 +35,7 @@ class DateChip extends StatelessWidget {
     if (date == null) {
       // 未设值：淡色 ActionChip
       return ActionChip(
-        avatar: Icon(icon, size: 16, color: scheme.outline),
+        avatar: icon,
         label: Text(
           '+ $emptyLabel',
           style: theme.textTheme.labelMedium?.copyWith(color: scheme.outline),
@@ -71,7 +72,7 @@ class DateChip extends StatelessWidget {
     final label = showTime ? formatDateTimeCn(date!) : formatDateCn(date!);
 
     return InputChip(
-      avatar: Icon(icon, size: 16, color: chipFg),
+      avatar: icon,
       label: Text(label),
       labelStyle: theme.textTheme.labelMedium?.copyWith(
         color: chipFg,
@@ -82,7 +83,7 @@ class DateChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(Radii.chip),
       ),
       side: BorderSide.none,
-      deleteIcon: Icon(Icons.close_rounded, size: 14, color: chipFg),
+      deleteIcon: AppIcons.svgIcon(AppIcons.close, size: 14),
       onDeleted: onClear,
       onPressed: onTap,
     );

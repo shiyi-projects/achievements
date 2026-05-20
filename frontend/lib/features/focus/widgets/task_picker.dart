@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/features/focus/providers/focus_providers.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:flutter/material.dart';
@@ -86,7 +87,7 @@ class _AssociatedRow extends StatelessWidget {
           ),
           const SizedBox(width: Spacing.xs),
           IconButton(
-            icon: const Icon(Icons.close_rounded, size: 18),
+            icon: AppIcons.svgIcon(AppIcons.close, size: 18),
             onPressed: onClear,
             visualDensity: VisualDensity.compact,
             color: scheme.onSurfaceVariant,

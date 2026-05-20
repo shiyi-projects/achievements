@@ -1,3 +1,4 @@
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/shared/animations/animated_list_item.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
@@ -30,21 +31,21 @@ class OverviewCards extends StatelessWidget {
       children: [
         _StatCard(
           index: 0,
-          icon: Icons.task_alt_rounded,
+          icon: AppIcons.svgIcon(AppIcons.completed, size: 18),
           label: '累计完成',
           value: totalCompleted,
           color: scheme.primary,
         ),
         _StatCard(
           index: 1,
-          icon: Icons.today_rounded,
+          icon: AppIcons.svgIcon(AppIcons.today, size: 18),
           label: '今日完成',
           value: todayCompleted,
           color: scheme.secondary,
         ),
         _StatCard(
           index: 2,
-          icon: Icons.local_fire_department_rounded,
+          icon: AppIcons.svgIcon(AppIcons.streak, size: 18),
           label: '连续天数',
           value: streakDays,
           suffix: ' 天',
@@ -52,7 +53,7 @@ class OverviewCards extends StatelessWidget {
         ),
         _StatCard(
           index: 3,
-          icon: Icons.timer_rounded,
+          icon: AppIcons.svgIcon(AppIcons.focusTimer, size: 18),
           label: '累计专注',
           value: totalFocusMinutes,
           formatter: (v) => '${v ~/ 60}h ${v % 60}m',
@@ -75,7 +76,7 @@ class _StatCard extends StatelessWidget {
   });
 
   final int index;
-  final IconData icon;
+  final Widget icon;
   final String label;
   final int value;
   final Color color;
@@ -101,7 +102,7 @@ class _StatCard extends StatelessWidget {
                 color: color.withValues(alpha: isLight ? 0.12 : 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: color, size: 18),
+              child: icon,
             ),
             const Spacer(),
             // ── Animated counter ──

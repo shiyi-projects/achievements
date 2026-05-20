@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/tag_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
@@ -232,11 +233,7 @@ class _TaskTileState extends ConsumerState<TaskTile>
       items.add(
         Padding(
           padding: const EdgeInsets.only(left: Spacing.sm),
-          child: Icon(
-            Icons.notifications_active_rounded,
-            size: 18,
-            color: scheme.outline,
-          ),
+          child: AppIcons.svgIcon(AppIcons.reminder, size: 18),
         ),
       );
     }
@@ -244,7 +241,7 @@ class _TaskTileState extends ConsumerState<TaskTile>
       items.add(
         Padding(
           padding: const EdgeInsets.only(left: Spacing.sm),
-          child: Icon(Icons.star_rounded, size: 18, color: scheme.tertiary)
+          child: AppIcons.svgIcon(AppIcons.important, size: 18)
               .animate(onPlay: (c) => c.stop())
               .scale(
                 begin: const Offset(0.0, 0.0),
@@ -282,8 +279,8 @@ class _TaskTileState extends ConsumerState<TaskTile>
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(
-                done ? Icons.undo_rounded : Icons.check_circle_outline_rounded,
+              leading: AppIcons.svgIcon(
+                done ? AppIcons.undo : AppIcons.incomplete,
               ),
               title: Text(done ? '标记为未完成' : '标记为完成'),
               onTap: () {
@@ -293,14 +290,7 @@ class _TaskTileState extends ConsumerState<TaskTile>
               },
             ),
             ListTile(
-              leading: Icon(
-                widget.task.starred
-                    ? Icons.star_rounded
-                    : Icons.star_outline_rounded,
-                color: widget.task.starred
-                    ? Theme.of(context).colorScheme.tertiary
-                    : null,
-              ),
+              leading: AppIcons.svgIcon(AppIcons.important),
               title: Text(widget.task.starred ? '取消星标' : '加星标'),
               onTap: () {
                 Navigator.pop(context);
@@ -309,7 +299,7 @@ class _TaskTileState extends ConsumerState<TaskTile>
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline_rounded),
+              leading: AppIcons.svgIcon(AppIcons.delete),
               title: const Text('移到回收站'),
               onTap: () {
                 Navigator.pop(context);
@@ -452,11 +442,11 @@ class _ParticleCheckboxState extends State<_ParticleCheckbox>
                     child: child,
                   ),
                   child: widget.checked
-                      ? const Icon(
-                          Icons.check_rounded,
-                          key: ValueKey('check'),
-                          size: 16,
-                          color: Colors.white,
+                      ? SizedBox(
+                          key: const ValueKey('check'),
+                          width: 16,
+                          height: 16,
+                          child: AppIcons.svgIcon(AppIcons.check, size: 16),
                         )
                       : const SizedBox.shrink(key: ValueKey('empty')),
                 ),

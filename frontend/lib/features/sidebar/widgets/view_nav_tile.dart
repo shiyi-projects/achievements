@@ -15,7 +15,7 @@ class ViewNavTile extends StatefulWidget {
     super.key,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -93,12 +93,10 @@ class _ViewNavTileState extends State<ViewNavTile> {
                             scale: widget.selected ? 1.08 : 1.0,
                             duration: MotionDurations.fast,
                             curve: MotionCurves.bouncySpring,
-                            child: Icon(
-                              widget.icon,
-                              size: 20,
-                              color: widget.selected
-                                  ? scheme.onSecondaryContainer
-                                  : scheme.onSurfaceVariant,
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: widget.icon,
                             ),
                           ),
                           const SizedBox(width: Spacing.md),

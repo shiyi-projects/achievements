@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/features/calendar/providers/calendar_providers.dart';
 import 'package:achievements/features/calendar/widgets/calendar_task_tile.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
@@ -22,8 +23,8 @@ class DayTaskList extends ConsumerWidget {
     final tasks = ref.watch(selectedDayTasksProvider);
 
     if (selected == null) {
-      return const EmptyState(
-        icon: Icons.calendar_today_rounded,
+      return EmptyState(
+        icon: AppIcons.svgIcon(AppIcons.calendar, size: 36),
         title: '点击日期查看任务',
         subtitle: '选择一个日期以查看当天的待办事项',
       );
@@ -68,11 +69,7 @@ class DayTaskList extends ConsumerWidget {
                     color: scheme.primaryContainer.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(Radii.chip),
                   ),
-                  child: Icon(
-                    Icons.event_rounded,
-                    size: 16,
-                    color: scheme.primary,
-                  ),
+                  child: AppIcons.svgIcon(AppIcons.planned, size: 16),
                 ),
                 const SizedBox(width: Spacing.sm),
                 Text(
@@ -108,9 +105,9 @@ class DayTaskList extends ConsumerWidget {
 
           // ── Task list or empty ──
           if (tasks.isEmpty)
-            const Expanded(
+            Expanded(
               child: EmptyState(
-                icon: Icons.event_available_rounded,
+                icon: AppIcons.svgIcon(AppIcons.planned, size: 36),
                 title: '这一天没有任务',
                 subtitle: '选定日期无待办事项',
               ),

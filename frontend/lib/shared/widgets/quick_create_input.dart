@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
 
@@ -135,11 +136,7 @@ class _QuickCreateInputState extends State<QuickCreateInput>
                     turns: _hasFocus ? 0.125 : 0, // 45° 旋转
                     duration: MotionDurations.fast,
                     curve: MotionCurves.bouncySpring,
-                    child: Icon(
-                      Icons.add_circle_outline_rounded,
-                      size: 22,
-                      color: _hasFocus ? scheme.primary : scheme.outline,
-                    ),
+                    child: AppIcons.svgIcon(AppIcons.add, size: 22),
                   ),
                 ),
                 const SizedBox(width: Spacing.sm),
@@ -186,11 +183,7 @@ class _QuickCreateInputState extends State<QuickCreateInput>
                     child: _showSuccess
                         ? IconButton(
                             key: const ValueKey('success'),
-                            icon: Icon(
-                              Icons.check_circle_rounded,
-                              size: 20,
-                              color: Colors.green.shade400,
-                            ),
+                            icon: AppIcons.svgIcon(AppIcons.completedStatus, size: 20),
                             onPressed: null,
                             style: IconButton.styleFrom(
                               backgroundColor: Colors.green.shade400.withValues(alpha: 0.15),
@@ -201,11 +194,7 @@ class _QuickCreateInputState extends State<QuickCreateInput>
                           )
                         : IconButton(
                             key: const ValueKey('send'),
-                            icon: Icon(
-                              Icons.arrow_upward_rounded,
-                              size: 20,
-                              color: _hasText ? scheme.onPrimaryContainer : scheme.outline,
-                            ),
+                            icon: AppIcons.svgIcon(AppIcons.send, size: 20),
                             onPressed: _submit,
                             tooltip: '创建',
                             style: IconButton.styleFrom(

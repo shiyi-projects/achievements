@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/task_detail/widgets/collapsible_meta.dart';
@@ -348,7 +349,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                     children: [
                       DateChip(
                         date: task.dueAt,
-                        icon: Icons.event_rounded,
+                        icon: AppIcons.svgIcon(AppIcons.planned, size: 16),
                         emptyLabel: '截止日期',
                         onTap: _pickDueDate,
                         onClear: task.dueAt != null
@@ -361,7 +362,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                       ),
                       DateChip(
                         date: task.remindAt,
-                        icon: Icons.notifications_rounded,
+                        icon: AppIcons.svgIcon(AppIcons.reminder, size: 16),
                         emptyLabel: '提醒',
                         showTime: true,
                         onTap: _pickRemind,

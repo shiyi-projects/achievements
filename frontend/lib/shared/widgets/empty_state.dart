@@ -17,7 +17,7 @@ class EmptyState extends StatelessWidget {
     super.key,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String title;
   final String? subtitle;
   final String? actionLabel;
@@ -43,7 +43,7 @@ class EmptyState extends StatelessWidget {
                   color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 36, color: scheme.outlineVariant),
+                child: SizedBox(width: 36, height: 36, child: icon),
               )
                   .animate(
                     onPlay: (ctrl) => ctrl.repeat(reverse: true),

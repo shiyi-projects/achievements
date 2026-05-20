@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/features/sidebar/widgets/sidebar_tile.dart';
@@ -37,11 +38,7 @@ class FolderGroup extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
             child: ListTile(
               dense: true,
-              leading: Icon(
-                isExpanded ? Icons.folder_open_rounded : Icons.folder_rounded,
-                size: 20,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              leading: AppIcons.svgIcon(AppIcons.folder),
               title: Text(
                 folder.name,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -64,7 +61,7 @@ class FolderGroup extends ConsumerWidget {
               padding: const EdgeInsets.only(left: Spacing.base),
               child: SidebarTile(
                 list: list,
-                icon: Icons.format_list_bulleted_rounded,
+                icon: AppIcons.svgIcon(AppIcons.list),
                 selected: list.id == currentId,
               ),
             ),

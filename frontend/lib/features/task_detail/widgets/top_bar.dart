@@ -1,4 +1,5 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
 
@@ -46,7 +47,7 @@ class TaskDetailTopBar extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.close_rounded),
+            icon: AppIcons.svgIcon(AppIcons.close),
             tooltip: '关闭',
             onPressed: onClose,
           ),
@@ -75,17 +76,13 @@ class TaskDetailTopBar extends StatelessWidget {
                   ),
                 );
               },
-              child: Icon(
-                starred ? Icons.star_rounded : Icons.star_outline_rounded,
-                key: ValueKey(starred),
-                color: starred ? scheme.tertiary : null,
-              ),
+              child: AppIcons.svgIcon(AppIcons.important),
             ),
             tooltip: starred ? '取消星标' : '添加星标',
             onPressed: onToggleStar,
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded),
+            icon: AppIcons.svgIcon(AppIcons.more),
             tooltip: '更多',
             onSelected: (v) {
               switch (v) {
@@ -166,11 +163,11 @@ class AnimatedCompleteButton extends StatelessWidget {
                   child: child,
                 ),
                 child: completed
-                    ? const Icon(
-                        Icons.check_rounded,
-                        key: ValueKey('done'),
-                        size: 14,
-                        color: Colors.white,
+                    ? SizedBox(
+                        key: const ValueKey('done'),
+                        width: 14,
+                        height: 14,
+                        child: AppIcons.svgIcon(AppIcons.check, size: 14),
                       )
                     : const SizedBox.shrink(key: ValueKey('undone')),
               ),

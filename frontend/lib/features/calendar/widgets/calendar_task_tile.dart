@@ -1,6 +1,7 @@
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
@@ -51,14 +52,14 @@ class CalendarTaskTile extends ConsumerWidget {
         background: _SwipeBackground(
           alignment: Alignment.centerLeft,
           color: scheme.primary,
-          icon: done ? Icons.replay_rounded : Icons.check_rounded,
+          icon: done ? AppIcons.svgIcon(AppIcons.undo, size: 20) : AppIcons.svgIcon(AppIcons.check, size: 20),
           label: done ? '恢复' : '完成',
         ),
         // ── 左滑: 删除 ──
         secondaryBackground: _SwipeBackground(
           alignment: Alignment.centerRight,
           color: scheme.error,
-          icon: Icons.delete_outline_rounded,
+          icon: AppIcons.svgIcon(AppIcons.delete, size: 20),
           label: '删除',
         ),
         confirmDismiss: (direction) async {
@@ -135,11 +136,7 @@ class CalendarTaskTile extends ConsumerWidget {
                                       const EdgeInsets.only(top: Spacing.xs),
                                   child: Row(
                                     children: [
-                                      Icon(
-                                        Icons.schedule_rounded,
-                                        size: 12,
-                                        color: scheme.outline,
-                                      ),
+                                      AppIcons.svgIcon(AppIcons.planned, size: 12),
                                       const SizedBox(width: 3),
                                       Text(
                                         timeLabel,
@@ -189,11 +186,7 @@ class CalendarTaskTile extends ConsumerWidget {
       items.add(
         Padding(
           padding: const EdgeInsets.only(left: Spacing.sm),
-          child: Icon(
-            Icons.notifications_active_rounded,
-            size: 16,
-            color: scheme.outline,
-          ),
+          child: AppIcons.svgIcon(AppIcons.reminder, size: 16),
         ),
       );
     }
@@ -201,11 +194,7 @@ class CalendarTaskTile extends ConsumerWidget {
       items.add(
         Padding(
           padding: const EdgeInsets.only(left: Spacing.sm),
-          child: Icon(
-            Icons.star_rounded,
-            size: 16,
-            color: Colors.amber.shade600,
-          ),
+          child: AppIcons.svgIcon(AppIcons.important, size: 16),
         ),
       );
     }
@@ -298,7 +287,7 @@ class _BouncyCheckboxState extends State<_BouncyCheckbox>
             border: Border.all(color: widget.color, width: 1.5),
           ),
           child: widget.checked
-              ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+              ? AppIcons.svgIcon(AppIcons.check, size: 14)
               : null,
         ),
       ),
@@ -320,7 +309,7 @@ class _SwipeBackground extends StatelessWidget {
 
   final AlignmentGeometry alignment;
   final Color color;
-  final IconData icon;
+  final Widget icon;
   final String label;
 
   @override
@@ -335,7 +324,7 @@ class _SwipeBackground extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 20),
+          icon,
           const SizedBox(width: Spacing.xs),
           Text(
             label,

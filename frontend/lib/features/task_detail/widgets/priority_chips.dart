@@ -1,6 +1,7 @@
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
 
@@ -24,7 +25,7 @@ class PriorityChips extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
       child: Row(
         children: [
-          Icon(Icons.flag_rounded, size: 20, color: scheme.onSurfaceVariant),
+          AppIcons.svgIcon(AppIcons.highPriority),
           const SizedBox(width: Spacing.base),
           Expanded(
             child: Wrap(
