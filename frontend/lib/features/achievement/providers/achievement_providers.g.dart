@@ -6,7 +6,7 @@ part of 'achievement_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$achievementStatusHash() => r'41be8ed2409ba22e5927dd8149117b1151254592';
+String _$achievementStatusHash() => r'251ffe1c515d6bb9dc087ab5e2d380e9c772db03';
 
 /// Maps achievement code → whether it is unlocked locally.
 ///

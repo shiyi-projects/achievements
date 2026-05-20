@@ -11,7 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// 全局指令面板(Ctrl+K)。
 ///
 /// 内容分三组:
-/// 1. 导航 — 内置视图(今天 / 日历 / 专注 / 统计 / 成就)
+/// 1. 导航 — 内置视图(今天 / 日历 / 专注 / 成就)
 /// 2. 清单 — 所有用户自定义清单
 /// 3. 任务 — 输入关键词后在所有任务中模糊匹配
 void showCommandPalette(BuildContext context) {
@@ -319,18 +319,11 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
             ref.read(currentViewNotifierProvider.notifier).showFocus(),
       ),
       _PaletteEntry(
-        icon: AppIcons.svgIcon(AppIcons.stats, size: 18),
-        label: '统计',
-        category: '导航',
-        action: (_, ref) =>
-            ref.read(currentViewNotifierProvider.notifier).showStatistics(),
-      ),
-      _PaletteEntry(
         icon: AppIcons.svgIcon(AppIcons.achievement, size: 18),
         label: '成就',
         category: '导航',
         action: (_, ref) =>
-            ref.read(currentViewNotifierProvider.notifier).showAchievement(),
+            ref.read(currentViewNotifierProvider.notifier).showInsights(),
       ),
     ];
 

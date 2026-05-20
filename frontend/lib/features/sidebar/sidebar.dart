@@ -110,16 +110,10 @@ class Sidebar extends ConsumerWidget {
                       onTap: viewNotifier.showFocus,
                     ),
                     ViewNavTile(
-                      icon: AppIcons.svgIcon(AppIcons.stats),
-                      label: '统计',
-                      selected: currentView == AppView.statistics,
-                      onTap: viewNotifier.showStatistics,
-                    ),
-                    ViewNavTile(
                       icon: AppIcons.svgIcon(AppIcons.achievement),
                       label: '成就',
-                      selected: currentView == AppView.achievement,
-                      onTap: viewNotifier.showAchievement,
+                      selected: currentView == AppView.insights,
+                      onTap: viewNotifier.showInsights,
                     ),
 
                     // ── Separator ──

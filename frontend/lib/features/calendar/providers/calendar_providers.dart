@@ -12,8 +12,11 @@ final focusedMonthProvider = StateProvider<DateTime>((ref) {
   return DateTime(now.year, now.month);
 });
 
-/// 当前选中日期。null 表示未选中。
-final selectedDayProvider = StateProvider<DateTime?>((ref) => null);
+/// 当前选中日期。默认选中今天。
+final selectedDayProvider = StateProvider<DateTime?>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+});
 
 /// 当月所有带 dueAt 的任务（响应式）。
 final monthTasksProvider = Provider<AsyncValue<List<Task>>>((ref) {

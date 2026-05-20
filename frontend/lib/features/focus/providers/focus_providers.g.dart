@@ -46,7 +46,7 @@ final overdueFocusPlansProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef OverdueFocusPlansRef = AutoDisposeStreamProviderRef<List<FocusPlan>>;
-String _$focusTimerHash() => r'5eaf9d1904b3ff604f3fffa2565c869586e84205';
+String _$focusTimerHash() => r'621e2aaff8db9909827d383e466b7015030fd5a6';
 
 /// See also [FocusTimer].
 @ProviderFor(FocusTimer)

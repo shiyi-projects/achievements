@@ -10,34 +10,69 @@ part 'achievement_providers.g.dart';
 Future<Map<String, bool>> achievementStatus(Ref ref) async {
   final repo = ref.watch(statsRepositoryProvider);
 
-  final results = await Future.wait<int>([
-    repo.totalCompletedTasks(),
-    repo.streakDays(),
-    repo.completedFocusSessions(),
-    repo.todayFocusMinutes(),
+  // Fetch all metrics in parallel for efficiency.
+  final intResults = await Future.wait<int>([
+    repo.totalCompletedTasks(),    // 0
+    repo.streakDays(),             // 1
+    repo.completedFocusSessions(), // 2
+    repo.todayFocusMinutes(),      // 3
+    repo.totalFocusMinutes(),      // 4
+    repo.maxDailyCompletedTasks(), // 5
   ]);
-  final totalTasks = results[0];
-  final streak = results[1];
-  final focusSessions = results[2];
-  final todayFocusMin = results[3];
+
+  final boolResults = await Future.wait<bool>([
+    repo.hasEarlyCompletion(), // 0
+    repo.hasLateCompletion(),  // 1
+  ]);
+
+  final metrics = _AchievementMetrics(
+    totalTasks: intResults[0],
+    streak: intResults[1],
+    focusSessions: intResults[2],
+    todayFocusMin: intResults[3],
+    totalFocusMin: intResults[4],
+    maxDailyTasks: intResults[5],
+    hasEarly: boolResults[0],
+    hasLate: boolResults[1],
+  );
 
   return {
     for (final def in kAchievementDefs)
-      def.code: _isUnlocked(def, totalTasks, streak, focusSessions, todayFocusMin),
+      def.code: _isUnlocked(def, metrics),
   };
 }
 
-bool _isUnlocked(
-  AchievementDef def,
-  int totalTasks,
-  int streak,
-  int focusSessions,
-  int todayFocusMin,
-) {
+class _AchievementMetrics {
+  const _AchievementMetrics({
+    required this.totalTasks,
+    required this.streak,
+    required this.focusSessions,
+    required this.todayFocusMin,
+    required this.totalFocusMin,
+    required this.maxDailyTasks,
+    required this.hasEarly,
+    required this.hasLate,
+  });
+
+  final int totalTasks;
+  final int streak;
+  final int focusSessions;
+  final int todayFocusMin;
+  final int totalFocusMin;
+  final int maxDailyTasks;
+  final bool hasEarly;
+  final bool hasLate;
+}
+
+bool _isUnlocked(AchievementDef def, _AchievementMetrics m) {
   return switch (def.criteriaType) {
-    AchievementCriteriaType.tasksCompleted => totalTasks >= def.threshold,
-    AchievementCriteriaType.streakDays => streak >= def.threshold,
-    AchievementCriteriaType.focusSessions => focusSessions >= def.threshold,
-    AchievementCriteriaType.dailyFocusMinutes => todayFocusMin >= def.threshold,
+    AchievementCriteriaType.tasksCompleted => m.totalTasks >= def.threshold,
+    AchievementCriteriaType.streakDays => m.streak >= def.threshold,
+    AchievementCriteriaType.focusSessions => m.focusSessions >= def.threshold,
+    AchievementCriteriaType.dailyFocusMinutes => m.todayFocusMin >= def.threshold,
+    AchievementCriteriaType.totalFocusMinutes => m.totalFocusMin >= def.threshold,
+    AchievementCriteriaType.dailyTasksCompleted => m.maxDailyTasks >= def.threshold,
+    AchievementCriteriaType.earlyCompletion => m.hasEarly,
+    AchievementCriteriaType.lateCompletion => m.hasLate,
   };
 }

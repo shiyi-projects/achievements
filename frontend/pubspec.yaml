@@ -89,6 +89,7 @@ flutter:
     - assets/app_icon.ico
     - assets/app_icon.png
     - assets/icons/
+    - assets/achievements_svg/
 
 flutter_launcher_icons:
   android: true

@@ -3,13 +3,13 @@ import 'package:achievements/core/notifications/reminder_checker.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
-import 'package:achievements/features/achievement/achievement_page.dart';
+import 'package:achievements/features/insights/insights_page.dart';
 import 'package:achievements/features/calendar/calendar_page.dart';
 import 'package:achievements/features/focus/focus_page.dart';
 import 'package:achievements/features/list_view/list_page.dart';
 import 'package:achievements/features/search/providers/search_providers.dart';
 import 'package:achievements/features/sidebar/sidebar.dart';
-import 'package:achievements/features/statistics/statistics_page.dart';
+
 import 'package:achievements/features/task_detail/task_detail_panel.dart';
 import 'package:achievements/features/today/today_page.dart';
 import 'package:achievements/platform/windows/command_palette.dart';
@@ -84,8 +84,7 @@ class AppShell extends ConsumerWidget {
     final title = switch (view) {
       AppView.calendar => '日历',
       AppView.focus => '专注',
-      AppView.statistics => '统计',
-      AppView.achievement => '成就',
+      AppView.insights => '成就',
       AppView.list => currentAsync.maybeWhen(
         data: (list) => list?.name ?? 'Achievements',
         orElse: () => 'Achievements',
@@ -95,8 +94,7 @@ class AppShell extends ConsumerWidget {
     final mainBody = switch (view) {
       AppView.calendar => const CalendarPage(),
       AppView.focus => const FocusPage(),
-      AppView.statistics => const StatisticsPage(),
-      AppView.achievement => const AchievementPage(),
+      AppView.insights => const InsightsPage(),
       AppView.list => currentAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) => Center(
@@ -228,9 +226,12 @@ class AppShell extends ConsumerWidget {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => const FractionallySizedBox(
-        heightFactor: 0.85,
-        child: TaskDetailPanel(),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => const TaskDetailPanel(),
       ),
     );
     ref.read(selectedTaskIdProvider.notifier).clear();
@@ -375,8 +376,7 @@ class _MobileBottomNav extends ConsumerWidget {
     (svgPath: AppIcons.list, label: '清单', view: AppView.list),
     (svgPath: AppIcons.calendar, label: '日历', view: AppView.calendar),
     (svgPath: AppIcons.focusTimer, label: '专注', view: AppView.focus),
-    (svgPath: AppIcons.stats, label: '统计', view: AppView.statistics),
-    (svgPath: AppIcons.achievement, label: '成就', view: AppView.achievement),
+    (svgPath: AppIcons.achievement, label: '成就', view: AppView.insights),
   ];
 
   @override
@@ -397,10 +397,8 @@ class _MobileBottomNav extends ConsumerWidget {
             notifier.showCalendar();
           case AppView.focus:
             notifier.showFocus();
-          case AppView.statistics:
-            notifier.showStatistics();
-          case AppView.achievement:
-            notifier.showAchievement();
+          case AppView.insights:
+            notifier.showInsights();
         }
       },
       destinations: [

@@ -174,6 +174,43 @@ class StatsRepository {
     return totalSecs ~/ 60;
   }
 
+  // ─── Achievement: daily task max ─────────────────────────────────────────────
+
+  /// Returns the maximum number of tasks completed in a single day (ever).
+  Future<int> maxDailyCompletedTasks() async {
+    final rows = await _db.customSelect(
+      'SELECT COUNT(*) AS cnt '
+      'FROM tasks '
+      'WHERE completed_at IS NOT NULL AND deleted_at IS NULL '
+      "GROUP BY date(completed_at, 'localtime') "
+      'ORDER BY cnt DESC LIMIT 1',
+    ).get();
+    if (rows.isEmpty) return 0;
+    return rows.first.read<int>('cnt');
+  }
+
+  /// Whether any task was ever completed before 07:00 local time.
+  Future<bool> hasEarlyCompletion() async {
+    final rows = await _db.customSelect(
+      'SELECT 1 FROM tasks '
+      'WHERE completed_at IS NOT NULL AND deleted_at IS NULL '
+      "AND time(completed_at, 'localtime') < '07:00:00' "
+      'LIMIT 1',
+    ).get();
+    return rows.isNotEmpty;
+  }
+
+  /// Whether any task was ever completed at or after 23:00 local time.
+  Future<bool> hasLateCompletion() async {
+    final rows = await _db.customSelect(
+      'SELECT 1 FROM tasks '
+      'WHERE completed_at IS NOT NULL AND deleted_at IS NULL '
+      "AND time(completed_at, 'localtime') >= '23:00:00' "
+      'LIMIT 1',
+    ).get();
+    return rows.isNotEmpty;
+  }
+
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   static DateTime _startOfToday() {

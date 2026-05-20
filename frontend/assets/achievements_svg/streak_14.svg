@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220" fill="none">
+    <defs>
+      <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#EEDFD7" flood-opacity="0.75"/>
+      </filter>
+      <linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#7EC6FF"/><stop offset="100%" stop-color="#5E9BFF"/>
+      </linearGradient>
+      <linearGradient id="gWarm" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#FF7268"/><stop offset="100%" stop-color="#FFB23D"/>
+      </linearGradient>
+      <linearGradient id="gFlame" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#FF7E3E"/><stop offset="100%" stop-color="#FFCD54"/>
+      </linearGradient>
+      <linearGradient id="gGold" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#FFD968"/><stop offset="100%" stop-color="#FFB52A"/>
+      </linearGradient>
+      <linearGradient id="gClock" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#FF7F79"/><stop offset="100%" stop-color="#FFA27C"/>
+      </linearGradient>
+      <style>
+        .num { font-family: 'Noto Sans CJK SC','Noto Sans CJK JP','Microsoft YaHei',sans-serif; font-weight: 800; fill: #FF7268; }
+        .small { font-family: 'Noto Sans CJK SC','Noto Sans CJK JP','Microsoft YaHei',sans-serif; font-weight: 700; fill: #FFFFFF; }
+      </style>
+    </defs>
+
+    <ellipse cx="110" cy="181" rx="45" ry="12" fill="#F0E1D9"/>
+    <circle cx="110" cy="104" r="66" fill="#FFF8F4" stroke="#F2E5DD" stroke-width="2" filter="url(#shadow)"/>
+    
+    <g>
+      <rect x="66" y="70" width="88" height="74" rx="16" fill="#FFFFFF" stroke="#DDD7E7" stroke-width="2"/>
+      <rect x="66" y="70" width="88" height="20" rx="16" fill="#5E9BFF"/>
+      <rect x="81" y="58" width="7" height="18" rx="3.5" fill="#B4C0E7"/>
+      <rect x="132" y="58" width="7" height="18" rx="3.5" fill="#B4C0E7"/>
+      <g stroke="#EEE8F7" stroke-width="2">
+        <line x1="78" y1="102" x2="142" y2="102"/>
+        <line x1="78" y1="116" x2="142" y2="116"/>
+      </g>
+      <g stroke="#44C27A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M82 126 l4 4 l7 -8"/>
+        <path d="M98 126 l4 4 l7 -8"/>
+        <path d="M114 126 l4 4 l7 -8"/>
+        <path d="M130 126 l4 4 l7 -8"/>
+      </g>
+      
+      <circle cx="145" cy="138" r="18" fill="#FFB23D" stroke="#FFFFFF" stroke-width="4"/>
+    <text x="145" y="145.2" text-anchor="middle" font-family="Noto Sans CJK SC, Noto Sans CJK JP, Microsoft YaHei, sans-serif" font-size="20" font-weight="800" fill="#FFFFFF">14</text>
+    </g>
+    </svg>

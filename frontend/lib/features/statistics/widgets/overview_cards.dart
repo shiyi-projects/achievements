@@ -21,56 +21,95 @@ class OverviewCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.6,
+    final isLight = scheme.brightness == Brightness.light;
+
+    // ── 紧凑单行四宫格 ──
+    return Row(
       children: [
-        _StatCard(
-          index: 0,
-          icon: AppIcons.svgIcon(AppIcons.completed, size: 18),
-          label: '累计完成',
-          value: totalCompleted,
-          color: scheme.primary,
+        Expanded(
+          child: _CompactStatCard(
+            index: 0,
+            icon: AppIcons.svgIcon(AppIcons.completed, size: 16),
+            label: '累计完成',
+            value: totalCompleted,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isLight
+                  ? [const Color(0xFF6C63FF), const Color(0xFF9B8FFF)]
+                  : [const Color(0xFF8B7FFF), const Color(0xFF6C63FF)],
+            ),
+          ),
         ),
-        _StatCard(
-          index: 1,
-          icon: AppIcons.svgIcon(AppIcons.today, size: 18),
-          label: '今日完成',
-          value: todayCompleted,
-          color: scheme.secondary,
+        const SizedBox(width: 8),
+        Expanded(
+          child: _CompactStatCard(
+            index: 1,
+            icon: AppIcons.svgIcon(AppIcons.today, size: 16),
+            label: '今日完成',
+            value: todayCompleted,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isLight
+                  ? [const Color(0xFFFF6B6B), const Color(0xFFFF9A8B)]
+                  : [const Color(0xFFFF8A80), const Color(0xFFFF6B6B)],
+            ),
+          ),
         ),
-        _StatCard(
-          index: 2,
-          icon: AppIcons.svgIcon(AppIcons.streak, size: 18),
-          label: '连续天数',
-          value: streakDays,
-          suffix: ' 天',
-          color: scheme.tertiary,
+        const SizedBox(width: 8),
+        Expanded(
+          child: _CompactStatCard(
+            index: 2,
+            icon: AppIcons.svgIcon(AppIcons.streak, size: 16),
+            label: '连续天数',
+            value: streakDays,
+            suffix: '天',
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isLight
+                  ? [const Color(0xFFFF9F43), const Color(0xFFFFC568)]
+                  : [const Color(0xFFFFB347), const Color(0xFFFF9F43)],
+            ),
+          ),
         ),
-        _StatCard(
-          index: 3,
-          icon: AppIcons.svgIcon(AppIcons.focusTimer, size: 18),
-          label: '累计专注',
-          value: totalFocusMinutes,
-          formatter: (v) => '${v ~/ 60}h ${v % 60}m',
-          color: scheme.primary,
+        const SizedBox(width: 8),
+        Expanded(
+          child: _CompactStatCard(
+            index: 3,
+            icon: AppIcons.svgIcon(AppIcons.focusTimer, size: 16),
+            label: '累计专注',
+            value: totalFocusMinutes,
+            formatter: _formatMinutes,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isLight
+                  ? [const Color(0xFF2ED8A3), const Color(0xFF6EEFC0)]
+                  : [const Color(0xFF4ADBB0), const Color(0xFF2ED8A3)],
+            ),
+          ),
         ),
       ],
     );
   }
+
+  static String _formatMinutes(int v) {
+    if (v < 60) return '${v}m';
+    final h = v ~/ 60;
+    final m = v % 60;
+    return m == 0 ? '${h}h' : '${h}h${m}m';
+  }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
+class _CompactStatCard extends StatelessWidget {
+  const _CompactStatCard({
     required this.index,
     required this.icon,
     required this.label,
     required this.value,
-    required this.color,
+    required this.gradient,
     this.suffix = '',
     this.formatter,
   });
@@ -79,7 +118,7 @@ class _StatCard extends StatelessWidget {
   final Widget icon;
   final String label;
   final int value;
-  final Color color;
+  final Gradient gradient;
   final String suffix;
   final String Function(int)? formatter;
 
@@ -89,59 +128,80 @@ class _StatCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final isLight = scheme.brightness == Brightness.light;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: isLight ? 0.12 : 0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: (gradient as LinearGradient)
+                .colors
+                .first
+                .withValues(alpha: isLight ? 0.25 : 0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Icon circle
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ColorFiltered(
+              colorFilter:
+                  const ColorFilter.mode(Colors.white, BlendMode.srcIn),
               child: icon,
             ),
-            const Spacer(),
-            // ── Animated counter ──
-            formatter != null
-                ? AnimatedCounter(
-                    value: value,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    prefix: '',
-                    suffix: '',
-                  )
-                : AnimatedCounter(
-                    value: value,
-                    suffix: suffix,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+          ),
+          const SizedBox(height: 10),
+          // Value
+          formatter != null
+              ? Text(
+                  formatter!(value),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1.1,
                   ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.outline,
-              ),
+                )
+              : AnimatedCounter(
+                  value: value,
+                  suffix: suffix,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1.1,
+                  ),
+                ),
+          const SizedBox(height: 2),
+          // Label
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 10,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     )
         .animate()
         .fadeIn(
           duration: MotionDurations.normal,
-          delay: Duration(milliseconds: 100 * index),
+          delay: Duration(milliseconds: 80 * index),
         )
         .slideY(
-          begin: 0.05,
+          begin: 0.08,
           duration: MotionDurations.normal,
-          delay: Duration(milliseconds: 100 * index),
+          delay: Duration(milliseconds: 80 * index),
           curve: MotionCurves.emphasizedDecelerate,
         );
   }
