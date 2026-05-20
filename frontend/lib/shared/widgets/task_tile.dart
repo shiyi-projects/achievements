@@ -4,10 +4,12 @@ import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/tag_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:achievements/platform/android/haptic.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:achievements/shared/widgets/priority_chip.dart';
 import 'package:achievements/shared/widgets/tags_row.dart';
 import 'package:achievements/state/selected_task.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,6 +59,10 @@ class TaskTile extends ConsumerWidget {
           borderRadius: BorderRadius.circular(Radii.card),
           onTap: () =>
               ref.read(selectedTaskIdProvider.notifier).select(task.id),
+          onLongPress: () {
+            Haptic.medium();
+            _showContextMenu(context, ref);
+          },
           child: IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -199,6 +205,58 @@ class TaskTile extends ConsumerWidget {
       case TaskPriority.none:
         return Colors.transparent;
     }
+  }
+
+  void _showContextMenu(BuildContext context, WidgetRef ref) {
+    final done = task.completedAt != null;
+    final repo = ref.read(taskRepositoryProvider);
+
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(
+                done ? Icons.undo_rounded : Icons.check_circle_outline_rounded,
+              ),
+              title: Text(done ? '标记为未完成' : '标记为完成'),
+              onTap: () {
+                Navigator.pop(context);
+                Haptic.light();
+                repo.setCompleted(task.id, completed: !done);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                task.starred
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                color: task.starred
+                    ? Theme.of(context).colorScheme.tertiary
+                    : null,
+              ),
+              title: Text(task.starred ? '取消星标' : '加星标'),
+              onTap: () {
+                Navigator.pop(context);
+                Haptic.light();
+                repo.update(task.id, starred: Value(!task.starred));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded),
+              title: const Text('移到回收站'),
+              onTap: () {
+                Navigator.pop(context);
+                Haptic.medium();
+                repo.softDelete(task.id);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

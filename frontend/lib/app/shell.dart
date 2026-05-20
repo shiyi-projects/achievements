@@ -1,6 +1,8 @@
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/data/local/database.dart';
+import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/achievement/achievement_page.dart';
 import 'package:achievements/features/calendar/calendar_page.dart';
 import 'package:achievements/features/focus/focus_page.dart';
@@ -155,6 +157,17 @@ class AppShell extends ConsumerWidget {
       );
     }
 
+    final currentList = currentAsync.maybeWhen(
+      data: (l) => l,
+      orElse: () => null,
+    );
+    final canCreate =
+        view == AppView.list &&
+        currentList != null &&
+        (!currentList.isSystem ||
+            SystemListKind.fromValue(currentList.systemKind) ==
+                SystemListKind.inbox);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
@@ -165,7 +178,29 @@ class AppShell extends ConsumerWidget {
       drawer: const Drawer(
         child: SizedBox(width: _kSidebarWidth, child: Sidebar()),
       ),
-      body: mainBody,
+      body: AnimatedSwitcher(
+        duration: MotionDurations.normal,
+        switchInCurve: MotionCurves.decelerate,
+        switchOutCurve: MotionCurves.accelerate,
+        transitionBuilder: (child, anim) => FadeTransition(
+          opacity: anim,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.03),
+              end: Offset.zero,
+            ).animate(anim),
+            child: child,
+          ),
+        ),
+        child: KeyedSubtree(key: ValueKey(view), child: mainBody),
+      ),
+      bottomNavigationBar: _MobileBottomNav(current: view),
+      floatingActionButton: canCreate
+          ? FloatingActionButton(
+              onPressed: () => _openQuickCreate(context, ref, currentList),
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
     );
   }
 
@@ -181,6 +216,64 @@ class AppShell extends ConsumerWidget {
       ),
     );
     ref.read(selectedTaskIdProvider.notifier).clear();
+  }
+
+  Future<void> _openQuickCreate(
+    BuildContext context,
+    WidgetRef ref,
+    TaskList list,
+  ) async {
+    final controller = TextEditingController();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+          left: Spacing.base,
+          right: Spacing.base,
+          top: Spacing.base,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  hintText: '新建任务…',
+                  border: InputBorder.none,
+                  filled: false,
+                ),
+                onSubmitted: (title) {
+                  if (title.trim().isEmpty) return;
+                  ref.read(taskRepositoryProvider).createTask(
+                    listId: list.id,
+                    title: title.trim(),
+                  );
+                  Navigator.pop(ctx);
+                },
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.send_rounded),
+              onPressed: () {
+                final title = controller.text.trim();
+                if (title.isEmpty) return;
+                ref.read(taskRepositoryProvider).createTask(
+                  listId: list.id,
+                  title: title,
+                );
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
   }
 }
 
@@ -280,5 +373,56 @@ class _SyncStatusIcon extends ConsumerWidget {
         ),
       ),
     };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Mobile bottom navigation bar
+// ─────────────────────────────────────────────────────────────────────
+
+class _MobileBottomNav extends ConsumerWidget {
+  const _MobileBottomNav({required this.current});
+
+  final AppView current;
+
+  static const _items = [
+    (icon: Icons.format_list_bulleted_rounded, label: '清单', view: AppView.list),
+    (icon: Icons.calendar_month_rounded, label: '日历', view: AppView.calendar),
+    (icon: Icons.timer_outlined, label: '专注', view: AppView.focus),
+    (icon: Icons.bar_chart_rounded, label: '统计', view: AppView.statistics),
+    (icon: Icons.emoji_events_rounded, label: '成就', view: AppView.achievement),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(currentViewNotifierProvider.notifier);
+    final selectedIndex =
+        _items.indexWhere((e) => e.view == current).clamp(0, _items.length - 1);
+
+    return NavigationBar(
+      selectedIndex: selectedIndex,
+      onDestinationSelected: (i) {
+        final item = _items[i];
+        switch (item.view) {
+          case AppView.list:
+            notifier.showList();
+          case AppView.calendar:
+            notifier.showCalendar();
+          case AppView.focus:
+            notifier.showFocus();
+          case AppView.statistics:
+            notifier.showStatistics();
+          case AppView.achievement:
+            notifier.showAchievement();
+        }
+      },
+      destinations: [
+        for (final item in _items)
+          NavigationDestination(
+            icon: Icon(item.icon),
+            label: item.label,
+          ),
+      ],
+    );
   }
 }

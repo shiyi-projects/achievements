@@ -1,7 +1,10 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
+import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:achievements/platform/android/haptic.dart';
 import 'package:achievements/shared/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 把任务列表拆成 "未完成 + 可折叠的已完成区" 两段。
 ///
@@ -9,7 +12,9 @@ import 'package:flutter/material.dart';
 /// - 仅 pending -> 直接渲染
 /// - 仅 completed -> 折叠区一开始展开
 /// - 两者都有 -> 上半 pending,下半 ExpansionTile("Completed (N)")
-class PendingCompletedList extends StatelessWidget {
+///
+/// 在移动端:向右滑动 = 完成/恢复,向左滑动 = 删除(带触觉反馈)。
+class PendingCompletedList extends ConsumerWidget {
   const PendingCompletedList({
     required this.tasks,
     required this.emptyState,
@@ -20,7 +25,7 @@ class PendingCompletedList extends StatelessWidget {
   final Widget emptyState;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (tasks.isEmpty) return emptyState;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -48,7 +53,8 @@ class PendingCompletedList extends StatelessWidget {
             ),
           ),
 
-        for (final t in pending) TaskTile(task: t),
+        for (final t in pending)
+          _SwipeableTaskTile(task: t, isPending: true),
 
         // ── Completed section ──
         if (completed.isNotEmpty)
@@ -74,11 +80,90 @@ class PendingCompletedList extends StatelessWidget {
                   ),
                 ),
                 childrenPadding: EdgeInsets.zero,
-                children: [for (final t in completed) TaskTile(task: t)],
+                children: [
+                  for (final t in completed)
+                    _SwipeableTaskTile(task: t, isPending: false),
+                ],
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Swipeable wrapper
+// ─────────────────────────────────────────────────────────────────────
+
+class _SwipeableTaskTile extends ConsumerWidget {
+  const _SwipeableTaskTile({required this.task, required this.isPending});
+
+  final Task task;
+  final bool isPending;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final repo = ref.read(taskRepositoryProvider);
+
+    return Dismissible(
+      key: ValueKey(task.id),
+      // Right swipe: complete (pending) or restore (completed)
+      background: _SwipeBackground(
+        color: scheme.primaryContainer,
+        icon: isPending ? Icons.check_circle_rounded : Icons.undo_rounded,
+        alignment: Alignment.centerLeft,
+      ),
+      // Left swipe: delete
+      secondaryBackground: _SwipeBackground(
+        color: scheme.errorContainer,
+        icon: Icons.delete_rounded,
+        alignment: Alignment.centerRight,
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          // complete / restore
+          await Haptic.medium();
+          await repo.setCompleted(task.id, completed: isPending);
+          return false; // the list refreshes reactively; don't remove widget
+        } else {
+          // delete — ask for confirmation on desktop, direct on mobile
+          await Haptic.heavy();
+          await repo.softDelete(task.id);
+          return false;
+        }
+      },
+      child: TaskTile(task: task),
+    );
+  }
+}
+
+class _SwipeBackground extends StatelessWidget {
+  const _SwipeBackground({
+    required this.color,
+    required this.icon,
+    required this.alignment,
+  });
+
+  final Color color;
+  final IconData icon;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: Spacing.base,
+        vertical: Spacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(Radii.card),
+      ),
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+      child: Icon(icon, color: Theme.of(context).colorScheme.onPrimaryContainer),
     );
   }
 }
