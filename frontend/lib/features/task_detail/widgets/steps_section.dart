@@ -140,14 +140,7 @@ class _StepsSectionState extends ConsumerState<StepsSection> {
           error: (_, __) => const SizedBox.shrink(),
           data: (stepList) {
             if (stepList.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-                child: Text(
-                  '暂无步骤',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: scheme.outline),
-                ),
-              );
+              return const SizedBox.shrink();
             }
             return ReorderableListView.builder(
               shrinkWrap: true,
@@ -215,12 +208,14 @@ class _StepRow extends StatefulWidget {
     required this.step,
     required this.index,
     required this.repo,
+    this.onDelete,
     super.key,
   });
 
   final TaskStep step;
   final int index;
   final StepRepository repo;
+  final VoidCallback? onDelete;
 
   @override
   State<_StepRow> createState() => _StepRowState();
@@ -368,12 +363,30 @@ class _StepRowState extends State<_StepRow> {
             ReorderableDragStartListener(
               index: widget.index,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Spacing.xs),
+                padding: const EdgeInsets.only(left: Spacing.xs),
                 child: Icon(
                   Icons.drag_handle_rounded,
                   size: 18,
                   color: scheme.outlineVariant,
                 ),
+              ),
+            ),
+
+            // ── Delete button (显式，提高可发现性) ──
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                iconSize: 16,
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: scheme.outline,
+                ),
+                tooltip: '删除步骤',
+                onPressed: widget.onDelete ??
+                    () => widget.repo.deleteStep(widget.step.id),
               ),
             ),
           ],

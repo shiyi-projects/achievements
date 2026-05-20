@@ -34,49 +34,40 @@ class TagEditor extends ConsumerWidget {
           orElse: () => const <String>{},
         );
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+          child: Wrap(
+            spacing: Spacing.xs + 2,
+            runSpacing: Spacing.xs + 2,
             children: [
-              AppIcons.svgIcon(AppIcons.tag),
-              const SizedBox(width: Spacing.base),
-              Expanded(
-                child: Wrap(
-                  spacing: Spacing.xs + 2,
-                  runSpacing: Spacing.xs + 2,
-                  children: [
-                    for (final tag in allTags)
-                      FilterChip(
-                        label: Text(tag.name),
-                        labelStyle: theme.textTheme.labelMedium,
-                        selected: mine.contains(tag.id),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(Radii.chip),
-                        ),
-                        onSelected: (sel) async {
-                          final repo = ref.read(tagRepositoryProvider);
-                          if (sel) {
-                            await repo.addToTask(taskId, tag.id);
-                          } else {
-                            await repo.removeFromTask(taskId, tag.id);
-                          }
-                        },
-                      ),
-                    ActionChip(
-                      avatar: AppIcons.svgIcon(AppIcons.add, size: 16),
-                      label: Text(
-                        'New',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: scheme.primary,
-                        ),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(Radii.chip),
-                      ),
-                      onPressed: () => _showCreate(context, ref),
-                    ),
-                  ],
+              for (final tag in allTags)
+                FilterChip(
+                  label: Text(tag.name),
+                  labelStyle: theme.textTheme.labelMedium,
+                  selected: mine.contains(tag.id),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(Radii.chip),
+                  ),
+                  onSelected: (sel) async {
+                    final repo = ref.read(tagRepositoryProvider);
+                    if (sel) {
+                      await repo.addToTask(taskId, tag.id);
+                    } else {
+                      await repo.removeFromTask(taskId, tag.id);
+                    }
+                  },
                 ),
+              ActionChip(
+                avatar: AppIcons.svgIcon(AppIcons.add, size: 16),
+                label: Text(
+                  'New',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.primary,
+                  ),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Radii.chip),
+                ),
+                onPressed: () => _showCreate(context, ref),
               ),
             ],
           ),

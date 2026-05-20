@@ -3,6 +3,7 @@ import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/state/selected_task.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -108,15 +109,7 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
           error: (_, __) => const SizedBox.shrink(),
           data: (subs) {
             if (subs.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-                child: Text(
-                  '暂无子任务',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.outline,
-                  ),
-                ),
-              );
+              return const SizedBox.shrink();
             }
             return Column(
               children: [for (final sub in subs) _SubtaskRow(sub: sub)],
@@ -213,6 +206,30 @@ class _SubtaskRow extends ConsumerWidget {
                   decorationColor: scheme.outline,
                 ),
               ),
+            ),
+            // ── Delete button (显式) ──
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                iconSize: 16,
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: scheme.outline,
+                ),
+                tooltip: '删除子任务',
+                onPressed: () => ref
+                    .read(taskRepositoryProvider)
+                    .softDelete(sub.id),
+              ),
+            ),
+            // ── Navigate arrow ──
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: scheme.outlineVariant,
             ),
           ],
         ),

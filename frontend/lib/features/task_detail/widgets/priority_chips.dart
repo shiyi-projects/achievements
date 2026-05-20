@@ -23,71 +23,63 @@ class PriorityChips extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-      child: Row(
+      child: Wrap(
+        spacing: Spacing.sm,
+        runSpacing: Spacing.sm,
         children: [
-          AppIcons.svgIcon(AppIcons.highPriority),
-          const SizedBox(width: Spacing.base),
-          Expanded(
-            child: Wrap(
-              spacing: Spacing.sm,
-              runSpacing: Spacing.sm,
-              children: [
-                for (final (p, label, color) in _items)
-                  AnimatedScale(
-                    scale: priority == p ? 1.05 : 1.0,
-                    duration: MotionDurations.fast,
-                    curve: MotionCurves.bouncySpring,
-                    child: ChoiceChip(
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (color != null) ...[
-                            AnimatedContainer(
-                              duration: MotionDurations.fast,
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: color,
-                                boxShadow: priority == p
-                                    ? [
-                                        BoxShadow(
-                                          color: color.withValues(alpha: 0.5),
-                                          blurRadius: 4,
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                            ),
-                            const SizedBox(width: Spacing.xs),
-                          ],
-                          Text(label),
-                        ],
+          for (final (p, label, color) in _items)
+            AnimatedScale(
+              scale: priority == p ? 1.05 : 1.0,
+              duration: MotionDurations.fast,
+              curve: MotionCurves.bouncySpring,
+              child: ChoiceChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (color != null) ...[
+                      AnimatedContainer(
+                        duration: MotionDurations.fast,
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: color,
+                          boxShadow: priority == p
+                              ? [
+                                  BoxShadow(
+                                    color: color.withValues(alpha: 0.5),
+                                    blurRadius: 4,
+                                  ),
+                                ]
+                              : null,
+                        ),
                       ),
-                      selected: priority == p,
-                      showCheckmark: false,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(Radii.chip),
-                      ),
-                      selectedColor: color?.withValues(alpha: 0.15) ??
-                          scheme.surfaceContainerHighest,
-                      side: priority == p && color != null
-                          ? BorderSide(color: color.withValues(alpha: 0.4))
-                          : null,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            priority == p ? FontWeight.w600 : FontWeight.w400,
-                        color: priority == p
-                            ? (color ?? scheme.onSurface)
-                            : scheme.onSurfaceVariant,
-                      ),
-                      onSelected: (_) => onChanged(p),
-                    ),
-                  ),
-              ],
+                      const SizedBox(width: Spacing.xs),
+                    ],
+                    Text(label),
+                  ],
+                ),
+                selected: priority == p,
+                showCheckmark: false,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Radii.chip),
+                ),
+                selectedColor: color?.withValues(alpha: 0.15) ??
+                    scheme.surfaceContainerHighest,
+                side: priority == p && color != null
+                    ? BorderSide(color: color.withValues(alpha: 0.4))
+                    : null,
+                labelStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                      priority == p ? FontWeight.w600 : FontWeight.w400,
+                  color: priority == p
+                      ? (color ?? scheme.onSurface)
+                      : scheme.onSurfaceVariant,
+                ),
+                onSelected: (_) => onChanged(p),
+              ),
             ),
-          ),
         ],
       ),
     );

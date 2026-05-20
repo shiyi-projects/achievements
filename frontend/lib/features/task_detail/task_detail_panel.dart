@@ -9,6 +9,8 @@ import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/focus/providers/focus_plan_service.dart';
 import 'package:achievements/features/task_detail/widgets/collapsible_meta.dart';
 import 'package:achievements/features/task_detail/widgets/date_chip.dart';
+import 'package:achievements/features/task_detail/widgets/detail_card.dart';
+import 'package:achievements/features/task_detail/widgets/focus_progress_row.dart';
 import 'package:achievements/features/task_detail/widgets/list_dropdown.dart';
 import 'package:achievements/features/task_detail/widgets/priority_chips.dart';
 import 'package:achievements/features/task_detail/widgets/steps_section.dart';
@@ -18,9 +20,10 @@ import 'package:achievements/features/task_detail/widgets/top_bar.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const Duration _kDebounce = Duration(milliseconds: 400);
+const Duration _kDebounce = Duration(milliseconds: 600);
 
 class TaskDetailPanel extends ConsumerWidget {
   const TaskDetailPanel({super.key});
@@ -84,17 +87,30 @@ class _TaskDetailForm extends ConsumerStatefulWidget {
 class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _notesCtrl;
+  late final FocusNode _titleFocus;
+  late final FocusNode _notesFocus;
 
   // 累积文本字段变更,统一 flush 到一次事务,避免每个字段单独 SELECT+UPDATE+INSERT。
   Value<String> _dirtyTitle = const Value.absent();
   Value<String?> _dirtyNotes = const Value.absent();
   Timer? _flushTimer;
 
+  // 描述区焦点状态，用于视觉反馈
+  bool _notesHasFocus = false;
+
   @override
   void initState() {
     super.initState();
     _titleCtrl = TextEditingController(text: widget.task.title);
     _notesCtrl = TextEditingController(text: widget.task.notes ?? '');
+    _titleFocus = FocusNode();
+    _notesFocus = FocusNode()
+      ..addListener(() {
+        final hasFocus = _notesFocus.hasFocus;
+        if (hasFocus != _notesHasFocus) {
+          setState(() => _notesHasFocus = hasFocus);
+        }
+      });
   }
 
   @override
@@ -114,6 +130,8 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     _flushPending(taskId: widget.task.id, version: widget.task.version);
     _titleCtrl.dispose();
     _notesCtrl.dispose();
+    _titleFocus.dispose();
+    _notesFocus.dispose();
     super.dispose();
   }
 
@@ -129,7 +147,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     });
   }
 
-  /// 把积累的变更写入 DB(一次事务),直接用已知 [version] 跳过额外的 SELECT。
+  /// 把积累的变更写入 DB（一次事务),直接用已知 [version] 跳过额外的 SELECT。
   void _flushPending({required String taskId, required int version}) {
     if (!_dirtyTitle.present && !_dirtyNotes.present) return;
     final title = _dirtyTitle;
@@ -142,6 +160,12 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
       title: title,
       notes: notes,
     );
+  }
+
+  /// 立即保存（Ctrl+S 触发），跳过 debounce。
+  void _flushNow() {
+    _flushTimer?.cancel();
+    _flushPending(taskId: widget.task.id, version: widget.task.version);
   }
 
   void _onTitleChanged(String v) {
@@ -158,6 +182,13 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     ref.read(selectedTaskIdProvider.notifier).clear();
     final nav = Navigator.maybeOf(context);
     if (nav != null && nav.canPop()) nav.pop();
+  }
+
+  void _backToParent() {
+    final parentId = widget.task.parentId;
+    if (parentId != null) {
+      ref.read(selectedTaskIdProvider.notifier).select(parentId);
+    }
   }
 
   CalendarDatePicker2WithActionButtonsConfig _calendarConfig() {
@@ -309,175 +340,267 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     final scheme = theme.colorScheme;
     final task = widget.task;
 
-    return Material(
-      color: scheme.surface,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // ── Top Bar ──
-            TaskDetailTopBar(
-              starred: task.starred,
-              completed: task.completedAt != null,
-              isTrashed: task.deletedAt != null,
-              onClose: _close,
-              onToggleComplete: () => _repo.setCompleted(
-                task.id,
-                completed: task.completedAt == null,
-              ),
-              onToggleStar: () => _repo.update(
-                task.id,
-                knownVersion: task.version,
-                starred: Value(!task.starred),
-              ),
-              onSoftDelete: _softDelete,
-              onRestore: _restore,
-              onHardDelete: _hardDelete,
-            ),
-            // ── Content ──
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  Spacing.xl, Spacing.base, Spacing.xl, Spacing.xl,
+    // 面包屑：父任务信息
+    final parentAsync = ref.watch(parentTaskProvider);
+    final parentTask = parentAsync.valueOrNull;
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): _close,
+        const SingleActivator(LogicalKeyboardKey.enter, control: true): () =>
+            _repo.setCompleted(task.id, completed: task.completedAt == null),
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+            _flushNow,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Material(
+          color: scheme.surface,
+          child: SafeArea(
+            child: Column(
+              children: [
+                // ── Top Bar ──
+                TaskDetailTopBar(
+                  starred: task.starred,
+                  completed: task.completedAt != null,
+                  isTrashed: task.deletedAt != null,
+                  parentTaskTitle: parentTask?.title,
+                  onBackToParent: _backToParent,
+                  onClose: _close,
+                  onToggleComplete: () => _repo.setCompleted(
+                    task.id,
+                    completed: task.completedAt == null,
+                  ),
+                  onToggleStar: () => _repo.update(
+                    task.id,
+                    knownVersion: task.version,
+                    starred: Value(!task.starred),
+                  ),
+                  onSoftDelete: _softDelete,
+                  onRestore: _restore,
+                  onHardDelete: _hardDelete,
                 ),
-                children: [
-                  // ── Title (改动6: 完成状态反馈) ──
-                  TextField(
-                    controller: _titleCtrl,
-                    onChanged: _onTitleChanged,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      decoration: task.completedAt != null
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: task.completedAt != null ? scheme.outline : null,
-                      decorationColor: scheme.outline,
+                // ── Content ──
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(
+                      Spacing.xl, Spacing.base, Spacing.xl, Spacing.xl,
                     ),
-                    textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(
-                      hintText: '任务标题',
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      fillColor: Colors.transparent,
-                      filled: false,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  const SizedBox(height: Spacing.base),
-                  // ── Notes ──
-                  TextField(
-                    controller: _notesCtrl,
-                    onChanged: _onNotesChanged,
-                    minLines: 2,
-                    maxLines: null,
-                    keyboardType: TextInputType.multiline,
-                    style: theme.textTheme.bodyLarge,
-                    decoration: InputDecoration(
-                      hintText: '添加描述...',
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      fillColor: Colors.transparent,
-                      filled: false,
-                      contentPadding: EdgeInsets.zero,
-                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.outline,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: Spacing.lg),
-
-                  // ── 属性区 (改动4: 流式分组) ──
-                  const SectionHeader(label: '属性'),
-                  const SizedBox(height: Spacing.sm),
-                  PriorityChips(
-                    priority: TaskPriority.fromValue(task.priority),
-                    onChanged: (p) => _repo.update(
-                      task.id,
-                      knownVersion: task.version,
-                      priority: Value(p.value),
-                    ),
-                  ),
-                  const SizedBox(height: Spacing.md),
-                  ListDropdown(
-                    currentListId: task.listId,
-                    onChanged: (newId) => _repo.update(
-                      task.id,
-                      knownVersion: task.version,
-                      listId: Value(newId),
-                    ),
-                  ),
-                  const SizedBox(height: Spacing.sm),
-                  TagEditor(taskId: task.id),
-
-                  const SizedBox(height: Spacing.lg),
-                  const SectionHeader(label: '时间'),
-                  const SizedBox(height: Spacing.sm),
-                  Wrap(
-                    spacing: Spacing.sm,
-                    runSpacing: Spacing.sm,
                     children: [
-                      DateChip(
-                        date: task.dueAt,
-                        icon: AppIcons.svgIcon(AppIcons.planned, size: 16),
-                        emptyLabel: '截止日期',
-                        onTap: _pickDueDate,
-                        onClear: task.dueAt != null
-                            ? () => _repo.update(
-                                  task.id,
-                                  knownVersion: task.version,
-                                  dueAt: const Value(null),
-                                )
-                            : null,
+                      // ── Title (完成状态反馈) ──
+                      TextField(
+                        controller: _titleCtrl,
+                        focusNode: _titleFocus,
+                        onChanged: _onTitleChanged,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          decoration: task.completedAt != null
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color:
+                              task.completedAt != null ? scheme.outline : null,
+                          decorationColor: scheme.outline,
+                        ),
+                        textInputAction: TextInputAction.done,
+                        decoration: const InputDecoration(
+                          hintText: '任务标题',
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          fillColor: Colors.transparent,
+                          filled: false,
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                      DateChip(
-                        date: task.remindAt,
-                        icon: AppIcons.svgIcon(AppIcons.reminder, size: 16),
-                        emptyLabel: '提醒',
-                        showTime: true,
-                        onTap: _pickRemind,
-                        onClear: task.remindAt != null
-                            ? () => _repo.update(
-                                  task.id,
-                                  knownVersion: task.version,
-                                  remindAt: const Value(null),
-                                )
-                            : null,
+                      const SizedBox(height: Spacing.xs),
+
+                      // ── Notes (增强：最小高度 + 聚焦视觉反馈) ──
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.all(Spacing.sm),
+                        decoration: BoxDecoration(
+                          color: _notesHasFocus
+                              ? scheme.primaryContainer.withValues(alpha: 0.08)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(Radii.input),
+                          border: Border.all(
+                            color: _notesHasFocus
+                                ? scheme.primary.withValues(alpha: 0.3)
+                                : Colors.transparent,
+                          ),
+                        ),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: TextField(
+                            controller: _notesCtrl,
+                            focusNode: _notesFocus,
+                            onChanged: _onNotesChanged,
+                            minLines: 2,
+                            maxLines: null,
+                            keyboardType: TextInputType.multiline,
+                            style: theme.textTheme.bodyLarge,
+                            decoration: InputDecoration(
+                              hintText: '添加描述...',
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              fillColor: Colors.transparent,
+                              filled: false,
+                              contentPadding: EdgeInsets.zero,
+                              hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.outline,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
+                      const SizedBox(height: Spacing.md),
+
+                      // ═════════════════════════════════════════
+                      // 属性卡片
+                      // ═════════════════════════════════════════
+                      DetailCard(
+                        icon: Icon(
+                          Icons.tune_rounded,
+                          size: 18,
+                          color: scheme.outline,
+                        ),
+                        title: '属性',
+                        children: [
+                          PriorityChips(
+                            priority: TaskPriority.fromValue(task.priority),
+                            onChanged: (p) => _repo.update(
+                              task.id,
+                              knownVersion: task.version,
+                              priority: Value(p.value),
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.xs),
+                          ListDropdown(
+                            currentListId: task.listId,
+                            onChanged: (newId) => _repo.update(
+                              task.id,
+                              knownVersion: task.version,
+                              listId: Value(newId),
+                            ),
+                          ),
+                          TagEditor(taskId: task.id),
+                        ],
+                      ),
+                      const SizedBox(height: Spacing.sm),
+
+                      // ═════════════════════════════════════════
+                      // 时间 & 专注卡片
+                      // ═════════════════════════════════════════
+                      DetailCard(
+                        icon: Icon(
+                          Icons.schedule_rounded,
+                          size: 18,
+                          color: scheme.outline,
+                        ),
+                        title: '时间 & 专注',
+                        children: [
+                          // ── 截止日期 / 提醒 / 预估时长 — 同一 Wrap 行 ──
+                          Wrap(
+                            spacing: Spacing.sm,
+                            runSpacing: Spacing.sm,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              DateChip(
+                                date: task.dueAt,
+                                icon: AppIcons.svgIcon(AppIcons.planned,
+                                    size: 16),
+                                emptyLabel: '截止日期',
+                                onTap: _pickDueDate,
+                                onClear: task.dueAt != null
+                                    ? () => _repo.update(
+                                          task.id,
+                                          knownVersion: task.version,
+                                          dueAt: const Value(null),
+                                        )
+                                    : null,
+                              ),
+                              DateChip(
+                                date: task.remindAt,
+                                icon: AppIcons.svgIcon(AppIcons.reminder,
+                                    size: 16),
+                                emptyLabel: '提醒',
+                                showTime: true,
+                                onTap: _pickRemind,
+                                onClear: task.remindAt != null
+                                    ? () => _repo.update(
+                                          task.id,
+                                          knownVersion: task.version,
+                                          remindAt: const Value(null),
+                                        )
+                                    : null,
+                              ),
+                              _EstimatedDurationRow(
+                                estimatedMinutes: task.estimatedMinutes,
+                                onChanged: (minutes) async {
+                                  await _repo.update(
+                                    task.id,
+                                    knownVersion: task.version,
+                                    estimatedMinutes: Value(minutes),
+                                  );
+                                  // 触发自动规划
+                                  if (minutes != null) {
+                                    final updatedTask = task;
+                                    ref
+                                        .read(focusPlanServiceProvider)
+                                        .generatePlans(updatedTask);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          // ── 专注进度（仅在有预估时长时显示） ──
+                          if (task.estimatedMinutes != null &&
+                              task.estimatedMinutes! > 0)
+                            FocusProgressRow(
+                              focusedSeconds: task.focusedSeconds,
+                              estimatedMinutes: task.estimatedMinutes!,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: Spacing.sm),
+
+                      // ═════════════════════════════════════════
+                      // 步骤卡片
+                      // ═════════════════════════════════════════
+                      DetailCard(
+                        padding: const EdgeInsets.fromLTRB(
+                          Spacing.base,
+                          Spacing.base,
+                          Spacing.base,
+                          Spacing.sm,
+                        ),
+                        children: [StepsSection(taskId: task.id)],
+                      ),
+                      const SizedBox(height: Spacing.sm),
+
+                      // ═════════════════════════════════════════
+                      // 子任务卡片
+                      // ═════════════════════════════════════════
+                      DetailCard(
+                        padding: const EdgeInsets.fromLTRB(
+                          Spacing.base,
+                          Spacing.base,
+                          Spacing.base,
+                          Spacing.sm,
+                        ),
+                        children: [SubtasksSection(parent: task)],
+                      ),
+                      const SizedBox(height: Spacing.sm),
+
+                      // ── 元信息 (折叠) ──
+                      CollapsibleMeta(task: task),
                     ],
                   ),
-                  const SizedBox(height: Spacing.sm),
-                  // ── 预估时长 ──
-                  _EstimatedDurationRow(
-                    estimatedMinutes: task.estimatedMinutes,
-                    onChanged: (minutes) async {
-                      await _repo.update(
-                        task.id,
-                        knownVersion: task.version,
-                        estimatedMinutes: Value(minutes),
-                      );
-                      // 触发自动规划
-                      if (minutes != null) {
-                        final updatedTask = task;
-                        ref.read(focusPlanServiceProvider).generatePlans(
-                              updatedTask,
-                            );
-                      }
-                    },
-                  ),
-
-                  const SizedBox(height: Spacing.lg),
-                  StepsSection(taskId: task.id),
-
-                  const SizedBox(height: Spacing.lg),
-                  SubtasksSection(parent: task),
-
-                  const SizedBox(height: Spacing.lg),
-                  // ── 元信息 (改动5: 折叠) ──
-                  CollapsibleMeta(task: task),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

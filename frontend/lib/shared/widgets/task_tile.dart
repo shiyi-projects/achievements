@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:achievements/features/task_detail/widgets/date_helpers.dart';
+
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
@@ -156,7 +158,7 @@ class _TaskTileState extends ConsumerState<TaskTile>
                             ),
                             const SizedBox(width: Spacing.md),
 
-                            // ── Title + Tags ──
+                            // ── Title + Meta + Tags ──
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,6 +179,14 @@ class _TaskTileState extends ConsumerState<TaskTile>
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
+                                  // ── Metadata row: due date / repeat / focus ──
+                                  if (_hasMetadata(task))
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: Spacing.xs,
+                                      ),
+                                      child: _MetadataRow(task: task),
+                                    ),
                                   if (tags.isNotEmpty)
                                     Padding(
                                       padding: const EdgeInsets.only(
@@ -405,6 +415,144 @@ class _TaskTileState extends ConsumerState<TaskTile>
         ),
       ),
     );
+  }
+}
+
+/// 判断任务是否有可显示的元数据信息。
+bool _hasMetadata(Task task) {
+  return task.dueAt != null ||
+      (task.repeatRule != null && task.repeatRule!.isNotEmpty) ||
+      (task.estimatedMinutes != null && task.estimatedMinutes! > 0);
+}
+
+/// 元数据信息行：截止日期 / 重复标识 / 专注进度。
+///
+/// 紧凑单行布局，用小图标 + 文字，不额外占用卡片高度。
+class _MetadataRow extends StatelessWidget {
+  const _MetadataRow({required this.task});
+  final Task task;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final items = <Widget>[];
+
+    // ── 1. 截止日期 ──
+    if (task.dueAt != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final dueDate = DateTime(
+        task.dueAt!.year,
+        task.dueAt!.month,
+        task.dueAt!.day,
+      );
+      final isOverdue = dueDate.isBefore(today) && task.completedAt == null;
+      final isToday = dueDate == today;
+
+      Color dateColor;
+      if (isOverdue) {
+        dateColor = scheme.error;
+      } else if (isToday) {
+        dateColor = AppColors.high;
+      } else {
+        dateColor = scheme.outline;
+      }
+
+      items.add(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isOverdue
+                  ? Icons.event_busy_rounded
+                  : Icons.event_rounded,
+              size: 13,
+              color: dateColor,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              formatDateCn(task.dueAt!),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: dateColor,
+                fontSize: 11,
+                fontWeight: isOverdue ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ── 2. 重复标识 ──
+    if (task.repeatRule != null && task.repeatRule!.isNotEmpty) {
+      items.add(
+        Icon(
+          Icons.repeat_rounded,
+          size: 13,
+          color: scheme.outline,
+        ),
+      );
+    }
+
+    // ── 3. 专注进度 ──
+    if (task.estimatedMinutes != null && task.estimatedMinutes! > 0) {
+      final focusedMin = task.focusedSeconds ~/ 60;
+      final estMin = task.estimatedMinutes!;
+      final isComplete = focusedMin >= estMin;
+
+      items.add(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isComplete
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.timer_outlined,
+              size: 13,
+              color: isComplete ? scheme.primary : scheme.outline,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              '${_fmtMin(focusedMin)}/${_fmtMin(estMin)}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: isComplete ? scheme.primary : scheme.outline,
+                fontSize: 11,
+                fontWeight: isComplete ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: Spacing.sm,
+      runSpacing: Spacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          items[i],
+          if (i < items.length - 1)
+            Text(
+              '·',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.outlineVariant,
+                fontSize: 10,
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  static String _fmtMin(int v) {
+    if (v >= 60) {
+      final h = v ~/ 60;
+      final m = v % 60;
+      return m == 0 ? '${h}h' : '${h}h${m}m';
+    }
+    return '${v}m';
   }
 }
 

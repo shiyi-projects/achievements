@@ -45,75 +45,69 @@ class ListDropdown extends ConsumerWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-      child: Row(
-        children: [
-          AppIcons.svgIcon(AppIcons.folder),
-          const SizedBox(width: Spacing.base),
-          Expanded(
-            child: PopupMenuButton<String>(
-              initialValue: currentListId,
-              onSelected: (id) {
-                if (id != currentListId) onChanged(id);
-              },
-              offset: const Offset(0, 36),
-              constraints:
-                  const BoxConstraints(maxHeight: 400, minWidth: 200),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Radii.input),
-              ),
-              itemBuilder: (_) => [
-                for (final l in inbox) _buildItem(l, scheme),
-                for (final l in rootLists) _buildItem(l, scheme),
-                for (final folder in folders) ...[
-                  if (byFolder.containsKey(folder.id)) ...[
-                    PopupMenuItem<String>(
-                      enabled: false,
-                      height: 32,
-                      child: Text(
-                        folder.name,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.outline,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                    for (final l in byFolder[folder.id]!)
-                      _buildItem(l, scheme, indent: true),
-                  ],
-                ],
-              ],
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Spacing.md,
-                  vertical: Spacing.sm,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(Radii.chip),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        currentName,
-                        style: theme.textTheme.bodyMedium,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: Spacing.xs),
-                    Icon(
-                      Icons.unfold_more_rounded,
-                      size: 16,
-                      color: scheme.outline,
-                    ),
-                  ],
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+      child: PopupMenuButton<String>(
+        initialValue: currentListId,
+        onSelected: (id) {
+          if (id != currentListId) onChanged(id);
+        },
+        offset: const Offset(0, 36),
+        constraints:
+            const BoxConstraints(maxHeight: 400, minWidth: 200),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Radii.input),
+        ),
+        itemBuilder: (_) => [
+          for (final l in inbox) _buildItem(l, scheme),
+          for (final l in rootLists) _buildItem(l, scheme),
+          for (final folder in folders) ...[
+            if (byFolder.containsKey(folder.id)) ...[
+              PopupMenuItem<String>(
+                enabled: false,
+                height: 32,
+                child: Text(
+                  folder.name,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.outline,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
-            ),
-          ),
+              for (final l in byFolder[folder.id]!)
+                _buildItem(l, scheme, indent: true),
+            ],
+          ],
         ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.md,
+            vertical: Spacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(Radii.chip),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcons.svgIcon(AppIcons.folder, size: 16),
+              const SizedBox(width: Spacing.sm),
+              Flexible(
+                child: Text(
+                  currentName,
+                  style: theme.textTheme.bodyMedium,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: Spacing.xs),
+              Icon(
+                Icons.unfold_more_rounded,
+                size: 16,
+                color: scheme.outline,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

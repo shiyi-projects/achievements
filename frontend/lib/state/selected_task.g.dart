@@ -24,6 +24,27 @@ final currentTaskProvider = AutoDisposeStreamProvider<Task?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentTaskRef = AutoDisposeStreamProviderRef<Task?>;
+String _$parentTaskHash() => r'84e26e891b5657e3345bb714206cd1fc04aa231d';
+
+/// 当前任务的父任务（面包屑导航用）。
+///
+/// 若当前任务有 [Task.parentId]，从 DB 实时查询父任务行；
+/// 否则 yield null。
+///
+/// Copied from [parentTask].
+@ProviderFor(parentTask)
+final parentTaskProvider = AutoDisposeStreamProvider<Task?>.internal(
+  parentTask,
+  name: r'parentTaskProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$parentTaskHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ParentTaskRef = AutoDisposeStreamProviderRef<Task?>;
 String _$selectedTaskIdHash() => r'ef6ba962267ce25c31995c20205cbc5ce58922a6';
 
 /// 当前打开的任务详情 ID。

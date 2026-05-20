@@ -35,3 +35,20 @@ Stream<Task?> currentTask(Ref ref) async* {
     db.tasks,
   )..where((t) => t.id.equals(id))).watchSingleOrNull();
 }
+
+/// 当前任务的父任务（面包屑导航用）。
+///
+/// 若当前任务有 [Task.parentId]，从 DB 实时查询父任务行；
+/// 否则 yield null。
+@riverpod
+Stream<Task?> parentTask(Ref ref) async* {
+  final current = ref.watch(currentTaskProvider).valueOrNull;
+  if (current == null || current.parentId == null) {
+    yield null;
+    return;
+  }
+  final db = ref.watch(appDatabaseProvider);
+  yield* (db.select(db.tasks)
+        ..where((t) => t.id.equals(current.parentId!)))
+      .watchSingleOrNull();
+}

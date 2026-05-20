@@ -18,6 +18,8 @@ class TaskDetailTopBar extends StatelessWidget {
     required this.onSoftDelete,
     required this.onRestore,
     required this.onHardDelete,
+    this.parentTaskTitle,
+    this.onBackToParent,
     super.key,
   });
 
@@ -31,9 +33,16 @@ class TaskDetailTopBar extends StatelessWidget {
   final VoidCallback onRestore;
   final VoidCallback onHardDelete;
 
+  /// 父任务标题。非 null 时显示面包屑导航。
+  final String? parentTaskTitle;
+
+  /// 返回父任务的回调。
+  final VoidCallback? onBackToParent;
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
@@ -48,9 +57,38 @@ class TaskDetailTopBar extends StatelessWidget {
         children: [
           IconButton(
             icon: AppIcons.svgIcon(AppIcons.close),
-            tooltip: '关闭',
+            tooltip: '关闭 (Esc)',
             onPressed: onClose,
           ),
+          // ── 面包屑：显示父任务名，可一键返回 ──
+          if (parentTaskTitle != null) ...[
+            const SizedBox(width: Spacing.xs),
+            Icon(
+              Icons.chevron_left_rounded,
+              size: 16,
+              color: scheme.outline,
+            ),
+            Flexible(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(Radii.chip),
+                onTap: onBackToParent,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Spacing.sm,
+                    vertical: Spacing.xs,
+                  ),
+                  child: Text(
+                    parentTaskTitle!,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.primary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+          ],
           const Spacer(),
           // ── 完成切换（带弹性动画） ──
           AnimatedCompleteButton(
@@ -58,7 +96,7 @@ class TaskDetailTopBar extends StatelessWidget {
             onTap: onToggleComplete,
           ),
           const SizedBox(width: Spacing.xs),
-          // ── 星标（带旋转缩放） ──
+          // ── 星标（带旋转缩放，ValueKey 驱动动画） ──
           IconButton(
             icon: AnimatedSwitcher(
               duration: MotionDurations.fast,
@@ -76,7 +114,10 @@ class TaskDetailTopBar extends StatelessWidget {
                   ),
                 );
               },
-              child: AppIcons.svgIcon(AppIcons.important),
+              child: SizedBox(
+                key: ValueKey(starred),
+                child: AppIcons.svgIcon(AppIcons.important),
+              ),
             ),
             tooltip: starred ? '取消星标' : '添加星标',
             onPressed: onToggleStar,
@@ -168,7 +209,7 @@ class AnimatedCompleteButton extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(Spacing.sm),
           child: AnimatedScale(
-            scale: completed ? 1.0 : 1.0,
+            scale: completed ? 1.08 : 1.0,
             duration: MotionDurations.fast,
             curve: MotionCurves.bouncySpring,
             child: AnimatedContainer(
