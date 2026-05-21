@@ -121,5 +121,6 @@ achievements-backend.zip
 *.tar.gz
 
 # ----- Claude Code local settings -----
-.claude/settings.local.json
+# 不加前导斜线,匹配仓库内任意路径下的 .claude/ 目录(如 frontend/.claude/)
+.claude/
 
