@@ -208,14 +208,12 @@ class _StepRow extends StatefulWidget {
     required this.step,
     required this.index,
     required this.repo,
-    this.onDelete,
     super.key,
   });
 
   final TaskStep step;
   final int index;
   final StepRepository repo;
-  final VoidCallback? onDelete;
 
   @override
   State<_StepRow> createState() => _StepRowState();
@@ -385,8 +383,7 @@ class _StepRowState extends State<_StepRow> {
                   color: scheme.outline,
                 ),
                 tooltip: '删除步骤',
-                onPressed: widget.onDelete ??
-                    () => widget.repo.deleteStep(widget.step.id),
+                onPressed: () => widget.repo.deleteStep(widget.step.id),
               ),
             ),
           ],

@@ -112,8 +112,6 @@ class _ReminderAlarmScreenState extends ConsumerState<ReminderAlarmScreen>
   }
 
   void _showSnoozeOptions() {
-    final scheme = Theme.of(context).colorScheme;
-
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
