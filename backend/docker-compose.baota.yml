@@ -24,8 +24,17 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
+    # 覆盖 Dockerfile 默认 CMD,让容器内 uvicorn 监听 8084(与宿主端口一致)
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8084"]
+    # Dockerfile healthcheck 默认 ping 8000,这里覆盖到 8084
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/api/v1/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     ports:
-      - "127.0.0.1:8084:8000"  # 容器内 8000 → 宿主 127.0.0.1:8084;nginx 反代到这里
+      - "127.0.0.1:8084:8084"  # 宿主 127.0.0.1:8084 → 容器 8084;nginx 反代到这里
     volumes:
       - /www/wwwroot/achievements-storage/attachments:/app/storage/attachments
     restart: always
