@@ -2,11 +2,16 @@
 # ============ Builder ============
 FROM python:3.13-slim AS builder
 
+# 国内服务器 build 时:--build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+# 默认走官方源,海外构建不受影响
+ARG PIP_INDEX_URL=https://pypi.org/simple/
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
-    UV_PROJECT_ENVIRONMENT=/opt/venv
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_DEFAULT_INDEX=${PIP_INDEX_URL}
 
 # uv 提供官方静态二进制
 COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /uvx /usr/local/bin/

@@ -1,0 +1,36 @@
+# 宝塔 VPS 单容器部署 compose。
+#
+# 用法:
+#   1. 服务器上 cd /www/wwwroot/achievements-backend
+#   2. 把 .env.prod 上传到这里(含 Supabase DATABASE_URL 等)
+#   3. docker compose -f docker-compose.baota.yml up -d --build
+#
+# 与原 docker-compose.prod.yml 的区别:
+# - 不跑 db / redis 容器(DB 走 Supabase;Redis 代码暂未用,后续再加)
+# - 不依赖 docker-compose.yml,**单文件可独立运行**
+# - 端口 8084 只绑回环,给宝塔 nginx 反代
+
+name: achievements-prod
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: achievements/backend:latest
+    container_name: achievements-api
+    env_file: .env.prod
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    ports:
+      - "127.0.0.1:8084:8000"  # 容器内 8000 → 宿主 127.0.0.1:8084;nginx 反代到这里
+    volumes:
+      - /www/wwwroot/achievements-storage/attachments:/app/storage/attachments
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 768M
