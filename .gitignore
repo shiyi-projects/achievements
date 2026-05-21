@@ -116,6 +116,10 @@ node_modules/
 tmp/
 temp/
 
+# ----- Build/deploy artifacts -----
+achievements-backend.zip
+*.tar.gz
+
 # ----- Claude Code local settings -----
 .claude/settings.local.json
 
