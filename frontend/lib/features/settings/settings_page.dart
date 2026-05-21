@@ -1,28 +1,25 @@
+import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 显示设置页弹窗(桌面用 dialog,移动用 bottom sheet)。
 void showSettingsDialog(BuildContext context) {
   final width = MediaQuery.sizeOf(context).width;
   if (width >= 600) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => const _SettingsDialog(),
-    );
+    showDialog<void>(context: context, builder: (_) => const _SettingsDialog());
   } else {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => const FractionallySizedBox(
-        heightFactor: 0.9,
-        child: SettingsPage(),
-      ),
+      builder: (_) =>
+          const FractionallySizedBox(heightFactor: 0.9, child: SettingsPage()),
     );
   }
 }
@@ -82,6 +79,9 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: Spacing.sm),
             _ColorSection(current: settings.seedColor),
             const Divider(height: Spacing.xl),
+            const _SectionHeader('同步'),
+            const _SyncSection(),
+            const Divider(height: Spacing.xl),
             const _SectionHeader('关于'),
             const _AboutSection(),
           ],
@@ -104,7 +104,12 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.base, Spacing.lg, Spacing.xs),
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.base,
+        Spacing.lg,
+        Spacing.xs,
+      ),
       child: Text(
         title,
         style: theme.textTheme.labelMedium?.copyWith(
@@ -138,10 +143,7 @@ class _ThemeModeSection extends ConsumerWidget {
         children: [
           Padding(
             padding: const EdgeInsets.only(bottom: Spacing.sm),
-            child: Text(
-              '主题模式',
-              style: theme.textTheme.titleSmall,
-            ),
+            child: Text('主题模式', style: theme.textTheme.titleSmall),
           ),
           SegmentedButton<ThemeMode>(
             segments: const [
@@ -234,6 +236,44 @@ class _ColorSection extends ConsumerWidget {
             }).toList(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Sync (user_id 展示 + 复制)
+// ─────────────────────────────────────────────────────────────────────
+
+class _SyncSection extends StatelessWidget {
+  const _SyncSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: AppIcons.svgIcon(AppIcons.sync),
+      title: const Text('用户 ID'),
+      subtitle: Text(
+        kLocalUserId,
+        style: theme.textTheme.bodySmall?.copyWith(
+          fontFamily: 'monospace',
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      trailing: IconButton(
+        icon: const Icon(Icons.copy_rounded, size: 20),
+        tooltip: '复制',
+        onPressed: () async {
+          await Clipboard.setData(const ClipboardData(text: kLocalUserId));
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('已复制到剪贴板'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        },
       ),
     );
   }
