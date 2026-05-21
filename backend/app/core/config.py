@@ -26,6 +26,9 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://achievements:achievements@db:5432/achievements"
+    # 走 Supabase Transaction Pooler(端口 6543)等不持有连接的 PgBouncer 兼容池时需开启,
+    # 否则 asyncpg 的预编译语句缓存会与连接复用冲突。直连/Session Pooler 保持 false 性能更好。
+    database_disable_statement_cache: bool = False
 
     # Redis
     redis_url: str = "redis://redis:6379/0"

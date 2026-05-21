@@ -2,7 +2,10 @@
 
 /// Phase 0/1 占位用户 ID,所有本地实体写入此 user_id。
 /// 启用真实账号后替换为登录返回的 user_id。
-const String kLocalUserId = '00000000-0000-0000-0000-000000000001';
+///
+/// **必须与后端 `.env*` 的 `LOCAL_USER_ID` 保持一致**,否则同步引擎会把云端数据
+/// 当作另一个用户的,推/拉都对不上。改这个常量要同时改后端 env。
+const String kLocalUserId = '6e6b88b6-762a-45c5-a9e8-c66c09365f87';
 
 /// 任务优先级。落库 `tasks.priority` 列,0 / 1 / 2 / 3。
 enum TaskPriority {
