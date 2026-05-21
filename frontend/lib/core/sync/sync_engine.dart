@@ -367,3 +367,20 @@ class SyncStatusController extends _$SyncStatusController {
   // ignore: use_setters_to_change_properties — 与 Riverpod 风格一致用 method
   void set(SyncStatus next) => state = next;
 }
+
+/// 上次同步成功的本地时间。由 SyncCoordinator 在每轮 idle 完成时写入
+/// `sync_cursors.last_sync_at`,此 provider watch 该行变更并返回 DateTime?。
+/// 设置页据此显示"X 分钟前"。
+///
+/// 用手写 StreamProvider 而不是 @Riverpod codegen,避免每次改这块都强制
+/// 跑 build_runner。
+final lastSyncAtProvider = StreamProvider<DateTime?>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return (db.select(db.syncCursors)
+        ..where((t) => t.key.equals(SyncCursorKey.lastSyncAt)))
+      .watchSingleOrNull()
+      .map((row) {
+    if (row == null) return null;
+    return DateTime.tryParse(row.value);
+  });
+});

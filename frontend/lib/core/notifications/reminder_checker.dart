@@ -122,10 +122,26 @@ class _ReminderCheckerState extends ConsumerState<ReminderChecker>
             '[ReminderChecker] ⏳ 安排定时器: "${task.title}" '
             '(${delay.inMinutes}分${delay.inSeconds % 60}秒后)',
           );
-          _timers[task.id] = Timer(delay, () {
-            debugPrint('[ReminderChecker] 🔔 定时器触发: "${task.title}"');
-            _timers.remove(task.id);
-            _enqueue(task);
+          final taskId = task.id;
+          _timers[taskId] = Timer(delay, () async {
+            debugPrint('[ReminderChecker] 🔔 定时器触发: taskId=$taskId');
+            _timers.remove(taskId);
+            // 重查 DB:Timer 触发瞬间任务可能刚被完成,stream emit 还在路上,
+            // 不能直接用闭包里的旧 task 去 enqueue。
+            if (!mounted) return;
+            final fresh = await ref
+                .read(taskRepositoryProvider)
+                .getById(taskId);
+            if (fresh == null ||
+                fresh.completedAt != null ||
+                fresh.deletedAt != null ||
+                fresh.remindAt == null) {
+              debugPrint(
+                '[ReminderChecker] ⏭ 定时器触发但任务已失效,跳过: taskId=$taskId',
+              );
+              return;
+            }
+            _enqueue(fresh);
           });
         }
       }
@@ -136,6 +152,17 @@ class _ReminderCheckerState extends ConsumerState<ReminderChecker>
     for (final id in staleIds) {
       debugPrint('[ReminderChecker] 🗑 取消定时器: taskId=$id');
       _timers.remove(id)?.cancel();
+    }
+
+    // 同时把 pendingQueue 里已经不活跃的任务剔除掉。否则前面 alarm 还在显示
+    // 的窗口期里,用户(或其他设备同步过来)把任务完成了,轮到它出队仍会弹。
+    final beforeQueue = _pendingQueue.length;
+    _pendingQueue.removeWhere((t) => !activeIds.contains(t.id));
+    if (_pendingQueue.length != beforeQueue) {
+      debugPrint(
+        '[ReminderChecker] 🧹 清理 pendingQueue: '
+        '${beforeQueue - _pendingQueue.length} 条已完成/删除',
+      );
     }
   }
 
@@ -158,8 +185,27 @@ class _ReminderCheckerState extends ConsumerState<ReminderChecker>
       return;
     }
 
+    // 弹窗前最后一次复核:从 DB 重新拉,任务可能已被完成/删除/清掉提醒。
+    // _reconcile 已尽量清理 pendingQueue,但 stream emit 和 _processQueue 调度
+    // 之间仍有可能错过一拍,这里兜底。
+    final fresh = await ref
+        .read(taskRepositoryProvider)
+        .getById(task.id);
+    if (!mounted) return;
+    if (fresh == null ||
+        fresh.completedAt != null ||
+        fresh.deletedAt != null ||
+        fresh.remindAt == null) {
+      debugPrint(
+        '[ReminderChecker] ⏭ 出队时已失效,跳过: "${task.title}"',
+      );
+      _shownIds.add(task.id); // 防止再次入队
+      unawaited(Future<void>.microtask(_processQueue));
+      return;
+    }
+
     _shownIds.add(task.id);
-    await _showAlarm(task);
+    await _showAlarm(fresh);
 
     // 闹钟关闭后处理下一个
     if (mounted && _pendingQueue.isNotEmpty) {

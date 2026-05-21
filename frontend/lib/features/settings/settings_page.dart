@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:achievements/core/constants.dart';
+import 'package:achievements/core/sync/sync_coordinator.dart';
+import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -78,6 +83,11 @@ class SettingsPage extends ConsumerWidget {
             _ThemeModeSection(current: settings.themeMode),
             const SizedBox(height: Spacing.sm),
             _ColorSection(current: settings.seedColor),
+            if (defaultTargetPlatform == TargetPlatform.windows) ...[
+              const Divider(height: Spacing.xl),
+              const _SectionHeader('桌面'),
+              _CloseActionSection(current: settings.closeAction),
+            ],
             const Divider(height: Spacing.xl),
             const _SectionHeader('同步'),
             const _SyncSection(),
@@ -242,40 +252,208 @@ class _ColorSection extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Sync (user_id 展示 + 复制)
+// 桌面:关闭按钮行为(Windows only)
 // ─────────────────────────────────────────────────────────────────────
 
-class _SyncSection extends StatelessWidget {
+class _CloseActionSection extends ConsumerWidget {
+  const _CloseActionSection({required this.current});
+
+  final CloseAction current;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final notifier = ref.read(settingsNotifierProvider.notifier);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: Spacing.xs),
+            child: Text('关闭按钮行为', style: theme.textTheme.titleSmall),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: Spacing.sm),
+            child: Text(
+              '点击窗口右上角 X 时的默认动作',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          SegmentedButton<CloseAction>(
+            segments: const [
+              ButtonSegment(
+                value: CloseAction.minimizeToTray,
+                label: Text('托盘'),
+                icon: Icon(Icons.minimize_rounded),
+              ),
+              ButtonSegment(
+                value: CloseAction.exitApp,
+                label: Text('退出'),
+                icon: Icon(Icons.power_settings_new_rounded),
+              ),
+              ButtonSegment(
+                value: CloseAction.ask,
+                label: Text('询问'),
+                icon: Icon(Icons.help_outline_rounded),
+              ),
+            ],
+            selected: {current},
+            onSelectionChanged: (sel) => notifier.setCloseAction(sel.first),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Sync (状态 + 上次同步 + 手动触发 + user_id)
+// ─────────────────────────────────────────────────────────────────────
+
+class _SyncSection extends ConsumerWidget {
   const _SyncSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return ListTile(
-      leading: AppIcons.svgIcon(AppIcons.sync),
-      title: const Text('用户 ID'),
-      subtitle: Text(
-        kLocalUserId,
-        style: theme.textTheme.bodySmall?.copyWith(
-          fontFamily: 'monospace',
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
+    final scheme = theme.colorScheme;
+    final status = ref.watch(syncStatusControllerProvider);
+    final lastSyncAtAsync = ref.watch(lastSyncAtProvider);
+    final lastSyncAt = lastSyncAtAsync.valueOrNull;
+    final isSyncing = status == SyncStatus.syncing;
+
+    final (statusIcon, statusColor, statusText) = switch (status) {
+      SyncStatus.idle => (
+        Icons.cloud_done_rounded,
+        scheme.primary,
+        '已同步',
       ),
-      trailing: IconButton(
-        icon: const Icon(Icons.copy_rounded, size: 20),
-        tooltip: '复制',
-        onPressed: () async {
-          await Clipboard.setData(const ClipboardData(text: kLocalUserId));
-          if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已复制到剪贴板'),
-              duration: Duration(seconds: 2),
+      SyncStatus.syncing => (
+        Icons.cloud_sync_rounded,
+        scheme.primary,
+        '同步中…',
+      ),
+      SyncStatus.error => (
+        Icons.error_outline_rounded,
+        scheme.error,
+        '同步失败',
+      ),
+      SyncStatus.offline => (
+        Icons.cloud_off_rounded,
+        scheme.outline,
+        '离线',
+      ),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── 状态 + 上次同步 ──
+          Row(
+            children: [
+              Icon(statusIcon, color: statusColor, size: 20),
+              const SizedBox(width: Spacing.sm),
+              Text(
+                statusText,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: statusColor,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                _formatLastSync(lastSyncAt),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Spacing.md),
+
+          // ── 手动同步 ──
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: isSyncing
+                  ? null
+                  : () => unawaited(
+                        ref.read(syncCoordinatorProvider).runFullSync(),
+                      ),
+              icon: isSyncing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.sync_rounded, size: 18),
+              label: Text(isSyncing ? '同步中…' : '立即同步'),
             ),
-          );
-        },
+          ),
+
+          const SizedBox(height: Spacing.md),
+          const Divider(height: 1),
+          const SizedBox(height: Spacing.sm),
+
+          // ── 用户 ID ──
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('用户 ID', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      kLocalUserId,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_rounded, size: 20),
+                tooltip: '复制',
+                onPressed: () async {
+                  await Clipboard.setData(
+                    const ClipboardData(text: kLocalUserId),
+                  );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('已复制到剪贴板'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
+  }
+
+  /// 把 ISO 时间格式化为"X 分钟前"。
+  String _formatLastSync(DateTime? at) {
+    if (at == null) return '从未同步';
+    final diff = DateTime.now().difference(at);
+    if (diff.isNegative) return '刚刚';
+    if (diff.inSeconds < 60) return '刚刚';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
+    if (diff.inHours < 24) return '${diff.inHours} 小时前';
+    if (diff.inDays < 7) return '${diff.inDays} 天前';
+    return '${at.year}-${at.month.toString().padLeft(2, '0')}-${at.day.toString().padLeft(2, '0')}';
   }
 }
 

@@ -123,12 +123,12 @@ class _SyncStatusIndicatorState extends ConsumerState<SyncStatusIndicator>
         '同步中…',
       ),
       SyncStatus.error => (
-        AppIcons.sync,
+        AppIcons.cloudError,
         theme.colorScheme.error,
         '同步失败',
       ),
       SyncStatus.offline => (
-        AppIcons.cloudSync,
+        AppIcons.cloudOff,
         theme.colorScheme.outline,
         '离线，暂存本地',
       ),

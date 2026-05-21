@@ -47,6 +47,18 @@ enum SystemListKind {
   final String value;
   final String id;
 
+  /// 系统清单的中文显示名。DB 里 seed 的英文名(Inbox / Today / …) 是
+  /// 同步协议的稳定标识,UI 这一层统一走此 getter 做翻译。
+  String get displayName => switch (this) {
+    SystemListKind.inbox => '收件箱',
+    SystemListKind.today => '今天',
+    SystemListKind.important => '重要',
+    SystemListKind.planned => '计划',
+    SystemListKind.all => '全部任务',
+    SystemListKind.completed => '已完成',
+    SystemListKind.trash => '回收站',
+  };
+
   static SystemListKind? fromValue(String? value) {
     if (value == null) return null;
     for (final kind in SystemListKind.values) {
@@ -54,4 +66,11 @@ enum SystemListKind {
     }
     return null;
   }
+}
+
+/// 返回任务清单的 UI 显示名:系统清单走 [SystemListKind.displayName]
+/// 中文翻译;用户自定义清单原样返回 `list.name`。
+String displayNameOfList({required String fallback, String? systemKind}) {
+  final kind = SystemListKind.fromValue(systemKind);
+  return kind?.displayName ?? fallback;
 }

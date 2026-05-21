@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -11,14 +11,17 @@ part 'sync_coordinator.g.dart';
 
 /// 同步触发协调器。
 ///
-/// 负责把 [SyncEngine] 的 pull / push 接到三个触发源:
+/// 负责把 [SyncEngine] 的 pull / push 接到多个触发源:
 ///   1. **启动**:bootstrap 调用 [runFullSync] 跑 pull → push。
 ///   2. **本地写入**:监听 outbox.watchPendingCount,500ms debounce 后跑 push。
 ///   3. **网络恢复**:connectivity_plus 监听到 offline → online 后跑 pull + push。
+///   4. **App 切回前台**:WidgetsBindingObserver.resumed → 节流的 full sync。
+///   5. **窗口获得焦点**:由 AppWindowListener 调 [triggerIfStale] 触发。
+///   6. **30s 轮询**:每轮成功后排下一次。
 ///
 /// 全部触发都会把 [SyncStatusController] 写入 syncing → idle / error / offline。
 /// 同一时间只允许一次 sync 在跑(_inFlight 闸门),并发触发被合并。
-class SyncCoordinator {
+class SyncCoordinator extends WidgetsBindingObserver {
   SyncCoordinator({
     required SyncEngine engine,
     required OutboxRepository outbox,
@@ -41,6 +44,8 @@ class SyncCoordinator {
   Timer? _pollTimer;
   bool _inFlight = false;
   bool _wasOffline = false;
+  bool _lifecycleObserverRegistered = false;
+  DateTime? _lastFullSyncStartAt;
 
   static const Duration _kPollInterval = Duration(seconds: 30);
 
@@ -50,6 +55,10 @@ class SyncCoordinator {
     _connectivitySub ??= _connectivity.onConnectivityChanged.listen(
       _onConnectivityChanged,
     );
+    if (!_lifecycleObserverRegistered) {
+      WidgetsBinding.instance.addObserver(this);
+      _lifecycleObserverRegistered = true;
+    }
   }
 
   /// 释放资源(目前没人调,挂在 keepAlive provider 上随 app 生命周期)。
@@ -59,6 +68,31 @@ class SyncCoordinator {
     _debounce?.cancel();
     _retryTimer?.cancel();
     _pollTimer?.cancel();
+    if (_lifecycleObserverRegistered) {
+      WidgetsBinding.instance.removeObserver(this);
+      _lifecycleObserverRegistered = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(triggerIfStale());
+    }
+  }
+
+  /// 节流的 full sync 触发。
+  ///
+  /// 若距上次 full sync 启动不到 [minAge] 不重复跑(避免短时间内 resume+focus
+  /// 等多个事件叠着触发);否则跑 [runFullSync]。
+  Future<void> triggerIfStale({
+    Duration minAge = const Duration(seconds: 10),
+  }) async {
+    final last = _lastFullSyncStartAt;
+    if (last != null && DateTime.now().difference(last) < minAge) {
+      return;
+    }
+    await runFullSync();
   }
 
   /// 完整同步:pull 增量,再把 outbox 推完。bootstrap / 网络恢复时用。
@@ -69,6 +103,7 @@ class SyncCoordinator {
     _pollTimer = null;
     if (_inFlight) return;
     _inFlight = true;
+    _lastFullSyncStartAt = DateTime.now();
     try {
       _status.set(SyncStatus.syncing);
       final pullResult = await _engine.pullOnce();
@@ -79,6 +114,9 @@ class SyncCoordinator {
       }
       final pushResult = await _engine.pushOnce();
       _status.set(pushResult);
+      if (pushResult == SyncStatus.idle) {
+        await _stampLastSyncAt();
+      }
       if (pushResult == SyncStatus.error || pushResult == SyncStatus.offline) {
         _scheduleRetry(runFullSync);
       }
@@ -99,10 +137,20 @@ class SyncCoordinator {
       _status.set(SyncStatus.syncing);
       final result = await _engine.pushOnce();
       _status.set(result);
+      if (result == SyncStatus.idle) {
+        await _stampLastSyncAt();
+      }
       _scheduleRetry(_runPush, only: result);
     } finally {
       _inFlight = false;
     }
+  }
+
+  Future<void> _stampLastSyncAt() {
+    return _outbox.setCursor(
+      SyncCursorKey.lastSyncAt,
+      DateTime.now().toIso8601String(),
+    );
   }
 
   void _schedulePoll() {

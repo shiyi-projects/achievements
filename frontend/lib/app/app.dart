@@ -2,6 +2,7 @@ import 'package:achievements/app/router.dart';
 import 'package:achievements/app/theme.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/repositories/bootstrap_provider.dart';
+import 'package:achievements/data/repositories/outbox_repository.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
@@ -48,7 +49,7 @@ class AchievementsApp extends ConsumerWidget {
         final bootstrap = ref.watch(appBootstrapProvider);
         return bootstrap.when(
           loading: () => const _BootstrapSplash(),
-          error: (e, st) => _BootstrapError(message: e.toString()),
+          error: (e, st) => _BootstrapError(error: e),
           data: (_) => child ?? const SizedBox.shrink(),
         );
       },
@@ -130,44 +131,84 @@ class _BootstrapSplash extends StatelessWidget {
   }
 }
 
-class _BootstrapError extends StatelessWidget {
-  const _BootstrapError({required this.message});
+class _BootstrapError extends ConsumerWidget {
+  const _BootstrapError({required this.error});
 
-  final String message;
+  final Object error;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final isFirstSync = error is FirstSyncFailedException;
+
+    final (icon, title, body) = isFirstSync
+        ? (
+            Icons.cloud_off_rounded,
+            '无法连接云端',
+            '为了避免新设备首次启动时还没拉到云端数据就在本地写,导致两端状态分裂,'
+                '同步首次必须成功才会放行。请检查网络后重试;如果你确实想先离线使用,'
+                '点「离线使用」绕过门控(之后联网时会按 LWW 自动合并)。',
+          )
+        : (
+            Icons.error_outline_rounded,
+            '初始化失败',
+            error.toString(),
+          );
+
     return Scaffold(
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline_rounded,
-                size: 48,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '初始化失败',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 56, color: scheme.error),
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: scheme.error,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                const SizedBox(height: 12),
+                Text(
+                  body,
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isFirstSync) ...[
+                      OutlinedButton(
+                        onPressed: () => _skipFirstSyncGate(ref),
+                        child: const Text('离线使用'),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    FilledButton.icon(
+                      onPressed: () =>
+                          ref.invalidate(appBootstrapProvider),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('重试'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _skipFirstSyncGate(WidgetRef ref) async {
+    await ref
+        .read(outboxRepositoryProvider)
+        .setCursor(SyncCursorKey.firstSyncDone, 'true');
+    ref.invalidate(appBootstrapProvider);
   }
 }

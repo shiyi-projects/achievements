@@ -1,19 +1,24 @@
+import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
+import 'package:achievements/features/search/providers/search_providers.dart';
 import 'package:achievements/state/current_view.dart';
 import 'package:achievements/state/selected_list.dart';
+import 'package:achievements/state/selected_task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// 全局指令面板(Ctrl+K)。
+/// 全局指令面板(Ctrl+K),同时承担全局搜索职责。
 ///
 /// 内容分三组:
 /// 1. 导航 — 内置视图(今天 / 日历 / 专注 / 成就)
 /// 2. 清单 — 所有用户自定义清单
-/// 3. 任务 — 输入关键词后在所有任务中模糊匹配
+/// 3. 任务 — 输入关键词后在所有任务中按标题/备注模糊匹配
+///
+/// 关闭时清空全局 [searchQueryProvider],避免下次打开时残留旧 query。
 void showCommandPalette(BuildContext context) {
   showDialog<void>(
     context: context,
@@ -64,6 +69,17 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
   List<_PaletteEntry> _entries = [];
 
   @override
+  void initState() {
+    super.initState();
+    // 打开面板时清空全局 query,避免上次的搜索结果在用户键入前闪现。
+    Future.microtask(() {
+      if (mounted) {
+        ref.read(searchQueryProvider.notifier).state = '';
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
@@ -75,6 +91,8 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
       _query = q;
       _selectedIndex = 0;
     });
+    // 驱动 searchResultsProvider 异步加载任务结果。
+    ref.read(searchQueryProvider.notifier).state = q;
   }
 
   void _activate(_PaletteEntry entry) {
@@ -106,8 +124,14 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
     final scheme = theme.colorScheme;
     final allLists = ref.watch(allListsProvider);
     final lists = allLists.valueOrNull ?? const [];
+    final tasksAsync = ref.watch(searchResultsProvider);
+    final tasks = tasksAsync.valueOrNull ?? const <Task>[];
+    final tasksLoading = tasksAsync.isLoading && _query.trim().isNotEmpty;
 
-    _entries = _buildEntries(lists, _query);
+    _entries = _buildEntries(lists, _query, tasks);
+    if (_selectedIndex >= _entries.length) {
+      _selectedIndex = _entries.isEmpty ? 0 : _entries.length - 1;
+    }
 
     return KeyboardListener(
       focusNode: FocusNode(),
@@ -192,11 +216,27 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
                 child: _entries.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.all(Spacing.xl),
-                        child: Text(
-                          '没有匹配结果',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (tasksLoading) ...[
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.8,
+                                  color: scheme.primary.withValues(alpha: 0.6),
+                                ),
+                              ),
+                              const SizedBox(width: Spacing.sm),
+                            ],
+                            Text(
+                              tasksLoading ? '搜索中…' : '没有匹配结果',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       )
                     : ListView.builder(
@@ -285,7 +325,11 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
     );
   }
 
-  List<_PaletteEntry> _buildEntries(List<TaskList> lists, String query) {
+  List<_PaletteEntry> _buildEntries(
+    List<TaskList> lists,
+    String query,
+    List<Task> tasks,
+  ) {
     final q = query.trim().toLowerCase();
 
     final navEntries = <_PaletteEntry>[
@@ -342,12 +386,40 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
         )
         .toList();
 
-    final all = [...navEntries, ...listEntries];
+    final navAndLists = [...navEntries, ...listEntries];
+    final navAndListsFiltered = q.isEmpty
+        ? navAndLists
+        : navAndLists.where((e) => e.label.toLowerCase().contains(q)).toList();
 
-    if (q.isEmpty) return all;
-    return all
-        .where((e) => e.label.toLowerCase().contains(q))
-        .toList();
+    if (q.isEmpty) return navAndListsFiltered;
+
+    // 任务搜索结果(已由 searchResultsProvider 异步加载,q 为空时为空列表)
+    final listById = {for (final l in lists) l.id: l};
+    final taskEntries = tasks.map((t) {
+      final parent = listById[t.listId];
+      final done = t.completedAt != null;
+      final category = parent == null
+          ? '任务'
+          : displayNameOfList(
+              systemKind: parent.systemKind,
+              fallback: parent.name,
+            );
+      return _PaletteEntry(
+        icon: AppIcons.svgIcon(
+          done ? AppIcons.completedStatus : AppIcons.incomplete,
+          size: 18,
+        ),
+        label: t.title,
+        category: category,
+        action: (_, ref) {
+          ref.read(selectedListIdProvider.notifier).select(t.listId);
+          ref.read(currentViewNotifierProvider.notifier).showList();
+          ref.read(selectedTaskIdProvider.notifier).select(t.id);
+        },
+      );
+    }).toList();
+
+    return [...navAndListsFiltered, ...taskEntries];
   }
 }
 

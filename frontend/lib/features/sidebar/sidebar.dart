@@ -89,9 +89,9 @@ class Sidebar extends ConsumerWidget {
                         icon: _systemIcon(
                           SystemListKind.fromValue(list.systemKind),
                         ),
-                        displayName: _systemDisplayName(
-                          SystemListKind.fromValue(list.systemKind),
-                          list.name,
+                        displayName: displayNameOfList(
+                          systemKind: list.systemKind,
+                          fallback: list.name,
                         ),
                         selected: list.id == currentId,
                       ),
@@ -247,26 +247,4 @@ class Sidebar extends ConsumerWidget {
     return AppIcons.svgIcon(path);
   }
 
-  /// 系统清单的中文显示名。数据库里 seed 出的英文(Inbox / Today / …)是给同步
-  /// 协议的稳定标识,UI 这一层做翻译;非系统清单走用户自定义的 [fallback]。
-  String _systemDisplayName(SystemListKind? kind, String fallback) {
-    switch (kind) {
-      case SystemListKind.inbox:
-        return '收件箱';
-      case SystemListKind.today:
-        return '今天';
-      case SystemListKind.important:
-        return '重要';
-      case SystemListKind.planned:
-        return '计划';
-      case SystemListKind.all:
-        return '全部任务';
-      case SystemListKind.completed:
-        return '已完成';
-      case SystemListKind.trash:
-        return '回收站';
-      case null:
-        return fallback;
-    }
-  }
 }

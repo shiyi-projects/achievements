@@ -27,7 +27,20 @@ class PendingCompletedList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (tasks.isEmpty) return emptyState;
+    if (tasks.isEmpty) {
+      // 用 ListView 而非裸 emptyState,这样外层 RefreshIndicator 在空清单上
+      // 也能拉到(下拉手势需要 Scrollable 才能触发)。
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            // 给 emptyState 一个能撑满屏幕的高度,视觉上还是居中。
+            height: MediaQuery.sizeOf(context).height * 0.7,
+            child: Center(child: emptyState),
+          ),
+        ],
+      );
+    }
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final pending = tasks.where((t) => t.completedAt == null).toList();
@@ -35,6 +48,7 @@ class PendingCompletedList extends ConsumerWidget {
 
     return ListView(
       padding: const EdgeInsets.only(top: Spacing.sm, bottom: Spacing.sm),
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
         // ── Pending section header ──
         if (pending.isNotEmpty)

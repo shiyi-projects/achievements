@@ -1,3 +1,4 @@
+import 'package:achievements/core/sync/sync_coordinator.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
@@ -24,15 +25,19 @@ class TodayPage extends ConsumerWidget {
     return Column(
       children: [
         Expanded(
-          child: tasksAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, st) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(Spacing.xl),
-                child: Text('加载失败: $e'),
+          child: RefreshIndicator(
+            onRefresh: () =>
+                ref.read(syncCoordinatorProvider).runFullSync(),
+            child: tasksAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, st) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(Spacing.xl),
+                  child: Text('加载失败: $e'),
+                ),
               ),
+              data: (tasks) => _TodayBody(tasks: tasks, now: DateTime.now()),
             ),
-            data: (tasks) => _TodayBody(tasks: tasks, now: DateTime.now()),
           ),
         ),
         QuickCreateInput(
@@ -67,6 +72,8 @@ class _TodayBody extends StatelessWidget {
     final completed = tasks.where((t) => t.completedAt != null).toList();
 
     return CustomScrollView(
+      // 让外层 RefreshIndicator 即使任务列表很短也能下拉。
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         // ── Welcome Card ──
         SliverToBoxAdapter(

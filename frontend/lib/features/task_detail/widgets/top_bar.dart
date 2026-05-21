@@ -91,92 +91,122 @@ class TaskDetailTopBar extends StatelessWidget {
           ],
           const Spacer(),
           // ── 完成切换（带弹性动画） ──
-          AnimatedCompleteButton(
-            completed: completed,
-            onTap: onToggleComplete,
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: AnimatedCompleteButton(
+              completed: completed,
+              onTap: onToggleComplete,
+            ),
           ),
           const SizedBox(width: Spacing.xs),
           // ── 星标（带旋转缩放，ValueKey 驱动动画） ──
-          IconButton(
-            icon: AnimatedSwitcher(
-              duration: MotionDurations.fast,
-              transitionBuilder: (child, anim) {
-                return RotationTransition(
-                  turns: Tween(begin: 0.8, end: 1.0).animate(
-                    CurvedAnimation(
-                      parent: anim,
-                      curve: MotionCurves.bouncySpring,
-                    ),
-                  ),
-                  child: ScaleTransition(
-                    scale: anim,
-                    child: child,
-                  ),
-                );
-              },
-              child: SizedBox(
-                key: ValueKey(starred),
-                child: AppIcons.svgIcon(AppIcons.important),
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              iconSize: 20,
+              style: IconButton.styleFrom(
+                backgroundColor: starred
+                    ? const Color(0xFFFFF8E1) // warm tint when starred
+                    : Colors.transparent,
+                shape: const CircleBorder(),
               ),
+              icon: AnimatedSwitcher(
+                duration: MotionDurations.fast,
+                transitionBuilder: (child, anim) {
+                  return RotationTransition(
+                    turns: Tween(begin: 0.8, end: 1.0).animate(
+                      CurvedAnimation(
+                        parent: anim,
+                        curve: MotionCurves.bouncySpring,
+                      ),
+                    ),
+                    child: ScaleTransition(
+                      scale: anim,
+                      child: child,
+                    ),
+                  );
+                },
+                child: starred
+                    ? SizedBox(
+                        key: const ValueKey(true),
+                        child: AppIcons.svgIcon(AppIcons.important),
+                      )
+                    : Icon(
+                        Icons.star_border_rounded,
+                        key: const ValueKey(false),
+                        size: 20,
+                        color: scheme.outline,
+                      ),
+              ),
+              tooltip: starred ? '取消星标' : '添加星标',
+              onPressed: onToggleStar,
             ),
-            tooltip: starred ? '取消星标' : '添加星标',
-            onPressed: onToggleStar,
           ),
-          PopupMenuButton<String>(
-            icon: AppIcons.svgIcon(AppIcons.more),
-            tooltip: '更多',
-            onSelected: (v) {
-              switch (v) {
-                case 'del':
-                  onSoftDelete();
-                case 'res':
-                  onRestore();
-                case 'hdel':
-                  onHardDelete();
-              }
-            },
-            itemBuilder: (ctx) {
-              final errColor = Theme.of(ctx).colorScheme.error;
-              return [
-                if (!isTrashed)
-                  PopupMenuItem(
-                    value: 'del',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline_rounded, size: 18,
-                          color: errColor),
-                        const SizedBox(width: Spacing.md),
-                        Text('移至回收站',
-                          style: TextStyle(color: errColor)),
-                      ],
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: PopupMenuButton<String>(
+              padding: EdgeInsets.zero,
+              icon: AppIcons.svgIcon(AppIcons.more),
+              iconSize: 20,
+              tooltip: '更多',
+              onSelected: (v) {
+                switch (v) {
+                  case 'del':
+                    onSoftDelete();
+                  case 'res':
+                    onRestore();
+                  case 'hdel':
+                    onHardDelete();
+                }
+              },
+              itemBuilder: (ctx) {
+                final errColor = Theme.of(ctx).colorScheme.error;
+                return [
+                  if (!isTrashed)
+                    PopupMenuItem(
+                      value: 'del',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded, size: 18,
+                            color: errColor),
+                          const SizedBox(width: Spacing.md),
+                          Text('移至回收站',
+                            style: TextStyle(color: errColor)),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    const PopupMenuItem(
+                      value: 'res',
+                      child: Row(
+                        children: [
+                          Icon(Icons.restore_rounded, size: 18),
+                          SizedBox(width: Spacing.md),
+                          Text('恢复'),
+                        ],
+                      ),
                     ),
-                  )
-                else ...[
-                  const PopupMenuItem(
-                    value: 'res',
-                    child: Row(
-                      children: [
-                        Icon(Icons.restore_rounded, size: 18),
-                        SizedBox(width: Spacing.md),
-                        Text('恢复'),
-                      ],
+                    PopupMenuItem(
+                      value: 'hdel',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_forever_rounded, size: 18,
+                            color: errColor),
+                          const SizedBox(width: Spacing.md),
+                          Text('永久删除',
+                            style: TextStyle(color: errColor)),
+                        ],
+                      ),
                     ),
-                  ),
-                  PopupMenuItem(
-                    value: 'hdel',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_forever_rounded, size: 18,
-                          color: errColor),
-                        const SizedBox(width: Spacing.md),
-                        Text('永久删除',
-                          style: TextStyle(color: errColor)),
-                      ],
-                    ),
-                  ),
-                ],
-              ];
-            },
+                  ],
+                ];
+              },
+            ),
           ),
         ],
       ),
@@ -206,8 +236,7 @@ class AnimatedCompleteButton extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(Radii.circle),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.sm),
+        child: Center(
           child: AnimatedScale(
             scale: completed ? 1.08 : 1.0,
             duration: MotionDurations.fast,

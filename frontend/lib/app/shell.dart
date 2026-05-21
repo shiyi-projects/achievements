@@ -1,18 +1,23 @@
+import 'dart:async';
+
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/notifications/reminder_checker.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
+import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/features/insights/insights_page.dart';
 import 'package:achievements/features/calendar/calendar_page.dart';
 import 'package:achievements/features/focus/focus_page.dart';
 import 'package:achievements/features/list_view/list_page.dart';
-import 'package:achievements/features/search/providers/search_providers.dart';
+import 'package:achievements/features/settings/models/app_settings.dart';
+import 'package:achievements/features/settings/settings_page.dart';
 import 'package:achievements/features/sidebar/sidebar.dart';
 
 import 'package:achievements/features/task_detail/task_detail_panel.dart';
 import 'package:achievements/features/today/today_page.dart';
 import 'package:achievements/platform/windows/command_palette.dart';
+import 'package:achievements/platform/windows/shell_commands.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:achievements/shared/animations/page_transitions.dart';
 import 'package:achievements/state/current_view.dart';
@@ -74,9 +79,11 @@ class AppShell extends ConsumerWidget {
       });
     }
 
-    // 切换视图时关闭搜索
-    ref.listen<AppView>(currentViewNotifierProvider, (_, __) {
-      closeSearch(ref);
+    // Windows 端托盘/窗口监听器把 UI 意图丢到 shellCommandProvider,这里统一兑现。
+    ref.listen<ShellCommand?>(shellCommandProvider, (_, cmd) {
+      if (cmd == null) return;
+      _handleShellCommand(context, ref, cmd);
+      ref.read(shellCommandProvider.notifier).state = null;
     });
 
     final view = ref.watch(currentViewNotifierProvider);
@@ -86,7 +93,12 @@ class AppShell extends ConsumerWidget {
       AppView.focus => '专注',
       AppView.insights => '成就',
       AppView.list => currentAsync.maybeWhen(
-        data: (list) => list?.name ?? 'Achievements',
+        data: (list) => list == null
+            ? 'Achievements'
+            : displayNameOfList(
+                systemKind: list.systemKind,
+                fallback: list.name,
+              ),
         orElse: () => 'Achievements',
       ),
     };
@@ -200,7 +212,15 @@ class AppShell extends ConsumerWidget {
         ),
         elevation: 0,
         scrolledUnderElevation: 0,
-        actions: const [_SyncStatusIcon(), SizedBox(width: 8)],
+        actions: [
+          IconButton(
+            icon: AppIcons.svgIcon(AppIcons.search),
+            tooltip: '搜索',
+            onPressed: () => showCommandPalette(context),
+          ),
+          const _SyncStatusIcon(),
+          const SizedBox(width: 8),
+        ],
       ),
       drawer: const Drawer(
         child: SizedBox(width: _kSidebarWidth, child: Sidebar()),
@@ -237,7 +257,61 @@ class AppShell extends ConsumerWidget {
     ref.read(selectedTaskIdProvider.notifier).clear();
   }
 
+  void _handleShellCommand(
+    BuildContext context,
+    WidgetRef ref,
+    ShellCommand cmd,
+  ) {
+    switch (cmd) {
+      case ShowTodayCommand():
+        final lists = ref.read(allListsProvider).valueOrNull ?? const [];
+        final today = lists
+            .where((l) => l.systemKind == SystemListKind.today.value)
+            .firstOrNull;
+        if (today != null) {
+          ref.read(selectedListIdProvider.notifier).select(today.id);
+        }
+        ref.read(currentViewNotifierProvider.notifier).showList();
+      case ShowFocusCommand():
+        ref.read(currentViewNotifierProvider.notifier).showFocus();
+      case OpenSettingsCommand():
+        showSettingsDialog(context);
+      case AskCloseCommand(completer: final completer):
+        _showAskCloseDialog(context, ref, completer);
+    }
+  }
 
+  Future<void> _showAskCloseDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Completer<CloseAction> completer,
+  ) async {
+    final picked = await showDialog<CloseAction>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('关闭 Achievements'),
+        content: const Text('要最小化到托盘继续在后台运行,还是真正退出?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(CloseAction.exitApp),
+            child: const Text('退出'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(CloseAction.minimizeToTray),
+            child: const Text('最小化到托盘'),
+          ),
+        ],
+      ),
+    );
+    // 取消(picked == null) → 视为最小化(等价于不退出,保留窗口可见性最稳)
+    completer.complete(picked ?? CloseAction.minimizeToTray);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -253,7 +327,6 @@ class _ModernAppBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isSearching = ref.watch(searchActiveProvider);
 
     return Container(
       height: 56,
@@ -293,22 +366,9 @@ class _ModernAppBar extends ConsumerWidget {
           ),
           const _SyncStatusIcon(),
           IconButton(
-            icon: AnimatedSwitcher(
-              duration: MotionDurations.fast,
-              transitionBuilder: (child, anim) => RotationTransition(
-                turns: Tween(begin: 0.5, end: 1.0).animate(anim),
-                child: FadeTransition(opacity: anim, child: child),
-              ),
-              child: AppIcons.svgIcon(AppIcons.search),
-            ),
-            tooltip: isSearching ? '关闭搜索' : '搜索',
-            onPressed: () {
-              if (isSearching) {
-                closeSearch(ref);
-              } else {
-                ref.read(searchActiveProvider.notifier).state = true;
-              }
-            },
+            icon: AppIcons.svgIcon(AppIcons.search),
+            tooltip: '搜索 (Ctrl+K)',
+            onPressed: () => showCommandPalette(context),
           ),
         ],
       ),
@@ -351,12 +411,12 @@ class _SyncStatusIcon extends ConsumerWidget {
         SyncStatus.offline => Tooltip(
           key: const ValueKey('offline'),
           message: '已离线',
-          child: AppIcons.svgIcon(AppIcons.cloudSync, size: 20),
+          child: AppIcons.svgIcon(AppIcons.cloudOff, size: 20),
         ),
         SyncStatus.error => Tooltip(
           key: const ValueKey('error'),
           message: '同步失败,30 秒后重试',
-          child: AppIcons.svgIcon(AppIcons.sync, size: 20),
+          child: AppIcons.svgIcon(AppIcons.cloudError, size: 20),
         ),
       },
     );

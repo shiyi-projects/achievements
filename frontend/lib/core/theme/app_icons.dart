@@ -67,6 +67,8 @@ abstract final class AppIcons {
   static const lock = '$_base/38_lock.svg';
   static const snooze = '$_base/39_snooze.svg';
   static const streak = '$_base/40_streak.svg';
+  static const cloudOff = '$_base/41_cloud_off.svg';
+  static const cloudError = '$_base/42_cloud_error.svg';
 
   // ── 工厂方法 ──────────────────────────────────────────────────────
 

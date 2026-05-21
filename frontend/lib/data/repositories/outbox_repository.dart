@@ -11,6 +11,15 @@ part 'outbox_repository.g.dart';
 /// 已知的 SyncCursors key。
 class SyncCursorKey {
   static const String lastPulledAt = 'last_pulled_at';
+
+  /// 本设备已完成"首次同步门"。值为 `'true'` 表示首次 pull 曾成功(或用户
+  /// 主动选择了"离线使用"绕过门控);为空/其他值则下次启动会重新走门。
+  static const String firstSyncDone = 'first_sync_done';
+
+  /// 上次同步成功的**本地** ISO 时间戳(`DateTime.now().toIso8601String()`)。
+  /// SyncCoordinator 在 pull+push 双双 idle 时写入,设置页据此显示"X 分钟前"。
+  /// 注意是本地时钟,跨设备不可比较。
+  static const String lastSyncAt = 'last_sync_at';
 }
 
 class OutboxRepository {

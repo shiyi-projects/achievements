@@ -1,7 +1,9 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // Built-in Kotlin: 不再显式 apply kotlin-android,改由 Flutter Gradle Plugin
+    // 内部应用 Kotlin。settings.gradle.kts 中保留 KGP 声明只是给仍依赖
+    // legacy KGP 的 plugin(如 flutter_timezone)用,本 app 不再 apply。
+    // The Flutter Gradle Plugin must be applied after the Android Gradle plugin.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -16,16 +18,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.shiyi.achievements"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -42,6 +40,13 @@ android {
 
 flutter {
     source = "../.."
+}
+
+// Built-in Kotlin DSL:取代旧的 android.kotlinOptions { jvmTarget = ... }。
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
+    }
 }
 
 dependencies {
