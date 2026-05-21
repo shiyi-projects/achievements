@@ -36,11 +36,11 @@ def upgrade() -> None:
     )
     op.create_index("ix_focus_sessions_user_id", "focus_sessions", ["user_id"])
     op.create_index("ix_focus_sessions_task_id", "focus_sessions", ["task_id"])
+    # 统计聚合按日期范围扫描用
     op.create_index(
         "ix_focus_sessions_user_started",
         "focus_sessions",
         ["user_id", "started_at"],
-        comment="统计聚合按日期范围扫描用",
     )
 
 

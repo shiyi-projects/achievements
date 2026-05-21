@@ -7,6 +7,7 @@ Create Date: 2026-05-20 00:01:00.000000
 """
 
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import sqlalchemy as sa
@@ -80,8 +81,6 @@ _SEEDS = [
 
 def upgrade() -> None:
     """创建 achievements / user_achievements 表并插入种子数据。"""
-    now = sa.func.now()
-
     op.create_table(
         "achievements",
         sa.Column("id", sa.Uuid(), nullable=False),
@@ -115,9 +114,11 @@ def upgrade() -> None:
         sa.column("description", sa.Text),
         sa.column("icon", sa.String),
         sa.column("criteria", sa.Text),
-        sa.column("created_at", sa.DateTime),
-        sa.column("updated_at", sa.DateTime),
+        sa.column("created_at", sa.DateTime(timezone=True)),
+        sa.column("updated_at", sa.DateTime(timezone=True)),
     )
+    # asyncpg executemany 不会替换 sa.text("CURRENT_TIMESTAMP"),必须给具体 datetime
+    now = datetime.now(timezone.utc)
     op.bulk_insert(
         achievements_table,
         [
@@ -128,8 +129,8 @@ def upgrade() -> None:
                 "description": s["description"],
                 "icon": s["icon"],
                 "criteria": s["criteria"],
-                "created_at": sa.text("CURRENT_TIMESTAMP"),
-                "updated_at": sa.text("CURRENT_TIMESTAMP"),
+                "created_at": now,
+                "updated_at": now,
             }
             for s in _SEEDS
         ],
