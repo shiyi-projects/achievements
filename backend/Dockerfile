@@ -1,41 +1,55 @@
-# syntax=docker/dockerfile:1.7
 # ============ Builder ============
 FROM python:3.13-slim AS builder
 
-# 国内服务器 build 时:--build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-# 默认走官方源,海外构建不受影响
+# 国内服务器 build 时通过 docker-compose args 传入:
+#   PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+#   USE_CN_MIRROR=true
+# 海外服务器默认走官方源，无需改动
 ARG PIP_INDEX_URL=https://pypi.org/simple/
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    UV_LINK_MODE=copy \
-    UV_COMPILE_BYTECODE=1 \
-    UV_PROJECT_ENVIRONMENT=/opt/venv \
-    UV_DEFAULT_INDEX=${PIP_INDEX_URL}
+    PYTHONUNBUFFERED=1
 
-# uv 提供官方静态二进制
-COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /uvx /usr/local/bin/
+# 安装 uv（仅用于从 uv.lock 导出 requirements.txt）
+RUN pip install --no-cache-dir -i ${PIP_INDEX_URL} uv
 
 WORKDIR /app
 
-# 先复制锁文件以最大化层缓存
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+# 创建 venv 供 runtime 阶段复用
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# 再复制源码并安装项目本身
+# 先复制锁文件（最大化 Docker 层缓存：依赖不变时跳过安装）
+COPY pyproject.toml uv.lock ./
+
+# 核心策略：
+#   uv sync --frozen 会使用 uv.lock 中硬编码的 files.pythonhosted.org URL
+#   国内服务器访问极慢，所以改为：
+#   1. uv export 导出纯文本 requirements.txt（只有包名+版本，无 URL）
+#   2. pip install -i 阿里云镜像 安装
+RUN uv export --frozen --no-dev --no-emit-project -o requirements.txt \
+    && pip install --no-cache-dir -i ${PIP_INDEX_URL} -r requirements.txt
+
+# 复制项目源码（不需要 pip install . ，直接 COPY 即可）
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
-RUN uv sync --frozen --no-dev
 
 # ============ Runtime ============
 FROM python:3.13-slim AS runtime
+
+ARG USE_CN_MIRROR=false
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-# 安装 libpq 以支持 asyncpg(asyncpg 内置静态依赖,这里仅为 healthcheck/pg_isready 备用)
+# 国内镜像：替换 Debian 源为阿里云加速 apt-get
+RUN if [ "$USE_CN_MIRROR" = "true" ]; then \
+      sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources; \
+    fi
+
+# 安装 curl 用于 healthcheck
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
@@ -45,12 +59,13 @@ RUN groupadd --system --gid 1000 app \
 
 WORKDIR /app
 
+# 从 builder 阶段复制 venv 和源码
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/app ./app
 COPY --from=builder /app/alembic ./alembic
 COPY --from=builder /app/alembic.ini ./
 
-# storage 目录由 compose volume 挂载;此处先创建空目录方便容器单独启动调试
+# storage 目录由 compose volume 挂载；此处创建空目录方便容器单独调试
 RUN mkdir -p /app/storage/attachments && chown -R app:app /app
 
 USER app

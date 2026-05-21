@@ -18,6 +18,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
+      args:
+        USE_CN_MIRROR: "true"
+        PIP_INDEX_URL: "https://mirrors.aliyun.com/pypi/simple/"
     image: achievements/backend:latest
     container_name: achievements-api
     env_file: .env.prod
