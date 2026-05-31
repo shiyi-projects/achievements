@@ -38,6 +38,4 @@ class UserAchievement(Base):
         nullable=False,
         primary_key=True,
     )
-    unlocked_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    unlocked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

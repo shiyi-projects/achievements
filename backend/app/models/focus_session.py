@@ -26,12 +26,8 @@ class FocusSession(Base, UUIDPKMixin, TimestampMixin):
     # 关联任务(可选)
     task_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True, index=True)
 
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    ended_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # 实际专注时长(秒),结束时写入
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)

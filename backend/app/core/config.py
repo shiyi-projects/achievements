@@ -37,13 +37,16 @@ class Settings(BaseSettings):
     storage_backend: Literal["local", "oss"] = "local"
     storage_local_root: str = "./storage/attachments"
 
-    # Auth (placeholder for Phase 0)
+    # Auth
     auth_enabled: bool = False
     local_user_id: str = "00000000-0000-0000-0000-000000000001"
     jwt_secret: str = "change-me-in-production"  # noqa: S105 — placeholder default; override via env
     jwt_alg: str = "HS256"
     jwt_access_ttl_min: int = 30
     jwt_refresh_ttl_days: int = 14
+    olib_base_url: str = "https://olib.11xy.cn"
+    olib_timeout_seconds: float = 8.0
+    auth_profile_cache_ttl_seconds: int = 60
 
     @field_validator("app_cors_origins", mode="before")
     @classmethod

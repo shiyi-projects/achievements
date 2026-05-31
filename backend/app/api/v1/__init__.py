@@ -25,10 +25,6 @@ api_router.include_router(lists.router, prefix="/lists", tags=["lists"])
 api_router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 api_router.include_router(tags.router, prefix="/tags", tags=["tags"])
 api_router.include_router(sync.router, prefix="/sync", tags=["sync"])
-api_router.include_router(
-    focus_sessions.router, prefix="/focus-sessions", tags=["focus-sessions"]
-)
-api_router.include_router(
-    achievements.router, prefix="/achievements", tags=["achievements"]
-)
+api_router.include_router(focus_sessions.router, prefix="/focus-sessions", tags=["focus-sessions"])
+api_router.include_router(achievements.router, prefix="/achievements", tags=["achievements"])
 api_router.include_router(stats.router, prefix="/stats", tags=["stats"])

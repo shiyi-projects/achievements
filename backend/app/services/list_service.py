@@ -5,14 +5,15 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.system_lists import (
+    LEGACY_SYSTEM_LIST_IDS,
     SYSTEM_LIST_DISPLAY_NAMES,
-    SYSTEM_LIST_IDS,
     SystemListKind,
+    system_list_id_for_user,
 )
 from app.models import Task, TaskList
 from app.schemas.task_list import TaskListCreate, TaskListUpdate
@@ -85,47 +86,72 @@ async def soft_delete_task_list(session: AsyncSession, item: TaskList) -> None:
 async def ensure_system_lists(session: AsyncSession, user_id: UUID) -> None:
     """Idempotent seed of the 7 built-in system lists for ``user_id``.
 
-    若已存在 system_kind 匹配但 id 不是固定值的行(旧随机 UUID),
-    把该行 id 以及所有 tasks.list_id 迁移到固定 UUID。
-    SQLite FK 默认未启用,迁移安全;PostgreSQL 上因先更新 tasks 再更新
-    task_lists,亦满足约束时序。
+    多用户模式下系统清单主键按 ``user_id + system_kind`` 确定性生成。
+    若发现旧固定 UUID 或更早的随机 UUID,先迁移 tasks 引用,再更新
+    task_lists.id。
     """
     for index, kind in enumerate(SystemListKind):
-        fixed_id = SYSTEM_LIST_IDS[kind]
+        desired_id = system_list_id_for_user(user_id, kind)
+        legacy_id = LEGACY_SYSTEM_LIST_IDS[kind]
         result = await session.execute(
             select(TaskList).where(
                 TaskList.user_id == user_id,
                 TaskList.system_kind == kind.value,
             )
         )
-        row = result.scalar_one_or_none()
-        if row is None:
+        rows = list(result.scalars().all())
+        desired_row = next((item for item in rows if item.id == desired_id), None)
+        if desired_row is None:
+            legacy_row = await session.get(TaskList, legacy_id)
+            source = rows[0] if rows else legacy_row
+            if source is None or source.user_id != user_id:
+                session.add(
+                    TaskList(
+                        id=desired_id,
+                        user_id=user_id,
+                        name=SYSTEM_LIST_DISPLAY_NAMES[kind],
+                        is_system=True,
+                        system_kind=kind.value,
+                        sort_order=index,
+                    )
+                )
+                continue
+            await session.execute(
+                text("UPDATE task_lists SET system_kind = NULL WHERE id = :id"),
+                {"id": source.id},
+            )
+            source.system_kind = None
             session.add(
                 TaskList(
-                    id=fixed_id,
+                    id=desired_id,
                     user_id=user_id,
-                    name=SYSTEM_LIST_DISPLAY_NAMES[kind],
+                    name=source.name,
+                    folder_id=source.folder_id,
+                    color=source.color,
+                    icon=source.icon,
+                    sort_order=source.sort_order,
                     is_system=True,
                     system_kind=kind.value,
-                    sort_order=index,
                 )
             )
-        elif row.id != fixed_id:
-            # 旧随机 UUID → 固定 UUID:先迁移 tasks 引用,再更新 task_lists.id
-            import logging as _logging
-            _logging.getLogger(__name__).warning(
-                "ensure_system_lists: normalizing %s list UUID %s → %s",
-                kind.value, row.id, fixed_id,
-            )
+            await session.flush()
             await session.execute(
-                sa_update(Task)
-                .where(Task.list_id == row.id)
-                .values(list_id=fixed_id)
+                sa_update(Task).where(Task.list_id == source.id).values(list_id=desired_id)
             )
+            await session.delete(source)
+            desired_row = await session.get(TaskList, desired_id)
+        for duplicate in rows:
+            if desired_row is not None and duplicate.id != desired_row.id:
+                await session.execute(
+                    sa_update(Task)
+                    .where(Task.list_id == duplicate.id)
+                    .values(list_id=desired_row.id)
+                )
+                await session.delete(duplicate)
+        legacy_row = await session.get(TaskList, legacy_id)
+        if legacy_row is not None and legacy_row.user_id == user_id and legacy_row.id != desired_id:
             await session.execute(
-                sa_update(TaskList)
-                .where(TaskList.id == row.id)
-                .values(id=fixed_id)
+                sa_update(Task).where(Task.list_id == legacy_row.id).values(list_id=desired_id)
             )
-            session.expunge(row)
+            await session.delete(legacy_row)
     await session.commit()

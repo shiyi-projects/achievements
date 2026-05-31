@@ -22,9 +22,10 @@ from app.services.list_service import ensure_system_lists
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(debug=settings.app_debug)
-    # Phase 0/1:为占位用户种入系统清单(幂等)
-    async with SessionLocal() as session:
-        await ensure_system_lists(session, UUID(settings.local_user_id))
+    # Local/dev mode keeps the placeholder user; production auth seeds per real user lazily.
+    if not settings.auth_enabled:
+        async with SessionLocal() as session:
+            await ensure_system_lists(session, UUID(settings.local_user_id))
     yield
 
 

@@ -150,7 +150,7 @@ async def push(
     按 entity 依赖顺序排序:folder → list → task → tag → task_tag。
     """
     # 按依赖排序,父实体先于子实体
-    _ORDER: dict[str, int] = {
+    order: dict[str, int] = {
         "folder": 0,
         "list": 1,
         "tag": 2,
@@ -158,7 +158,7 @@ async def push(
         "task_tag": 4,
     }
     indexed = list(enumerate(request.mutations))
-    indexed.sort(key=lambda pair: _ORDER.get(pair[1].entity, 99))
+    indexed.sort(key=lambda pair: order.get(pair[1].entity, 99))
 
     # slot for results, preserve original order
     results: list[MutationResult | None] = [None] * len(request.mutations)
@@ -190,9 +190,13 @@ async def _apply_one(
         parsed = payload_schema.model_validate(mut.payload)
     except Exception as exc:
         import logging
+
         logging.getLogger(__name__).warning(
             "sync: mutation %s/%s rejected (payload validation): %s: %s",
-            mut.entity, mut.id, type(exc).__name__, exc,
+            mut.entity,
+            mut.id,
+            type(exc).__name__,
+            exc,
         )
         return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
 
@@ -211,9 +215,12 @@ async def _apply_one(
                 missing = [f for f in required if payload_data.get(f) is None]
                 if missing:
                     import logging
+
                     logging.getLogger(__name__).warning(
                         "sync: mutation %s/%s rejected (missing required fields: %s)",
-                        mut.entity, mut.id, ", ".join(missing),
+                        mut.entity,
+                        mut.id,
+                        ", ".join(missing),
                     )
                     return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
 
@@ -221,7 +228,9 @@ async def _apply_one(
                 _assign(row, parsed)
                 session.add(row)
                 await session.flush()
-                return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=row.version)
+                return MutationResult(
+                    entity=mut.entity, id=mut.id, status="applied", version=row.version
+                )
 
             if existing.user_id != user_id:
                 return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
@@ -243,13 +252,19 @@ async def _apply_one(
                 _assign(existing, parsed)
             existing.version += 1
             await session.flush()
-            return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=existing.version)
+            return MutationResult(
+                entity=mut.entity, id=mut.id, status="applied", version=existing.version
+            )
     except Exception as exc:
         # IntegrityError, FK violation, etc. — reject this mutation only
         import logging
+
         logging.getLogger(__name__).warning(
             "sync: mutation %s/%s rejected due to %s: %s",
-            mut.entity, mut.id, type(exc).__name__, exc,
+            mut.entity,
+            mut.id,
+            type(exc).__name__,
+            exc,
         )
         return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
 
@@ -257,4 +272,3 @@ async def _apply_one(
 def _assign(row: Any, parsed: Any) -> None:
     for key, value in parsed.model_dump(exclude_unset=True).items():
         setattr(row, key, value)
-

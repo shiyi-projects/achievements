@@ -22,32 +22,41 @@ from app.models.task import Task
 
 async def get_overview(session: AsyncSession, user_id: UUID) -> dict[str, Any]:
     """总览:完成任务数、今日完成、连续天数、累计专注分钟。"""
-    total_completed = await session.scalar(
-        select(func.count()).where(
-            Task.user_id == user_id,
-            Task.completed_at.is_not(None),
-            Task.deleted_at.is_(None),
+    total_completed = (
+        await session.scalar(
+            select(func.count()).where(
+                Task.user_id == user_id,
+                Task.completed_at.is_not(None),
+                Task.deleted_at.is_(None),
+            )
         )
-    ) or 0
+        or 0
+    )
 
     today_start = _today_utc()
-    today_completed = await session.scalar(
-        select(func.count()).where(
-            Task.user_id == user_id,
-            Task.completed_at >= today_start,
-            Task.completed_at < today_start + timedelta(days=1),
-            Task.deleted_at.is_(None),
+    today_completed = (
+        await session.scalar(
+            select(func.count()).where(
+                Task.user_id == user_id,
+                Task.completed_at >= today_start,
+                Task.completed_at < today_start + timedelta(days=1),
+                Task.deleted_at.is_(None),
+            )
         )
-    ) or 0
+        or 0
+    )
 
     streak = await _streak_days(session, user_id)
 
-    total_focus_minutes = await session.scalar(
-        select(func.coalesce(func.sum(FocusSession.duration_seconds), 0)).where(
-            FocusSession.user_id == user_id,
-            FocusSession.duration_seconds.is_not(None),
+    total_focus_minutes = (
+        await session.scalar(
+            select(func.coalesce(func.sum(FocusSession.duration_seconds), 0)).where(
+                FocusSession.user_id == user_id,
+                FocusSession.duration_seconds.is_not(None),
+            )
         )
-    ) or 0
+        or 0
+    )
 
     return {
         "total_completed": total_completed,
@@ -106,9 +115,7 @@ async def get_focus_stats(
         select(
             func.date(FocusSession.started_at).label("day"),
             func.count().label("sessions"),
-            func.coalesce(func.sum(FocusSession.duration_seconds), 0).label(
-                "total_seconds"
-            ),
+            func.coalesce(func.sum(FocusSession.duration_seconds), 0).label("total_seconds"),
         )
         .where(
             FocusSession.user_id == user_id,

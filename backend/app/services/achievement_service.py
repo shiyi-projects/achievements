@@ -53,9 +53,7 @@ async def evaluate(session: AsyncSession, user_id: UUID) -> list[Achievement]:
     """评估并解锁所有满足条件但尚未解锁的成就。返回本次新解锁的列表。"""
     # 已解锁的 achievement_id 集合
     unlocked_ids_result = await session.execute(
-        select(UserAchievement.achievement_id).where(
-            UserAchievement.user_id == user_id
-        )
+        select(UserAchievement.achievement_id).where(UserAchievement.user_id == user_id)
     )
     unlocked_ids = {row[0] for row in unlocked_ids_result.all()}
 
@@ -84,9 +82,7 @@ async def evaluate(session: AsyncSession, user_id: UUID) -> list[Achievement]:
     return newly_unlocked
 
 
-async def _check(
-    session: AsyncSession, user_id: UUID, criteria: dict[str, Any]
-) -> bool:
+async def _check(session: AsyncSession, user_id: UUID, criteria: dict[str, Any]) -> bool:
     ctype = criteria.get("type")
     threshold: int = int(criteria.get("threshold", 1))
 
@@ -171,9 +167,7 @@ async def _count_focus_sessions(session: AsyncSession, user_id: UUID) -> int:
 async def _today_focus_minutes(session: AsyncSession, user_id: UUID) -> int:
     from datetime import date, timedelta
 
-    today_start = datetime.combine(date.today(), datetime.min.time()).replace(
-        tzinfo=UTC
-    )
+    today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=UTC)
     today_end = today_start + timedelta(days=1)
 
     result = await session.execute(

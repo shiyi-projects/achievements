@@ -1,4 +1,4 @@
-"""Smoke tests for the health and auth-placeholder endpoints."""
+"""Smoke tests for health and auth endpoints."""
 
 from __future__ import annotations
 
@@ -22,9 +22,9 @@ async def test_healthz_ok(client: AsyncClient) -> None:
     assert payload["version"]
 
 
-async def test_auth_register_is_not_implemented(client: AsyncClient) -> None:
+async def test_auth_register_validates_device_payload(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/auth/register",
         json={"email": "a@b.com", "password": "x" * 8},
     )
-    assert response.status_code == 501
+    assert response.status_code == 422
