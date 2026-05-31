@@ -1,7 +1,0 @@
-services:
-  api:
-    env_file:
-      - path: .env.dev
-        required: true
-    ports: !override
-      - "8001:8084"
