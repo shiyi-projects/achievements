@@ -1,8 +1,8 @@
-import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/id.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -10,15 +10,16 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'tag_repository.g.dart';
 
 class TagRepository {
-  TagRepository(this._db, this._outbox);
+  TagRepository(this._db, this._outbox, this._userId);
 
   final AppDatabase _db;
   final OutboxRepository _outbox;
+  final String _userId;
 
   /// 监听所有未软删的标签。
   Stream<List<Tag>> watchAll() {
     return (_db.select(_db.tags)
-          ..where((t) => t.deletedAt.isNull())
+          ..where((t) => t.userId.equals(_userId) & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm(expression: t.name)]))
         .watch();
   }
@@ -31,7 +32,7 @@ class TagRepository {
         _db.taskTags.tagId.equalsExp(_db.tags.id) &
             _db.taskTags.taskId.equals(taskId),
       ),
-    ])..where(_db.tags.deletedAt.isNull());
+    ])..where(_db.tags.userId.equals(_userId) & _db.tags.deletedAt.isNull());
     return query.map((row) => row.readTable(_db.tags)).watch();
   }
 
@@ -44,7 +45,12 @@ class TagRepository {
     return _db.transaction(() async {
       final existing =
           await (_db.select(_db.tags)
-                ..where((t) => t.name.equals(trimmed) & t.deletedAt.isNull())
+                ..where(
+                  (t) =>
+                      t.userId.equals(_userId) &
+                      t.name.equals(trimmed) &
+                      t.deletedAt.isNull(),
+                )
                 ..limit(1))
               .getSingleOrNull();
       if (existing != null) return existing.id;
@@ -55,7 +61,7 @@ class TagRepository {
           .insert(
             TagsCompanion.insert(
               id: id,
-              userId: kLocalUserId,
+              userId: _userId,
               name: trimmed,
               color: Value(color),
             ),
@@ -71,15 +77,38 @@ class TagRepository {
     });
   }
 
+  /// 重命名标签(乐观锁 baseVersion + upsert 广播)。
+  Future<void> rename(String id, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'Tag name must not be blank');
+    }
+    await _db.transaction(() async {
+      final current = await (_db.select(
+        _db.tags,
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).getSingle();
+      await (_db.update(_db.tags)
+            ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
+          .write(TagsCompanion(name: Value(trimmed)));
+      await _outbox.enqueue(
+        entity: 'tag',
+        op: 'upsert',
+        entityId: id,
+        baseVersion: current.version,
+        payload: {'name': trimmed, 'color': current.color},
+      );
+    });
+  }
+
   /// 软删标签(同步引擎后再单独广播)。
   Future<void> softDelete(String id) async {
     await _db.transaction(() async {
       final current = await (_db.select(
         _db.tags,
-      )..where((t) => t.id.equals(id))).getSingle();
-      await (_db.update(_db.tags)..where((t) => t.id.equals(id))).write(
-        TagsCompanion(deletedAt: Value(DateTime.now())),
-      );
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).getSingle();
+      await (_db.update(_db.tags)
+            ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
+          .write(TagsCompanion(deletedAt: Value(DateTime.now())));
       await _outbox.enqueue(
         entity: 'tag',
         op: 'delete',
@@ -94,6 +123,7 @@ class TagRepository {
   //   (sync_service.py:_apply_one),addToTask/removeFromTask 暂只走本地。
   //   待后端补完 task_tag 同步后,这里再 enqueue。
   Future<void> addToTask(String taskId, String tagId) async {
+    if (!await _ownsTaskAndTag(taskId, tagId)) return;
     await _db
         .into(_db.taskTags)
         .insertOnConflictUpdate(
@@ -102,9 +132,25 @@ class TagRepository {
   }
 
   Future<void> removeFromTask(String taskId, String tagId) async {
+    if (!await _ownsTaskAndTag(taskId, tagId)) return;
     await (_db.delete(
       _db.taskTags,
     )..where((tt) => tt.taskId.equals(taskId) & tt.tagId.equals(tagId))).go();
+  }
+
+  Future<bool> _ownsTaskAndTag(String taskId, String tagId) async {
+    final task =
+        await (_db.select(_db.tasks)
+              ..where((t) => t.id.equals(taskId) & t.userId.equals(_userId))
+              ..limit(1))
+            .getSingleOrNull();
+    if (task == null) return false;
+    final tag =
+        await (_db.select(_db.tags)
+              ..where((t) => t.id.equals(tagId) & t.userId.equals(_userId))
+              ..limit(1))
+            .getSingleOrNull();
+    return tag != null;
   }
 }
 
@@ -113,6 +159,7 @@ TagRepository tagRepository(Ref ref) {
   return TagRepository(
     ref.watch(appDatabaseProvider),
     ref.watch(outboxRepositoryProvider),
+    ref.watch(currentUserIdProvider),
   );
 }
 

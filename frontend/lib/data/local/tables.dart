@@ -95,15 +95,12 @@ class FocusPlans extends Table {
   IntColumn get plannedMinutes => integer()();
 
   /// 已完成的实际专注时长（秒）。计时结束时自动累加。
-  IntColumn get actualSeconds =>
-      integer().withDefault(const Constant(0))();
+  IntColumn get actualSeconds => integer().withDefault(const Constant(0))();
 
   /// 当日内排序顺序。
-  IntColumn get sortOrder =>
-      integer().withDefault(const Constant(0))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
-  DateTimeColumn get createdAt =>
-      dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

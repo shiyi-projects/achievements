@@ -7,7 +7,7 @@ part of 'focus_plan_repository.dart';
 // **************************************************************************
 
 String _$focusPlanRepositoryHash() =>
-    r'6b2426d0ac5274a0b209a7a8b1dba0f81c5ad6ff';
+    r'512d5ec0940b90d1cb382b24cc35bd5759eb6aa2';
 
 /// See also [focusPlanRepository].
 @ProviderFor(focusPlanRepository)

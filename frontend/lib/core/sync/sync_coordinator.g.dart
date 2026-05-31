@@ -6,7 +6,7 @@ part of 'sync_coordinator.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$syncCoordinatorHash() => r'212995125478ed50181c29e568c7e0e56dfb64e0';
+String _$syncCoordinatorHash() => r'04806e01097c1d00fc590448193ffe5f8b158664';
 
 /// See also [syncCoordinator].
 @ProviderFor(syncCoordinator)

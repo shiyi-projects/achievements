@@ -4,6 +4,7 @@ import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,10 +15,11 @@ part 'task_repository.g.dart';
 typedef _TaskFilter = Expression<bool> Function($TasksTable);
 
 class TaskRepository {
-  TaskRepository(this._db, this._outbox);
+  TaskRepository(this._db, this._outbox, this._userId);
 
   final AppDatabase _db;
   final OutboxRepository _outbox;
+  final String _userId;
 
   /// 创建一条新任务并落 Drift,返回主键。
   Future<String> createTask({
@@ -35,7 +37,7 @@ class TaskRepository {
           .insert(
             TasksCompanion.insert(
               id: id,
-              userId: kLocalUserId,
+              userId: _userId,
               listId: listId,
               title: title,
               parentId: Value(parentId),
@@ -65,7 +67,10 @@ class TaskRepository {
   /// 监听某父任务的直接子任务(单层)。
   Stream<List<Task>> watchSubtasks(String parentId) {
     return _watchWith(
-      (t) => t.deletedAt.isNull() & t.parentId.equals(parentId),
+      (t) =>
+          t.userId.equals(_userId) &
+          t.deletedAt.isNull() &
+          t.parentId.equals(parentId),
     );
   }
 
@@ -73,11 +78,11 @@ class TaskRepository {
     await _db.transaction(() async {
       final current = await (_db.select(
         _db.tasks,
-      )..where((t) => t.id.equals(id))).getSingle();
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).getSingle();
       final completedAt = completed ? DateTime.now() : null;
-      await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
-        TasksCompanion(completedAt: Value(completedAt)),
-      );
+      await (_db.update(_db.tasks)
+            ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
+          .write(TasksCompanion(completedAt: Value(completedAt)));
       await _outbox.enqueue(
         entity: 'task',
         op: 'upsert',
@@ -104,20 +109,22 @@ class TaskRepository {
     }
 
     final nextId = newId();
-    await _db.into(_db.tasks).insert(
-      TasksCompanion.insert(
-        id: nextId,
-        userId: kLocalUserId,
-        listId: current.listId,
-        title: current.title,
-        notes: Value(current.notes),
-        priority: Value(current.priority),
-        dueAt: Value(nextDue),
-        remindAt: Value(nextRemind),
-        repeatRule: Value(rule),
-        starred: Value(current.starred),
-      ),
-    );
+    await _db
+        .into(_db.tasks)
+        .insert(
+          TasksCompanion.insert(
+            id: nextId,
+            userId: _userId,
+            listId: current.listId,
+            title: current.title,
+            notes: Value(current.notes),
+            priority: Value(current.priority),
+            dueAt: Value(nextDue),
+            remindAt: Value(nextRemind),
+            repeatRule: Value(rule),
+            starred: Value(current.starred),
+          ),
+        );
     await _outbox.enqueue(
       entity: 'task',
       op: 'upsert',
@@ -145,9 +152,21 @@ class TaskRepository {
       case 'WEEKLY':
         return base.add(const Duration(days: 7));
       case 'MONTHLY':
-        return DateTime(base.year, base.month + 1, base.day, base.hour, base.minute);
+        return DateTime(
+          base.year,
+          base.month + 1,
+          base.day,
+          base.hour,
+          base.minute,
+        );
       case 'YEARLY':
-        return DateTime(base.year + 1, base.month, base.day, base.hour, base.minute);
+        return DateTime(
+          base.year + 1,
+          base.month,
+          base.day,
+          base.hour,
+          base.minute,
+        );
       default:
         return null;
     }
@@ -172,10 +191,13 @@ class TaskRepository {
     await _db.transaction(() async {
       final version =
           knownVersion ??
-          (await (_db.select(
-            _db.tasks,
-          )..where((t) => t.id.equals(id))).getSingle()).version;
-      await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
+          (await (_db.select(_db.tasks)
+                    ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
+                  .getSingle())
+              .version;
+      await (_db.update(
+        _db.tasks,
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).write(
         TasksCompanion(
           title: title,
           notes: notes,
@@ -224,15 +246,13 @@ class TaskRepository {
     return (_db.select(_db.tasks)
           ..where(
             (t) =>
+                t.userId.equals(_userId) &
                 t.deletedAt.isNull() &
-                (t.title.lower().like(pattern) |
-                    t.notes.lower().like(pattern)),
+                (t.title.lower().like(pattern) | t.notes.lower().like(pattern)),
           )
           ..orderBy([
-            (t) => OrderingTerm(
-              expression: t.updatedAt,
-              mode: OrderingMode.desc,
-            ),
+            (t) =>
+                OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
           ])
           ..limit(limit))
         .get();
@@ -243,6 +263,7 @@ class TaskRepository {
   Stream<List<Task>> watchTasksWithActiveReminders() {
     return _watchWith(
       (t) =>
+          t.userId.equals(_userId) &
           t.remindAt.isNotNull() &
           t.completedAt.isNull() &
           t.deletedAt.isNull(),
@@ -256,14 +277,13 @@ class TaskRepository {
     return (_db.select(_db.tasks)
           ..where(
             (t) =>
+                t.userId.equals(_userId) &
                 t.remindAt.isNotNull() &
                 t.remindAt.isSmallerOrEqualValue(now) &
                 t.completedAt.isNull() &
                 t.deletedAt.isNull(),
           )
-          ..orderBy([
-            (t) => OrderingTerm(expression: t.remindAt),
-          ]))
+          ..orderBy([(t) => OrderingTerm(expression: t.remindAt)]))
         .get();
   }
 
@@ -271,10 +291,10 @@ class TaskRepository {
     await _db.transaction(() async {
       final current = await (_db.select(
         _db.tasks,
-      )..where((t) => t.id.equals(id))).getSingle();
-      await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
-        TasksCompanion(deletedAt: Value(DateTime.now())),
-      );
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).getSingle();
+      await (_db.update(_db.tasks)
+            ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
+          .write(TasksCompanion(deletedAt: Value(DateTime.now())));
       await _outbox.enqueue(
         entity: 'task',
         op: 'delete',
@@ -289,10 +309,10 @@ class TaskRepository {
     await _db.transaction(() async {
       final current = await (_db.select(
         _db.tasks,
-      )..where((t) => t.id.equals(id))).getSingle();
-      await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
-        const TasksCompanion(deletedAt: Value(null)),
-      );
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).getSingle();
+      await (_db.update(_db.tasks)
+            ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
+          .write(const TasksCompanion(deletedAt: Value(null)));
       await _outbox.enqueue(
         entity: 'task',
         op: 'upsert',
@@ -309,10 +329,13 @@ class TaskRepository {
   /// 仍会落,但 UI 查询都过滤了 deletedAt 非空,效果等价于不可见)。
   Future<void> hardDelete(String id) async {
     await _db.transaction(() async {
-      final current = await (_db.select(
+      final current =
+          await (_db.select(_db.tasks)
+                ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
+              .getSingleOrNull();
+      await (_db.delete(
         _db.tasks,
-      )..where((t) => t.id.equals(id))).getSingleOrNull();
-      await (_db.delete(_db.tasks)..where((t) => t.id.equals(id))).go();
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
       if (current != null) {
         await _outbox.enqueue(
           entity: 'task',
@@ -334,31 +357,44 @@ class TaskRepository {
           final start = _startOfToday();
           final end = start.add(const Duration(days: 1));
           return (t) =>
-              t.deletedAt.isNull() & t.dueAt.isBetweenValues(start, end);
+              t.userId.equals(_userId) &
+              t.deletedAt.isNull() &
+              t.dueAt.isBetweenValues(start, end);
         case SystemListKind.important:
-          return (t) => t.deletedAt.isNull() & t.starred.equals(true);
+          return (t) =>
+              t.userId.equals(_userId) &
+              t.deletedAt.isNull() &
+              t.starred.equals(true);
         case SystemListKind.planned:
           final tomorrow = _startOfToday().add(const Duration(days: 1));
           return (t) =>
+              t.userId.equals(_userId) &
               t.deletedAt.isNull() &
               t.dueAt.isBiggerOrEqualValue(tomorrow) &
               t.completedAt.isNull();
         case SystemListKind.all:
-          return (t) => t.deletedAt.isNull();
+          return (t) => t.userId.equals(_userId) & t.deletedAt.isNull();
         case SystemListKind.completed:
-          return (t) => t.deletedAt.isNull() & t.completedAt.isNotNull();
+          return (t) =>
+              t.userId.equals(_userId) &
+              t.deletedAt.isNull() &
+              t.completedAt.isNotNull();
         case SystemListKind.trash:
-          return (t) => t.deletedAt.isNotNull();
+          return (t) => t.userId.equals(_userId) & t.deletedAt.isNotNull();
         case SystemListKind.inbox:
         case null:
           return (t) =>
+              t.userId.equals(_userId) &
               t.deletedAt.isNull() &
               t.listId.equals(list.id) &
               t.parentId.isNull();
       }
     }
     return (t) =>
-        t.deletedAt.isNull() & t.listId.equals(list.id) & t.parentId.isNull();
+        t.userId.equals(_userId) &
+        t.deletedAt.isNull() &
+        t.listId.equals(list.id) &
+        t.parentId.isNull();
   }
 
   Stream<List<Task>> watchForList(TaskList list) {
@@ -404,7 +440,8 @@ class TaskRepository {
 
   /// 根据 ID 获取单个任务。
   Future<Task?> getById(String taskId) {
-    return (_db.select(_db.tasks)..where((t) => t.id.equals(taskId)))
+    return (_db.select(_db.tasks)
+          ..where((t) => t.id.equals(taskId) & t.userId.equals(_userId)))
         .getSingleOrNull();
   }
 
@@ -412,10 +449,11 @@ class TaskRepository {
   Future<void> addFocusedSeconds(String taskId, int seconds) async {
     final task = await getById(taskId);
     if (task == null || seconds <= 0) return;
-    await (_db.update(_db.tasks)..where((t) => t.id.equals(taskId)))
-        .write(TasksCompanion(
-      focusedSeconds: Value(task.focusedSeconds + seconds),
-    ));
+    await (_db.update(
+      _db.tasks,
+    )..where((t) => t.id.equals(taskId) & t.userId.equals(_userId))).write(
+      TasksCompanion(focusedSeconds: Value(task.focusedSeconds + seconds)),
+    );
   }
 }
 
@@ -424,6 +462,7 @@ TaskRepository taskRepository(Ref ref) {
   return TaskRepository(
     ref.watch(appDatabaseProvider),
     ref.watch(outboxRepositoryProvider),
+    ref.watch(currentUserIdProvider),
   );
 }
 
@@ -460,5 +499,7 @@ Stream<int> taskCountForListId(Ref ref, String listId) async* {
 @riverpod
 Stream<List<Task>> tasksForMonth(Ref ref, DateTime monthStart) {
   final monthEnd = DateTime(monthStart.year, monthStart.month + 1);
-  return ref.watch(taskRepositoryProvider).watchTasksInRange(monthStart, monthEnd);
+  return ref
+      .watch(taskRepositoryProvider)
+      .watchTasksInRange(monthStart, monthEnd);
 }

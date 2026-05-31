@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:achievements/features/auth/auth_controller.dart';
+import 'package:achievements/features/auth/auth_session.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -17,19 +21,42 @@ const String kApiBaseUrl = String.fromEnvironment(
   defaultValue: _kDefaultBaseUrl,
 );
 
-/// 全局 Dio 客户端。
-///
-/// Phase 2 step 1:仅供 SyncEngine 用;后续接入 retrofit 自动生成实体客户端。
+@Riverpod(keepAlive: true)
+Dio authApiClient(Ref ref) {
+  return Dio(_baseOptions());
+}
+
+/// 全局认证后 Dio 客户端。
 @Riverpod(keepAlive: true)
 Dio apiClient(Ref ref) {
-  final dio = Dio(
-    BaseOptions(
-      baseUrl: kApiBaseUrl,
-      connectTimeout: const Duration(seconds: 8),
-      sendTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-      contentType: 'application/json',
+  final dio = Dio(_baseOptions());
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) {
+        final session = ref.read(currentAuthSessionProvider);
+        if (session != null) {
+          options.headers['Authorization'] = 'Bearer ${session.token}';
+        }
+        handler.next(options);
+      },
+      onError: (error, handler) async {
+        final authState = ref.read(authControllerProvider);
+        if (error.response?.statusCode == 401 && authState is! AuthSwitching) {
+          unawaited(ref.read(authControllerProvider.notifier).logout());
+        }
+        handler.next(error);
+      },
     ),
   );
   return dio;
+}
+
+BaseOptions _baseOptions() {
+  return BaseOptions(
+    baseUrl: kApiBaseUrl,
+    connectTimeout: const Duration(seconds: 8),
+    sendTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 15),
+    contentType: 'application/json',
+  );
 }

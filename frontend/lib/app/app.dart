@@ -3,30 +3,30 @@ import 'package:achievements/app/theme.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/repositories/bootstrap_provider.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
+import 'package:achievements/features/auth/auth_session.dart';
+import 'package:achievements/features/auth/qr_login_page.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Achievements 根 Widget。
-///
-/// MaterialApp.router 驱动路由,builder 内根据 appBootstrap 状态决定:
-///   - loading -> [_BootstrapSplash]
-///   - error   -> [_BootstrapError]
-///   - data    -> 真实页面(child!)
-///
-/// 主题默认跟随系统 brightness;Phase 4 设置页接入后由用户偏好驱动。
 class AchievementsApp extends ConsumerWidget {
   const AchievementsApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    final settings = ref.watch(settingsNotifierProvider).valueOrNull ??
-        kDefaultSettings;
+    final auth = ref.watch(authControllerProvider);
+    final settings = switch (auth) {
+      AuthAuthenticated() =>
+        ref.watch(settingsNotifierProvider).valueOrNull ?? kDefaultSettings,
+      _ => kDefaultSettings,
+    };
 
     return MaterialApp.router(
       title: 'Achievements',
@@ -36,23 +36,35 @@ class AchievementsApp extends ConsumerWidget {
       darkTheme: buildDarkTheme(settings.seedColor),
       routerConfig: router,
       locale: const Locale('zh', 'CN'),
-      supportedLocales: const [
-        Locale('zh', 'CN'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
       builder: (context, child) {
-        final bootstrap = ref.watch(appBootstrapProvider);
-        return bootstrap.when(
-          loading: () => const _BootstrapSplash(),
-          error: (e, st) => _BootstrapError(error: e),
-          data: (_) => child ?? const SizedBox.shrink(),
-        );
+        return switch (auth) {
+          AuthLoading() || AuthSwitching() => const _BootstrapSplash(),
+          AuthUnauthenticated() => const QrLoginPage(),
+          AuthAuthenticated() => _AuthenticatedBootstrap(child: child),
+        };
       },
+    );
+  }
+}
+
+class _AuthenticatedBootstrap extends ConsumerWidget {
+  const _AuthenticatedBootstrap({required this.child});
+
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bootstrap = ref.watch(appBootstrapProvider);
+    return bootstrap.when(
+      loading: () => const _BootstrapSplash(),
+      error: (e, st) => _BootstrapError(error: e),
+      data: (_) => child ?? const SizedBox.shrink(),
     );
   }
 }
@@ -75,19 +87,24 @@ class _BootstrapSplash extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isLight
-                ? [scheme.surface, scheme.primaryContainer.withValues(alpha: 0.3)]
-                : [scheme.surface, scheme.primaryContainer.withValues(alpha: 0.1)],
+                ? [
+                    scheme.surface,
+                    scheme.primaryContainer.withValues(alpha: 0.3),
+                  ]
+                : [
+                    scheme.surface,
+                    scheme.primaryContainer.withValues(alpha: 0.1),
+                  ],
           ),
         ),
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── Logo ──
               ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: AppIcons.svgIcon(AppIcons.appIcon, size: 64),
-              )
+                    borderRadius: BorderRadius.circular(16),
+                    child: AppIcons.svgIcon(AppIcons.appIcon, size: 64),
+                  )
                   .animate()
                   .scale(
                     begin: const Offset(0.3, 0.3),
@@ -103,12 +120,10 @@ class _BootstrapSplash extends StatelessWidget {
                   letterSpacing: -0.5,
                   color: scheme.onSurface,
                 ),
-              )
-                  .animate()
-                  .fadeIn(
-                    duration: MotionDurations.normal,
-                    delay: const Duration(milliseconds: 200),
-                  ),
+              ).animate().fadeIn(
+                duration: MotionDurations.normal,
+                delay: const Duration(milliseconds: 200),
+              ),
               const SizedBox(height: 32),
               SizedBox(
                 width: 28,
@@ -117,12 +132,10 @@ class _BootstrapSplash extends StatelessWidget {
                   strokeWidth: 2.5,
                   color: scheme.primary.withValues(alpha: 0.6),
                 ),
-              )
-                  .animate()
-                  .fadeIn(
-                    duration: MotionDurations.normal,
-                    delay: const Duration(milliseconds: 400),
-                  ),
+              ).animate().fadeIn(
+                duration: MotionDurations.normal,
+                delay: const Duration(milliseconds: 400),
+              ),
             ],
           ),
         ),
@@ -149,11 +162,7 @@ class _BootstrapError extends ConsumerWidget {
                 '同步首次必须成功才会放行。请检查网络后重试;如果你确实想先离线使用,'
                 '点「离线使用」绕过门控(之后联网时会按 LWW 自动合并)。',
           )
-        : (
-            Icons.error_outline_rounded,
-            '初始化失败',
-            error.toString(),
-          );
+        : (Icons.error_outline_rounded, '初始化失败', error.toString());
 
     return Scaffold(
       body: Center(
@@ -168,9 +177,9 @@ class _BootstrapError extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: scheme.error,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(color: scheme.error),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -190,8 +199,7 @@ class _BootstrapError extends ConsumerWidget {
                       const SizedBox(width: 12),
                     ],
                     FilledButton.icon(
-                      onPressed: () =>
-                          ref.invalidate(appBootstrapProvider),
+                      onPressed: () => ref.invalidate(appBootstrapProvider),
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('重试'),
                     ),

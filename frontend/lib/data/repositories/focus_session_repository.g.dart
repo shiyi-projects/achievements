@@ -7,20 +7,20 @@ part of 'focus_session_repository.dart';
 // **************************************************************************
 
 String _$focusSessionRepositoryHash() =>
-    r'0bba027b7868c0316e54edd5ec330db389d62f0d';
+    r'dd6f0ddd6cca5ddd67d794db07a1ad8a66ccca19';
 
 /// See also [focusSessionRepository].
 @ProviderFor(focusSessionRepository)
 final focusSessionRepositoryProvider =
     Provider<FocusSessionRepository>.internal(
-  focusSessionRepository,
-  name: r'focusSessionRepositoryProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$focusSessionRepositoryHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+      focusSessionRepository,
+      name: r'focusSessionRepositoryProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$focusSessionRepositoryHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element

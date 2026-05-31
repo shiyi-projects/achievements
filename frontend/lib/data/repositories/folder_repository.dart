@@ -1,8 +1,8 @@
-import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/id.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -10,14 +10,15 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'folder_repository.g.dart';
 
 class FolderRepository {
-  FolderRepository(this._db, this._outbox);
+  FolderRepository(this._db, this._outbox, this._userId);
 
   final AppDatabase _db;
   final OutboxRepository _outbox;
+  final String _userId;
 
   Stream<List<Folder>> watchAll() {
     return (_db.select(_db.folders)
-          ..where((t) => t.deletedAt.isNull())
+          ..where((t) => t.userId.equals(_userId) & t.deletedAt.isNull())
           ..orderBy([
             (t) => OrderingTerm(expression: t.sortOrder),
             (t) => OrderingTerm(expression: t.name),
@@ -28,16 +29,18 @@ class FolderRepository {
   Future<String> create({required String name}) async {
     final id = newId();
     return _db.transaction(() async {
-      final lastSort = await (_db.selectOnly(
-        _db.folders,
-      )..addColumns([_db.folders.sortOrder.max()])).getSingleOrNull();
+      final lastSort =
+          await (_db.selectOnly(_db.folders)
+                ..addColumns([_db.folders.sortOrder.max()])
+                ..where(_db.folders.userId.equals(_userId)))
+              .getSingleOrNull();
       final nextSort = (lastSort?.read(_db.folders.sortOrder.max()) ?? -1) + 1;
       await _db
           .into(_db.folders)
           .insert(
             FoldersCompanion.insert(
               id: id,
-              userId: kLocalUserId,
+              userId: _userId,
               name: name,
               sortOrder: Value(nextSort),
             ),
@@ -57,10 +60,10 @@ class FolderRepository {
     await _db.transaction(() async {
       final current = await (_db.select(
         _db.folders,
-      )..where((t) => t.id.equals(id))).getSingle();
-      await (_db.update(_db.folders)..where((t) => t.id.equals(id))).write(
-        FoldersCompanion(name: Value(name)),
-      );
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).getSingle();
+      await (_db.update(_db.folders)
+            ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
+          .write(FoldersCompanion(name: Value(name)));
       await _outbox.enqueue(
         entity: 'folder',
         op: 'upsert',
@@ -77,11 +80,14 @@ class FolderRepository {
   ///   - 文件夹本身 enqueue 一条 folder delete
   Future<void> softDelete(Folder folder) async {
     await _db.transaction(() async {
-      final affected = await (_db.select(
-        _db.taskLists,
-      )..where((t) => t.folderId.equals(folder.id))).get();
-      await (_db.update(_db.taskLists)
-            ..where((t) => t.folderId.equals(folder.id)))
+      final affected =
+          await (_db.select(_db.taskLists)..where(
+                (t) => t.folderId.equals(folder.id) & t.userId.equals(_userId),
+              ))
+              .get();
+      await (_db.update(_db.taskLists)..where(
+            (t) => t.folderId.equals(folder.id) & t.userId.equals(_userId),
+          ))
           .write(const TaskListsCompanion(folderId: Value(null)));
       for (final list in affected) {
         await _outbox.enqueue(
@@ -92,7 +98,8 @@ class FolderRepository {
           payload: {'folder_id': null},
         );
       }
-      await (_db.update(_db.folders)..where((t) => t.id.equals(folder.id)))
+      await (_db.update(_db.folders)
+            ..where((t) => t.id.equals(folder.id) & t.userId.equals(_userId)))
           .write(FoldersCompanion(deletedAt: Value(DateTime.now())));
       await _outbox.enqueue(
         entity: 'folder',
@@ -110,6 +117,7 @@ FolderRepository folderRepository(Ref ref) {
   return FolderRepository(
     ref.watch(appDatabaseProvider),
     ref.watch(outboxRepositoryProvider),
+    ref.watch(currentUserIdProvider),
   );
 }
 

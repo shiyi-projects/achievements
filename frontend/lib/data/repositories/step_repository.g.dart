@@ -6,7 +6,7 @@ part of 'step_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$stepRepositoryHash() => r'4ebdc50b4a4d85054056f46240f49e538ad8a7b9';
+String _$stepRepositoryHash() => r'bae358be0421a98d51ddc06354008c9c589ae020';
 
 /// See also [stepRepository].
 @ProviderFor(stepRepository)
@@ -56,21 +56,15 @@ class StepsForTaskFamily extends Family<AsyncValue<List<TaskStep>>> {
   const StepsForTaskFamily();
 
   /// See also [stepsForTask].
-  StepsForTaskProvider call(
-    String taskId,
-  ) {
-    return StepsForTaskProvider(
-      taskId,
-    );
+  StepsForTaskProvider call(String taskId) {
+    return StepsForTaskProvider(taskId);
   }
 
   @override
   StepsForTaskProvider getProviderOverride(
     covariant StepsForTaskProvider provider,
   ) {
-    return call(
-      provider.taskId,
-    );
+    return call(provider.taskId);
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -91,24 +85,19 @@ class StepsForTaskFamily extends Family<AsyncValue<List<TaskStep>>> {
 /// See also [stepsForTask].
 class StepsForTaskProvider extends AutoDisposeStreamProvider<List<TaskStep>> {
   /// See also [stepsForTask].
-  StepsForTaskProvider(
-    String taskId,
-  ) : this._internal(
-          (ref) => stepsForTask(
-            ref as StepsForTaskRef,
-            taskId,
-          ),
-          from: stepsForTaskProvider,
-          name: r'stepsForTaskProvider',
-          debugGetCreateSourceHash:
-              const bool.fromEnvironment('dart.vm.product')
-                  ? null
-                  : _$stepsForTaskHash,
-          dependencies: StepsForTaskFamily._dependencies,
-          allTransitiveDependencies:
-              StepsForTaskFamily._allTransitiveDependencies,
-          taskId: taskId,
-        );
+  StepsForTaskProvider(String taskId)
+    : this._internal(
+        (ref) => stepsForTask(ref as StepsForTaskRef, taskId),
+        from: stepsForTaskProvider,
+        name: r'stepsForTaskProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$stepsForTaskHash,
+        dependencies: StepsForTaskFamily._dependencies,
+        allTransitiveDependencies:
+            StepsForTaskFamily._allTransitiveDependencies,
+        taskId: taskId,
+      );
 
   StepsForTaskProvider._internal(
     super._createNotifier, {
@@ -195,21 +184,13 @@ class StepCountFamily extends Family<({int done, int total})> {
   /// 仅返回计数,供 TaskTile 轻量订阅,减少不必要的 rebuild。
   ///
   /// Copied from [stepCount].
-  StepCountProvider call(
-    String taskId,
-  ) {
-    return StepCountProvider(
-      taskId,
-    );
+  StepCountProvider call(String taskId) {
+    return StepCountProvider(taskId);
   }
 
   @override
-  StepCountProvider getProviderOverride(
-    covariant StepCountProvider provider,
-  ) {
-    return call(
-      provider.taskId,
-    );
+  StepCountProvider getProviderOverride(covariant StepCountProvider provider) {
+    return call(provider.taskId);
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -234,23 +215,18 @@ class StepCountProvider extends AutoDisposeProvider<({int done, int total})> {
   /// 仅返回计数,供 TaskTile 轻量订阅,减少不必要的 rebuild。
   ///
   /// Copied from [stepCount].
-  StepCountProvider(
-    String taskId,
-  ) : this._internal(
-          (ref) => stepCount(
-            ref as StepCountRef,
-            taskId,
-          ),
-          from: stepCountProvider,
-          name: r'stepCountProvider',
-          debugGetCreateSourceHash:
-              const bool.fromEnvironment('dart.vm.product')
-                  ? null
-                  : _$stepCountHash,
-          dependencies: StepCountFamily._dependencies,
-          allTransitiveDependencies: StepCountFamily._allTransitiveDependencies,
-          taskId: taskId,
-        );
+  StepCountProvider(String taskId)
+    : this._internal(
+        (ref) => stepCount(ref as StepCountRef, taskId),
+        from: stepCountProvider,
+        name: r'stepCountProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$stepCountHash,
+        dependencies: StepCountFamily._dependencies,
+        allTransitiveDependencies: StepCountFamily._allTransitiveDependencies,
+        taskId: taskId,
+      );
 
   StepCountProvider._internal(
     super._createNotifier, {
@@ -316,5 +292,6 @@ class _StepCountProviderElement
   @override
   String get taskId => (origin as StepCountProvider).taskId;
 }
+
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

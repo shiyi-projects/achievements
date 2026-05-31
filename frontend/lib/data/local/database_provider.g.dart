@@ -6,20 +6,20 @@ part of 'database_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appDatabaseHash() => r'59cce38d45eeaba199eddd097d8e149d66f9f3e1';
+String _$appDatabaseHash() => r'c45b9201a2181b391ce398eccad6005a62bf6acc';
 
-/// 应用全局 [AppDatabase] 单例。
+/// 当前登录用户专属 [AppDatabase] 单例。
 ///
-/// keepAlive 保持整个 App 生命周期都共享一个数据库连接;
-/// dispose 时(应用退出 / 测试覆盖)关闭连接释放文件句柄。
+/// 每个 appUserId 使用独立 SQLite 文件,避免遗漏 userId 过滤时跨账号串数据。
 ///
 /// Copied from [appDatabase].
 @ProviderFor(appDatabase)
 final appDatabaseProvider = Provider<AppDatabase>.internal(
   appDatabase,
   name: r'appDatabaseProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$appDatabaseHash,
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$appDatabaseHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );

@@ -5,8 +5,9 @@ import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
 import 'package:achievements/data/remote/api_client.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:dio/dio.dart';
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -29,21 +30,25 @@ class SyncEngine {
     required Dio dio,
     required OutboxRepository outbox,
     required AppDatabase db,
+    required String userId,
   }) : _dio = dio,
        _outbox = outbox,
-       _db = db;
+       _db = db,
+       _userId = userId;
 
   final Dio _dio;
   final OutboxRepository _outbox;
   final AppDatabase _db;
+  final String _userId;
 
   /// 拉一次增量。失败不抛(网络断 / 服务端 5xx),由 [SyncStatus] 上报。
-  Future<SyncStatus> pullOnce() async {
+  Future<SyncStatus> pullOnce({CancelToken? cancelToken}) async {
     final since = await _outbox.getCursor(SyncCursorKey.lastPulledAt);
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/api/v1/sync/pull',
         queryParameters: since == null ? null : {'since': since},
+        cancelToken: cancelToken,
       );
       final data = response.data;
       if (data == null) return SyncStatus.error;
@@ -54,6 +59,7 @@ class SyncEngine {
       );
       return SyncStatus.idle;
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.cancel) return SyncStatus.error;
       debugPrint('sync pull failed: ${e.type} ${e.message}');
       return e.type == DioExceptionType.connectionError
           ? SyncStatus.offline
@@ -75,7 +81,7 @@ class SyncEngine {
   /// - `rejected`:服务端拒收(payload 校验失败 / 不允许的实体等),outbox 行删除。
   ///
   /// 整体网络异常:全部 mutation `markFailed`,retry_count 用尽后自然退出循环。
-  Future<SyncStatus> pushOnce() async {
+  Future<SyncStatus> pushOnce({CancelToken? cancelToken}) async {
     final pending = await _outbox.pending();
     if (pending.isEmpty) return SyncStatus.idle;
 
@@ -85,12 +91,14 @@ class SyncEngine {
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/v1/sync/push',
         data: {'mutations': mutations},
+        cancelToken: cancelToken,
       );
       final data = response.data;
       if (data == null) return SyncStatus.error;
       await _applyPushResponse(pending, data);
       return SyncStatus.idle;
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.cancel) return SyncStatus.error;
       debugPrint('sync push failed: ${e.type} ${e.message}');
       for (final row in pending) {
         await _outbox.markFailed(row.id, '${e.type}:${e.message ?? ""}');
@@ -197,18 +205,21 @@ class SyncEngine {
   ) async {
     switch (entity) {
       case 'folder':
-        await (_db.update(_db.folders)..where((t) => t.id.equals(entityId)))
+        await (_db.update(_db.folders)
+              ..where((t) => t.id.equals(entityId) & t.userId.equals(_userId)))
             .write(FoldersCompanion(version: Value(version)));
       case 'list':
-        await (_db.update(_db.taskLists)..where((t) => t.id.equals(entityId)))
+        await (_db.update(_db.taskLists)
+              ..where((t) => t.id.equals(entityId) & t.userId.equals(_userId)))
             .write(TaskListsCompanion(version: Value(version)));
       case 'task':
-        await (_db.update(_db.tasks)..where((t) => t.id.equals(entityId)))
+        await (_db.update(_db.tasks)
+              ..where((t) => t.id.equals(entityId) & t.userId.equals(_userId)))
             .write(TasksCompanion(version: Value(version)));
       case 'tag':
-        await (_db.update(_db.tags)..where((t) => t.id.equals(entityId))).write(
-          TagsCompanion(version: Value(version)),
-        );
+        await (_db.update(_db.tags)
+              ..where((t) => t.id.equals(entityId) & t.userId.equals(_userId)))
+            .write(TagsCompanion(version: Value(version)));
     }
   }
 
@@ -257,16 +268,31 @@ class SyncEngine {
         await _db.into(_db.tags).insertOnConflictUpdate(_tagsCompanion(raw));
       }
       for (final raw in _list(data['task_tags'])) {
+        final taskId = raw['task_id'] as String;
+        final tagId = raw['tag_id'] as String;
+        if (!await _ownsTaskAndTag(taskId, tagId)) continue;
         await _db
             .into(_db.taskTags)
             .insertOnConflictUpdate(
-              TaskTagsCompanion.insert(
-                taskId: raw['task_id'] as String,
-                tagId: raw['tag_id'] as String,
-              ),
+              TaskTagsCompanion.insert(taskId: taskId, tagId: tagId),
             );
       }
     });
+  }
+
+  Future<bool> _ownsTaskAndTag(String taskId, String tagId) async {
+    final task =
+        await (_db.select(_db.tasks)
+              ..where((t) => t.id.equals(taskId) & t.userId.equals(_userId))
+              ..limit(1))
+            .getSingleOrNull();
+    if (task == null) return false;
+    final tag =
+        await (_db.select(_db.tags)
+              ..where((t) => t.id.equals(tagId) & t.userId.equals(_userId))
+              ..limit(1))
+            .getSingleOrNull();
+    return tag != null;
   }
 
   static List<Map<String, dynamic>> _list(Object? v) {
@@ -280,10 +306,10 @@ class SyncEngine {
   static DateTime? _dt(Object? v) =>
       v == null ? null : DateTime.parse(v as String);
 
-  static FoldersCompanion _foldersCompanion(Map<String, dynamic> r) {
+  FoldersCompanion _foldersCompanion(Map<String, dynamic> r) {
     return FoldersCompanion(
       id: Value(r['id'] as String),
-      userId: const Value('00000000-0000-0000-0000-000000000001'),
+      userId: Value(_userId),
       name: Value(r['name'] as String),
       sortOrder: Value(r['sort_order'] as int? ?? 0),
       createdAt: Value(_dt(r['created_at']) ?? DateTime.now()),
@@ -293,10 +319,10 @@ class SyncEngine {
     );
   }
 
-  static TaskListsCompanion _taskListsCompanion(Map<String, dynamic> r) {
+  TaskListsCompanion _taskListsCompanion(Map<String, dynamic> r) {
     return TaskListsCompanion(
       id: Value(r['id'] as String),
-      userId: const Value('00000000-0000-0000-0000-000000000001'),
+      userId: Value(_userId),
       folderId: Value(r['folder_id'] as String?),
       name: Value(r['name'] as String),
       color: Value(r['color'] as String?),
@@ -311,10 +337,10 @@ class SyncEngine {
     );
   }
 
-  static TasksCompanion _tasksCompanion(Map<String, dynamic> r) {
+  TasksCompanion _tasksCompanion(Map<String, dynamic> r) {
     return TasksCompanion(
       id: Value(r['id'] as String),
-      userId: const Value('00000000-0000-0000-0000-000000000001'),
+      userId: Value(_userId),
       listId: Value(r['list_id'] as String),
       parentId: Value(r['parent_id'] as String?),
       title: Value(r['title'] as String),
@@ -335,10 +361,10 @@ class SyncEngine {
     );
   }
 
-  static TagsCompanion _tagsCompanion(Map<String, dynamic> r) {
+  TagsCompanion _tagsCompanion(Map<String, dynamic> r) {
     return TagsCompanion(
       id: Value(r['id'] as String),
-      userId: const Value('00000000-0000-0000-0000-000000000001'),
+      userId: Value(_userId),
       name: Value(r['name'] as String),
       color: Value(r['color'] as String?),
       createdAt: Value(_dt(r['created_at']) ?? DateTime.now()),
@@ -355,6 +381,7 @@ SyncEngine syncEngine(Ref ref) {
     dio: ref.watch(apiClientProvider),
     outbox: ref.watch(outboxRepositoryProvider),
     db: ref.watch(appDatabaseProvider),
+    userId: ref.watch(currentUserIdProvider),
   );
 }
 
@@ -380,7 +407,7 @@ final lastSyncAtProvider = StreamProvider<DateTime?>((ref) {
         ..where((t) => t.key.equals(SyncCursorKey.lastSyncAt)))
       .watchSingleOrNull()
       .map((row) {
-    if (row == null) return null;
-    return DateTime.tryParse(row.value);
-  });
+        if (row == null) return null;
+        return DateTime.tryParse(row.value);
+      });
 });

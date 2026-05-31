@@ -4,8 +4,11 @@ import 'package:achievements/core/notifications/notification_service.dart';
 import 'package:achievements/core/notifications/reminder_scheduler.dart';
 import 'package:achievements/core/sync/sync_coordinator.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
+import 'package:achievements/data/repositories/legacy_import_service.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
+import 'package:achievements/features/auth/account_operation_gate.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -25,8 +28,7 @@ class FirstSyncFailedException implements Exception {
   final SyncStatus status;
 
   @override
-  String toString() =>
-      'FirstSyncFailedException(status: ${status.name})';
+  String toString() => 'FirstSyncFailedException(status: ${status.name})';
 }
 
 /// 应用启动期一次性初始化:
@@ -41,37 +43,46 @@ class FirstSyncFailedException implements Exception {
 /// AchievementsApp 在渲染前 watch 此 Future,完成后再放行 router。
 @Riverpod(keepAlive: true)
 Future<void> appBootstrap(Ref ref) async {
-  await ref.read(listRepositoryProvider).ensureSystemLists();
+  final userId = ref.watch(currentUserIdProvider);
+  await ref.watch(accountOperationGateProvider).runForAccount(
+    userId,
+    () => ref.read(currentAuthSessionProvider)?.appUserId,
+    () async {
+      final lists = ref.read(listRepositoryProvider);
+      await lists.ensureSystemLists();
+      await ref.read(legacyImportServiceProvider).importIfNeeded();
 
-  final notifications = ref.read(notificationServiceProvider);
-  await notifications.initialize();
-  // 权限申请失败不阻塞启动,只是后续 schedule 会静默无效
-  await notifications.requestPermissions();
+      final notifications = ref.read(notificationServiceProvider);
+      await notifications.initialize();
+      // 权限申请失败不阻塞启动,只是后续 schedule 会静默无效
+      await notifications.requestPermissions();
 
-  ref.read(reminderSchedulerProvider).start();
+      ref.read(reminderSchedulerProvider).start();
 
-  // ── 首次同步门 ──────────────────────────────────────────────────
-  // 新设备本地只种了系统清单,outbox 是空的;但用户能在 splash 关掉后立刻
-  // 写本地。如果首次 pull 还没成功就放行 UI,云端旧数据会在稍后 pull 时
-  // insertOnConflictUpdate 进来,跟用户刚写的混在一起,LWW 可能让用户白写。
-  // 这里直接 await pullOnce(),失败就抛错让 UI 拦住,不进入正常自动同步循环。
-  final outbox = ref.read(outboxRepositoryProvider);
-  final statusController = ref.read(syncStatusControllerProvider.notifier);
-  final firstSyncDone =
-      (await outbox.getCursor(SyncCursorKey.firstSyncDone)) == 'true';
+      // ── 首次同步门 ──────────────────────────────────────────────────
+      // 新设备本地只种了系统清单,outbox 是空的;但用户能在 splash 关掉后立刻
+      // 写本地。如果首次 pull 还没成功就放行 UI,云端旧数据会在稍后 pull 时
+      // insertOnConflictUpdate 进来,跟用户刚写的混在一起,LWW 可能让用户白写。
+      // 这里直接 await pullOnce(),失败就抛错让 UI 拦住,不进入正常自动同步循环。
+      final outbox = ref.read(outboxRepositoryProvider);
+      final statusController = ref.read(syncStatusControllerProvider.notifier);
+      final firstSyncDone =
+          (await outbox.getCursor(SyncCursorKey.firstSyncDone)) == 'true';
 
-  if (!firstSyncDone) {
-    statusController.set(SyncStatus.syncing);
-    final result = await ref.read(syncEngineProvider).pullOnce();
-    statusController.set(result);
-    if (result != SyncStatus.idle) {
-      throw FirstSyncFailedException(result);
-    }
-    await outbox.setCursor(SyncCursorKey.firstSyncDone, 'true');
-  }
+      if (!firstSyncDone) {
+        statusController.set(SyncStatus.syncing);
+        final result = await ref.read(syncEngineProvider).pullOnce();
+        statusController.set(result);
+        if (result != SyncStatus.idle) {
+          throw FirstSyncFailedException(result);
+        }
+        await outbox.setCursor(SyncCursorKey.firstSyncDone, 'true');
+      }
 
-  // 门通过后才接管自动同步;此时再 runFullSync 一次会拉到几乎为空的 delta
-  // (cursor 已被首次 pull 推到最新),开销可忽略。
-  final coord = ref.read(syncCoordinatorProvider)..start();
-  unawaited(coord.runFullSync());
+      // 门通过后才接管自动同步;此时再 runFullSync 一次会拉到几乎为空的 delta
+      // (cursor 已被首次 pull 推到最新),开销可忽略。
+      final coord = ref.read(syncCoordinatorProvider)..start();
+      unawaited(coord.runFullSync());
+    },
+  );
 }

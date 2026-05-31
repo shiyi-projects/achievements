@@ -6,15 +6,16 @@ part of 'sync_engine.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$syncEngineHash() => r'33410d5b3c7e441d4f10fec68f9c74e3ec6633aa';
+String _$syncEngineHash() => r'080ef9850e023d9314d62ffa936e68fcd89b1e0a';
 
 /// See also [syncEngine].
 @ProviderFor(syncEngine)
 final syncEngineProvider = Provider<SyncEngine>.internal(
   syncEngine,
   name: r'syncEngineProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$syncEngineHash,
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$syncEngineHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
@@ -31,14 +32,14 @@ String _$syncStatusControllerHash() =>
 @ProviderFor(SyncStatusController)
 final syncStatusControllerProvider =
     NotifierProvider<SyncStatusController, SyncStatus>.internal(
-  SyncStatusController.new,
-  name: r'syncStatusControllerProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$syncStatusControllerHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+      SyncStatusController.new,
+      name: r'syncStatusControllerProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$syncStatusControllerHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 typedef _$SyncStatusController = Notifier<SyncStatus>;
 // ignore_for_file: type=lint

@@ -6,19 +6,35 @@ part of 'api_client.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$apiClientHash() => r'41de26451f7b28970f25ff7f1af0aca0635d884c';
+String _$authApiClientHash() => r'5c9396387ff3630ab71f12463be1da88c56021d5';
 
-/// 全局 Dio 客户端。
-///
-/// Phase 2 step 1:仅供 SyncEngine 用;后续接入 retrofit 自动生成实体客户端。
+/// See also [authApiClient].
+@ProviderFor(authApiClient)
+final authApiClientProvider = Provider<Dio>.internal(
+  authApiClient,
+  name: r'authApiClientProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$authApiClientHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef AuthApiClientRef = ProviderRef<Dio>;
+String _$apiClientHash() => r'f2dda40d1e32d85a33ea7c49b0ad00ed4ab68e67';
+
+/// 全局认证后 Dio 客户端。
 ///
 /// Copied from [apiClient].
 @ProviderFor(apiClient)
 final apiClientProvider = Provider<Dio>.internal(
   apiClient,
   name: r'apiClientProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$apiClientHash,
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$apiClientHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );

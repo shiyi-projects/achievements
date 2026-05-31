@@ -6,7 +6,7 @@ part of 'tag_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$tagRepositoryHash() => r'dacc5f91d310dc921383397ca6fe2c489ec4346e';
+String _$tagRepositoryHash() => r'593c8277609d2a19c04655577c4fc378f71bdeef';
 
 /// See also [tagRepository].
 @ProviderFor(tagRepository)
@@ -30,8 +30,9 @@ String _$allTagsHash() => r'f221b1f55db9511a8a204fd042048953b67d3a88';
 final allTagsProvider = AutoDisposeStreamProvider<List<Tag>>.internal(
   allTags,
   name: r'allTagsProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$allTagsHash,
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$allTagsHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
@@ -80,21 +81,15 @@ class TagsForTaskFamily extends Family<AsyncValue<List<Tag>>> {
   /// 监听某任务当前关联的标签列表。
   ///
   /// Copied from [tagsForTask].
-  TagsForTaskProvider call(
-    String taskId,
-  ) {
-    return TagsForTaskProvider(
-      taskId,
-    );
+  TagsForTaskProvider call(String taskId) {
+    return TagsForTaskProvider(taskId);
   }
 
   @override
   TagsForTaskProvider getProviderOverride(
     covariant TagsForTaskProvider provider,
   ) {
-    return call(
-      provider.taskId,
-    );
+    return call(provider.taskId);
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -119,24 +114,18 @@ class TagsForTaskProvider extends AutoDisposeStreamProvider<List<Tag>> {
   /// 监听某任务当前关联的标签列表。
   ///
   /// Copied from [tagsForTask].
-  TagsForTaskProvider(
-    String taskId,
-  ) : this._internal(
-          (ref) => tagsForTask(
-            ref as TagsForTaskRef,
-            taskId,
-          ),
-          from: tagsForTaskProvider,
-          name: r'tagsForTaskProvider',
-          debugGetCreateSourceHash:
-              const bool.fromEnvironment('dart.vm.product')
-                  ? null
-                  : _$tagsForTaskHash,
-          dependencies: TagsForTaskFamily._dependencies,
-          allTransitiveDependencies:
-              TagsForTaskFamily._allTransitiveDependencies,
-          taskId: taskId,
-        );
+  TagsForTaskProvider(String taskId)
+    : this._internal(
+        (ref) => tagsForTask(ref as TagsForTaskRef, taskId),
+        from: tagsForTaskProvider,
+        name: r'tagsForTaskProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$tagsForTaskHash,
+        dependencies: TagsForTaskFamily._dependencies,
+        allTransitiveDependencies: TagsForTaskFamily._allTransitiveDependencies,
+        taskId: taskId,
+      );
 
   TagsForTaskProvider._internal(
     super._createNotifier, {
@@ -195,11 +184,13 @@ mixin TagsForTaskRef on AutoDisposeStreamProviderRef<List<Tag>> {
 }
 
 class _TagsForTaskProviderElement
-    extends AutoDisposeStreamProviderElement<List<Tag>> with TagsForTaskRef {
+    extends AutoDisposeStreamProviderElement<List<Tag>>
+    with TagsForTaskRef {
   _TagsForTaskProviderElement(super.provider);
 
   @override
   String get taskId => (origin as TagsForTaskProvider).taskId;
 }
+
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

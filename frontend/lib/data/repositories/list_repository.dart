@@ -3,6 +3,7 @@ import 'package:achievements/core/id.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -10,15 +11,16 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'list_repository.g.dart';
 
 class ListRepository {
-  ListRepository(this._db, this._outbox);
+  ListRepository(this._db, this._outbox, this._userId);
 
   final AppDatabase _db;
   final OutboxRepository _outbox;
+  final String _userId;
 
   /// 监听所有未软删的清单(系统 + 自定义),按 sortOrder 升序。
   Stream<List<TaskList>> watchAll() {
     return (_db.select(_db.taskLists)
-          ..where((t) => t.deletedAt.isNull())
+          ..where((t) => t.userId.equals(_userId) & t.deletedAt.isNull())
           ..orderBy([
             (t) => OrderingTerm(expression: t.sortOrder),
             (t) => OrderingTerm(expression: t.name),
@@ -28,7 +30,8 @@ class ListRepository {
 
   /// 监听某文件夹下的清单(folderId=null 表示无文件夹根目录)。
   Stream<List<TaskList>> watchByFolder(String? folderId) {
-    final query = _db.select(_db.taskLists)..where((t) => t.deletedAt.isNull());
+    final query = _db.select(_db.taskLists)
+      ..where((t) => t.userId.equals(_userId) & t.deletedAt.isNull());
     if (folderId == null) {
       query.where((t) => t.folderId.isNull());
     } else {
@@ -41,14 +44,16 @@ class ListRepository {
   /// 通过系统类别拉单条清单(用于路由到 Sidebar 内置项)。
   Future<TaskList?> findBySystemKind(SystemListKind kind) {
     return (_db.select(_db.taskLists)
-          ..where((t) => t.systemKind.equals(kind.value))
+          ..where(
+            (t) => t.userId.equals(_userId) & t.systemKind.equals(kind.value),
+          )
           ..limit(1))
         .getSingleOrNull();
   }
 
   Future<TaskList?> findById(String id) {
     return (_db.select(_db.taskLists)
-          ..where((t) => t.id.equals(id))
+          ..where((t) => t.id.equals(id) & t.userId.equals(_userId))
           ..limit(1))
         .getSingleOrNull();
   }
@@ -62,9 +67,11 @@ class ListRepository {
   }) async {
     final id = newId();
     return _db.transaction(() async {
-      final lastSort = await (_db.selectOnly(
-        _db.taskLists,
-      )..addColumns([_db.taskLists.sortOrder.max()])).getSingleOrNull();
+      final lastSort =
+          await (_db.selectOnly(_db.taskLists)
+                ..addColumns([_db.taskLists.sortOrder.max()])
+                ..where(_db.taskLists.userId.equals(_userId)))
+              .getSingleOrNull();
       final nextSort =
           (lastSort?.read(_db.taskLists.sortOrder.max()) ?? 99) + 1;
       await _db
@@ -72,7 +79,7 @@ class ListRepository {
           .insert(
             TaskListsCompanion.insert(
               id: id,
-              userId: kLocalUserId,
+              userId: _userId,
               name: name,
               folderId: Value(folderId),
               color: Value(color),
@@ -103,10 +110,10 @@ class ListRepository {
     await _db.transaction(() async {
       final current = await (_db.select(
         _db.taskLists,
-      )..where((t) => t.id.equals(id))).getSingle();
-      await (_db.update(_db.taskLists)..where((t) => t.id.equals(id))).write(
-        TaskListsCompanion(name: Value(name)),
-      );
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).getSingle();
+      await (_db.update(_db.taskLists)
+            ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
+          .write(TaskListsCompanion(name: Value(name)));
       await _outbox.enqueue(
         entity: 'list',
         op: 'upsert',
@@ -123,7 +130,8 @@ class ListRepository {
       throw StateError('System list cannot be deleted: ${list.name}');
     }
     await _db.transaction(() async {
-      await (_db.update(_db.taskLists)..where((t) => t.id.equals(list.id)))
+      await (_db.update(_db.taskLists)
+            ..where((t) => t.id.equals(list.id) & t.userId.equals(_userId)))
           .write(TaskListsCompanion(deletedAt: Value(DateTime.now())));
       await _outbox.enqueue(
         entity: 'list',
@@ -138,10 +146,12 @@ class ListRepository {
   /// 把清单挂到某个文件夹下(folderId=null 即移出文件夹)。
   Future<void> setFolder(String listId, String? folderId) async {
     await _db.transaction(() async {
-      final current = await (_db.select(
-        _db.taskLists,
-      )..where((t) => t.id.equals(listId))).getSingle();
-      await (_db.update(_db.taskLists)..where((t) => t.id.equals(listId)))
+      final current =
+          await (_db.select(_db.taskLists)
+                ..where((t) => t.id.equals(listId) & t.userId.equals(_userId)))
+              .getSingle();
+      await (_db.update(_db.taskLists)
+            ..where((t) => t.id.equals(listId) & t.userId.equals(_userId)))
           .write(TaskListsCompanion(folderId: Value(folderId)));
       await _outbox.enqueue(
         entity: 'list',
@@ -171,8 +181,8 @@ class ListRepository {
             .into(_db.taskLists)
             .insert(
               TaskListsCompanion.insert(
-                id: kind.id,
-                userId: kLocalUserId,
+                id: systemListIdForUser(_userId, kind),
+                userId: _userId,
                 name: _displayName(kind),
                 isSystem: const Value(true),
                 systemKind: Value(kind.value),
@@ -208,6 +218,7 @@ ListRepository listRepository(Ref ref) {
   return ListRepository(
     ref.watch(appDatabaseProvider),
     ref.watch(outboxRepositoryProvider),
+    ref.watch(currentUserIdProvider),
   );
 }
 

@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
+import 'package:achievements/features/auth/account_operation_gate.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -26,23 +29,37 @@ class SyncCoordinator extends WidgetsBindingObserver {
     required SyncEngine engine,
     required OutboxRepository outbox,
     required SyncStatusController status,
+    required AccountOperationGate gate,
+    required String userId,
+    required String? Function() currentUserId,
     Connectivity? connectivity,
   }) : _engine = engine,
        _outbox = outbox,
        _status = status,
+       _gate = gate,
+       _userId = userId,
+       _currentUserId = currentUserId,
        _connectivity = connectivity ?? Connectivity();
 
   final SyncEngine _engine;
   final OutboxRepository _outbox;
   final SyncStatusController _status;
+  final AccountOperationGate _gate;
+  final String _userId;
+  final String? Function() _currentUserId;
   final Connectivity _connectivity;
 
+  // Subscriptions are intentionally stored and cancelled in stopAndDrain/dispose.
+  // ignore: cancel_subscriptions
   StreamSubscription<int>? _outboxSub;
+  // ignore: cancel_subscriptions
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _debounce;
   Timer? _retryTimer;
   Timer? _pollTimer;
-  bool _inFlight = false;
+  Future<void>? _activeRun;
+  CancelToken? _cancelToken;
+  bool _stopping = false;
   bool _wasOffline = false;
   bool _lifecycleObserverRegistered = false;
   DateTime? _lastFullSyncStartAt;
@@ -51,6 +68,7 @@ class SyncCoordinator extends WidgetsBindingObserver {
 
   /// 启动触发监听。bootstrap 阶段调用一次。
   void start() {
+    if (_stopping) return;
     _outboxSub ??= _outbox.watchPendingCount().listen(_onOutboxChanged);
     _connectivitySub ??= _connectivity.onConnectivityChanged.listen(
       _onConnectivityChanged,
@@ -61,22 +79,41 @@ class SyncCoordinator extends WidgetsBindingObserver {
     }
   }
 
-  /// 释放资源(目前没人调,挂在 keepAlive provider 上随 app 生命周期)。
+  Future<void> stopAndDrain() async {
+    _stopping = true;
+    _cancelToken?.cancel('stopping');
+    await _cancelTriggers();
+    await _activeRun;
+  }
+
   void dispose() {
-    _outboxSub?.cancel();
-    _connectivitySub?.cancel();
+    _stopping = true;
+    _cancelToken?.cancel('disposed');
+    unawaited(_cancelTriggers());
+  }
+
+  Future<void> _cancelTriggers() async {
+    final outboxSub = _outboxSub;
+    final connectivitySub = _connectivitySub;
+    _outboxSub = null;
+    _connectivitySub = null;
     _debounce?.cancel();
+    _debounce = null;
     _retryTimer?.cancel();
+    _retryTimer = null;
     _pollTimer?.cancel();
+    _pollTimer = null;
     if (_lifecycleObserverRegistered) {
       WidgetsBinding.instance.removeObserver(this);
       _lifecycleObserverRegistered = false;
     }
+    await outboxSub?.cancel();
+    await connectivitySub?.cancel();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (!_stopping && state == AppLifecycleState.resumed) {
       unawaited(triggerIfStale());
     }
   }
@@ -88,6 +125,7 @@ class SyncCoordinator extends WidgetsBindingObserver {
   Future<void> triggerIfStale({
     Duration minAge = const Duration(seconds: 10),
   }) async {
+    if (_stopping) return;
     final last = _lastFullSyncStartAt;
     if (last != null && DateTime.now().difference(last) < minAge) {
       return;
@@ -97,52 +135,71 @@ class SyncCoordinator extends WidgetsBindingObserver {
 
   /// 完整同步:pull 增量,再把 outbox 推完。bootstrap / 网络恢复时用。
   Future<void> runFullSync() async {
+    if (_stopping || _activeRun != null) return;
     _retryTimer?.cancel();
     _retryTimer = null;
     _pollTimer?.cancel();
     _pollTimer = null;
-    if (_inFlight) return;
-    _inFlight = true;
     _lastFullSyncStartAt = DateTime.now();
+    _activeRun = _gate
+        .runForAccount(_userId, _currentUserId, () async {
+          if (_stopping) return;
+          try {
+            _status.set(SyncStatus.syncing);
+            final token = _cancelToken = CancelToken();
+            final pullResult = await _engine.pullOnce(cancelToken: token);
+            if (_stopping) return;
+            if (pullResult != SyncStatus.idle) {
+              _status.set(pullResult);
+              _scheduleRetry(runFullSync);
+              return;
+            }
+            final pushResult = await _engine.pushOnce(cancelToken: token);
+            if (_stopping) return;
+            _status.set(pushResult);
+            if (pushResult == SyncStatus.idle) {
+              await _stampLastSyncAt();
+            }
+            if (pushResult == SyncStatus.error ||
+                pushResult == SyncStatus.offline) {
+              _scheduleRetry(runFullSync);
+            }
+          } finally {
+            // 无论成功还是失败(错误路径已有 retry),都在 30s 后再轮询。
+            if (!_stopping && _retryTimer == null) _schedulePoll();
+          }
+        })
+        .then((_) {});
     try {
-      _status.set(SyncStatus.syncing);
-      final pullResult = await _engine.pullOnce();
-      if (pullResult != SyncStatus.idle) {
-        _status.set(pullResult);
-        _scheduleRetry(runFullSync);
-        return;
-      }
-      final pushResult = await _engine.pushOnce();
-      _status.set(pushResult);
-      if (pushResult == SyncStatus.idle) {
-        await _stampLastSyncAt();
-      }
-      if (pushResult == SyncStatus.error || pushResult == SyncStatus.offline) {
-        _scheduleRetry(runFullSync);
-      }
+      await _activeRun;
     } finally {
-      _inFlight = false;
-      // 无论成功还是失败(错误路径已有 retry),都在 30s 后再轮询
-      if (_retryTimer == null) _schedulePoll();
+      _activeRun = null;
     }
   }
 
   /// 单独跑一次 push(本地写入 debounce 后调用)。
   Future<void> _runPush() async {
+    if (_stopping || _activeRun != null) return;
     _retryTimer?.cancel();
     _retryTimer = null;
-    if (_inFlight) return;
-    _inFlight = true;
+    _activeRun = _gate
+        .runForAccount(_userId, _currentUserId, () async {
+          if (_stopping) return;
+          final token = _cancelToken = CancelToken();
+          _status.set(SyncStatus.syncing);
+          final result = await _engine.pushOnce(cancelToken: token);
+          if (_stopping) return;
+          _status.set(result);
+          if (result == SyncStatus.idle) {
+            await _stampLastSyncAt();
+          }
+          _scheduleRetry(_runPush, only: result);
+        })
+        .then((_) {});
     try {
-      _status.set(SyncStatus.syncing);
-      final result = await _engine.pushOnce();
-      _status.set(result);
-      if (result == SyncStatus.idle) {
-        await _stampLastSyncAt();
-      }
-      _scheduleRetry(_runPush, only: result);
+      await _activeRun;
     } finally {
-      _inFlight = false;
+      _activeRun = null;
     }
   }
 
@@ -154,33 +211,36 @@ class SyncCoordinator extends WidgetsBindingObserver {
   }
 
   void _schedulePoll() {
+    if (_stopping) return;
     _pollTimer?.cancel();
-    _pollTimer = Timer(_kPollInterval, () => unawaited(runFullSync()));
+    _pollTimer = Timer(_kPollInterval, () {
+      if (!_stopping) unawaited(runFullSync());
+    });
   }
 
   /// error / offline 时 30s 后重跑 [callback]。
   void _scheduleRetry(Future<void> Function() callback, {SyncStatus? only}) {
+    if (_stopping) return;
     final shouldRetry =
-        only == null ||
-        only == SyncStatus.error ||
-        only == SyncStatus.offline;
+        only == null || only == SyncStatus.error || only == SyncStatus.offline;
     if (!shouldRetry) return;
-    _retryTimer = Timer(
-      const Duration(seconds: 30),
-      () => unawaited(callback()),
-    );
+    _retryTimer = Timer(const Duration(seconds: 30), () {
+      if (!_stopping) unawaited(callback());
+    });
   }
 
   void _onOutboxChanged(int count) {
-    if (count <= 0) return;
+    if (_stopping || count <= 0) return;
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), _runPush);
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (!_stopping) unawaited(_runPush());
+    });
   }
 
   void _onConnectivityChanged(List<ConnectivityResult> results) {
     final isOffline =
         results.isEmpty || results.every((r) => r == ConnectivityResult.none);
-    if (_wasOffline && !isOffline) {
+    if (!_stopping && _wasOffline && !isOffline) {
       // 离线 → 在线的边沿触发一次全量 sync。
       debugPrint('sync: connectivity restored, kicking full sync');
       unawaited(runFullSync());
@@ -191,9 +251,15 @@ class SyncCoordinator extends WidgetsBindingObserver {
 
 @Riverpod(keepAlive: true)
 SyncCoordinator syncCoordinator(Ref ref) {
-  return SyncCoordinator(
+  final userId = ref.watch(currentUserIdProvider);
+  final coord = SyncCoordinator(
     engine: ref.watch(syncEngineProvider),
     outbox: ref.watch(outboxRepositoryProvider),
     status: ref.watch(syncStatusControllerProvider.notifier),
+    gate: ref.watch(accountOperationGateProvider),
+    userId: userId,
+    currentUserId: () => ref.read(currentAuthSessionProvider)?.appUserId,
   );
+  ref.onDispose(coord.dispose);
+  return coord;
 }

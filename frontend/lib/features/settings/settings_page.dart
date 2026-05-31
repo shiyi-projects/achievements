@@ -1,10 +1,11 @@
 import 'dart:async';
 
-import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/sync/sync_coordinator.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
+import 'package:achievements/features/auth/auth_session.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
 import 'package:flutter/foundation.dart';
@@ -327,26 +328,10 @@ class _SyncSection extends ConsumerWidget {
     final isSyncing = status == SyncStatus.syncing;
 
     final (statusIcon, statusColor, statusText) = switch (status) {
-      SyncStatus.idle => (
-        Icons.cloud_done_rounded,
-        scheme.primary,
-        '已同步',
-      ),
-      SyncStatus.syncing => (
-        Icons.cloud_sync_rounded,
-        scheme.primary,
-        '同步中…',
-      ),
-      SyncStatus.error => (
-        Icons.error_outline_rounded,
-        scheme.error,
-        '同步失败',
-      ),
-      SyncStatus.offline => (
-        Icons.cloud_off_rounded,
-        scheme.outline,
-        '离线',
-      ),
+      SyncStatus.idle => (Icons.cloud_done_rounded, scheme.primary, '已同步'),
+      SyncStatus.syncing => (Icons.cloud_sync_rounded, scheme.primary, '同步中…'),
+      SyncStatus.error => (Icons.error_outline_rounded, scheme.error, '同步失败'),
+      SyncStatus.offline => (Icons.cloud_off_rounded, scheme.outline, '离线'),
     };
 
     return Padding(
@@ -361,9 +346,7 @@ class _SyncSection extends ConsumerWidget {
               const SizedBox(width: Spacing.sm),
               Text(
                 statusText,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: statusColor,
-                ),
+                style: theme.textTheme.titleSmall?.copyWith(color: statusColor),
               ),
               const Spacer(),
               Text(
@@ -383,8 +366,8 @@ class _SyncSection extends ConsumerWidget {
               onPressed: isSyncing
                   ? null
                   : () => unawaited(
-                        ref.read(syncCoordinatorProvider).runFullSync(),
-                      ),
+                      ref.read(syncCoordinatorProvider).runFullSync(),
+                    ),
               icon: isSyncing
                   ? const SizedBox(
                       width: 16,
@@ -400,45 +383,7 @@ class _SyncSection extends ConsumerWidget {
           const Divider(height: 1),
           const SizedBox(height: Spacing.sm),
 
-          // ── 用户 ID ──
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('用户 ID', style: theme.textTheme.titleSmall),
-                    const SizedBox(height: 2),
-                    Text(
-                      kLocalUserId,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontFamily: 'monospace',
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.copy_rounded, size: 20),
-                tooltip: '复制',
-                onPressed: () async {
-                  await Clipboard.setData(
-                    const ClipboardData(text: kLocalUserId),
-                  );
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('已复制到剪贴板'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
+          const _AccountSection(),
         ],
       ),
     );
@@ -454,6 +399,100 @@ class _SyncSection extends ConsumerWidget {
     if (diff.inHours < 24) return '${diff.inHours} 小时前';
     if (diff.inDays < 7) return '${diff.inDays} 天前';
     return '${at.year}-${at.month.toString().padLeft(2, '0')}-${at.day.toString().padLeft(2, '0')}';
+  }
+}
+
+class _AccountSection extends ConsumerWidget {
+  const _AccountSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authControllerProvider);
+    final session = switch (auth) {
+      AuthAuthenticated(:final session) => session,
+      _ => null,
+    };
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    if (session == null) {
+      return Text('未登录', style: TextStyle(color: scheme.onSurfaceVariant));
+    }
+    final nickname = session.profile.nickname?.trim();
+    final avatarUrl = session.profile.avatarUrl?.trim();
+    final avatarUri = avatarUrl == null ? null : Uri.tryParse(avatarUrl);
+    final hasRemoteAvatar =
+        avatarUri != null && avatarUri.hasScheme && avatarUri.hasAuthority;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              backgroundImage: hasRemoteAvatar
+                  ? NetworkImage(avatarUrl!)
+                  : null,
+              child: hasRemoteAvatar ? null : const Icon(Icons.person_rounded),
+            ),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    nickname == null || nickname.isEmpty ? '微信用户' : nickname,
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  Text(
+                    'OLib #${session.olibUserId} · ${session.profile.role}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () async {
+                await ref.read(authControllerProvider.notifier).logout();
+                if (context.mounted) Navigator.of(context).maybePop();
+              },
+              icon: const Icon(Icons.logout_rounded, size: 18),
+              label: const Text('退出'),
+            ),
+          ],
+        ),
+        const SizedBox(height: Spacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                session.appUserId,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                  color: scheme.onSurfaceVariant,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.copy_rounded, size: 20),
+              tooltip: '复制 Achievements 用户 ID',
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: session.appUserId));
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('已复制到剪贴板'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
 

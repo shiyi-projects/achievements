@@ -1,7 +1,7 @@
-import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/id.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -9,9 +9,10 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'focus_session_repository.g.dart';
 
 class FocusSessionRepository {
-  FocusSessionRepository(this._db);
+  FocusSessionRepository(this._db, this._userId);
 
   final AppDatabase _db;
+  final String _userId;
 
   /// 保存一次专注会话。返回生成的 id。
   Future<String> save({
@@ -23,18 +24,20 @@ class FocusSessionRepository {
     String? taskId,
   }) async {
     final id = newId();
-    await _db.into(_db.focusSessions).insert(
-      FocusSessionsCompanion.insert(
-        id: id,
-        userId: kLocalUserId,
-        taskId: Value(taskId),
-        startedAt: startedAt,
-        endedAt: Value(endedAt),
-        durationSeconds: Value(durationSeconds),
-        mode: Value(mode),
-        completed: Value(completed),
-      ),
-    );
+    await _db
+        .into(_db.focusSessions)
+        .insert(
+          FocusSessionsCompanion.insert(
+            id: id,
+            userId: _userId,
+            taskId: Value(taskId),
+            startedAt: startedAt,
+            endedAt: Value(endedAt),
+            durationSeconds: Value(durationSeconds),
+            mode: Value(mode),
+            completed: Value(completed),
+          ),
+        );
     return id;
   }
 
@@ -42,24 +45,24 @@ class FocusSessionRepository {
   Future<int> todayTotalSeconds() async {
     final start = _startOfToday();
     final end = start.add(const Duration(days: 1));
-    final rows = await (_db.select(_db.focusSessions)
-          ..where(
-            (s) =>
-                s.startedAt.isBetweenValues(start, end) &
-                s.durationSeconds.isNotNull(),
-          ))
-        .get();
+    final rows =
+        await (_db.select(_db.focusSessions)..where(
+              (s) =>
+                  s.userId.equals(_userId) &
+                  s.startedAt.isBetweenValues(start, end) &
+                  s.durationSeconds.isNotNull(),
+            ))
+            .get();
     return rows.fold<int>(0, (sum, r) => sum + (r.durationSeconds ?? 0));
   }
 
   /// 最近 [limit] 条会话,按开始时间倒序。
   Stream<List<FocusSession>> watchRecent({int limit = 10}) {
     return (_db.select(_db.focusSessions)
+          ..where((s) => s.userId.equals(_userId))
           ..orderBy([
-            (s) => OrderingTerm(
-              expression: s.startedAt,
-              mode: OrderingMode.desc,
-            ),
+            (s) =>
+                OrderingTerm(expression: s.startedAt, mode: OrderingMode.desc),
           ])
           ..limit(limit))
         .watch();
@@ -74,13 +77,14 @@ class FocusSessionRepository {
   Future<int> todayCompletedCount() async {
     final start = _startOfToday();
     final end = start.add(const Duration(days: 1));
-    final rows = await (_db.select(_db.focusSessions)
-          ..where(
-            (s) =>
-                s.startedAt.isBetweenValues(start, end) &
-                s.completed.equals(true),
-          ))
-        .get();
+    final rows =
+        await (_db.select(_db.focusSessions)..where(
+              (s) =>
+                  s.userId.equals(_userId) &
+                  s.startedAt.isBetweenValues(start, end) &
+                  s.completed.equals(true),
+            ))
+            .get();
     return rows.length;
   }
 
@@ -88,13 +92,14 @@ class FocusSessionRepository {
   Future<int> todayLongestSession() async {
     final start = _startOfToday();
     final end = start.add(const Duration(days: 1));
-    final rows = await (_db.select(_db.focusSessions)
-          ..where(
-            (s) =>
-                s.startedAt.isBetweenValues(start, end) &
-                s.durationSeconds.isNotNull(),
-          ))
-        .get();
+    final rows =
+        await (_db.select(_db.focusSessions)..where(
+              (s) =>
+                  s.userId.equals(_userId) &
+                  s.startedAt.isBetweenValues(start, end) &
+                  s.durationSeconds.isNotNull(),
+            ))
+            .get();
     if (rows.isEmpty) return 0;
     return rows
         .map((r) => r.durationSeconds ?? 0)
@@ -106,12 +111,14 @@ class FocusSessionRepository {
     final start = _startOfToday();
     final end = start.add(const Duration(days: 1));
     return (_db.select(_db.focusSessions)
-          ..where((s) => s.startedAt.isBetweenValues(start, end))
+          ..where(
+            (s) =>
+                s.userId.equals(_userId) &
+                s.startedAt.isBetweenValues(start, end),
+          )
           ..orderBy([
-            (s) => OrderingTerm(
-                  expression: s.startedAt,
-                  mode: OrderingMode.desc,
-                ),
+            (s) =>
+                OrderingTerm(expression: s.startedAt, mode: OrderingMode.desc),
           ]))
         .watch();
   }
@@ -119,5 +126,8 @@ class FocusSessionRepository {
 
 @Riverpod(keepAlive: true)
 FocusSessionRepository focusSessionRepository(Ref ref) {
-  return FocusSessionRepository(ref.watch(appDatabaseProvider));
+  return FocusSessionRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(currentUserIdProvider),
+  );
 }

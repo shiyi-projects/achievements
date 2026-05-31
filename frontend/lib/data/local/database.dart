@@ -8,16 +8,28 @@ import 'package:drift/drift.dart';
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Folders, TaskLists, Tasks, Tags, TaskTags, Outbox, SyncCursors, FocusSessions, AppPreferences, TaskSteps, FocusPlans],
+  tables: [
+    Folders,
+    TaskLists,
+    Tasks,
+    Tags,
+    TaskTags,
+    Outbox,
+    SyncCursors,
+    FocusSessions,
+    AppPreferences,
+    TaskSteps,
+    FocusPlans,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(openLocalConnection());
+  AppDatabase({String? userId}) : super(openLocalConnection(userId: userId));
 
   /// 测试用:注入内存 / 自定义 executor。
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -74,6 +86,8 @@ class AppDatabase extends _$AppDatabase {
             'ALTER TABLE tasks ADD COLUMN focused_seconds INTEGER NOT NULL DEFAULT 0',
           );
         }
+        // v9 → v10:系统清单 ID 改为按用户生成。旧主库迁移在 legacy import 中处理;
+        // 这里不再依赖全局固定 UUID。
       },
     );
   }
@@ -121,32 +135,28 @@ class AppDatabase extends _$AppDatabase {
   /// 完整 upsert,使其在下次 push 时能正确同步到服务端。
   Future<void> _normalizeSystemListIds() async {
     for (final kind in SystemListKind.values) {
-      final fixedId = kind.id;
+      final fixedId = kLegacySystemListIds[kind.value]!;
 
       // 找出 system_kind 匹配但 id 不是固定值的行(可能有多条旧随机 UUID)
       final wrongs =
-          await (select(taskLists)
-                ..where(
-                  (t) =>
-                      t.systemKind.equals(kind.value) &
-                      t.deletedAt.isNull() &
-                      t.id.equals(fixedId).not(),
-                ))
+          await (select(taskLists)..where(
+                (t) =>
+                    t.systemKind.equals(kind.value) &
+                    t.deletedAt.isNull() &
+                    t.id.equals(fixedId).not(),
+              ))
               .get();
 
       for (final old in wrongs) {
         // 1. 记录受影响的 tasks(用于后续补录 outbox)
-        final affected =
-            await (select(tasks)
-                  ..where(
-                    (t) =>
-                        t.listId.equals(old.id) & t.deletedAt.isNull(),
-                  ))
-                .get();
+        final affected = await (select(
+          tasks,
+        )..where((t) => t.listId.equals(old.id) & t.deletedAt.isNull())).get();
 
         // 2. 把 tasks.list_id 从旧 UUID 改为固定 UUID
-        await (update(tasks)..where((t) => t.listId.equals(old.id)))
-            .write(TasksCompanion(listId: Value(fixedId)));
+        await (update(tasks)..where((t) => t.listId.equals(old.id))).write(
+          TasksCompanion(listId: Value(fixedId)),
+        );
 
         // 3. 修正 outbox 中 task 类型条目的 payload.list_id
         await customStatement(
@@ -184,8 +194,7 @@ class AppDatabase extends _$AppDatabase {
               await (select(outbox)
                     ..where(
                       (t) =>
-                          t.entity.equals('task') &
-                          t.entityId.equals(task.id),
+                          t.entity.equals('task') & t.entityId.equals(task.id),
                     )
                     ..limit(1))
                   .get();

@@ -1,5 +1,6 @@
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
+import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,9 @@ const _keyCloseAction = 'close_action';
 class SettingsNotifier extends _$SettingsNotifier {
   @override
   Future<AppSettingsData> build() async {
+    if (ref.watch(currentAuthSessionProvider) == null) {
+      return kDefaultSettings;
+    }
     final db = ref.read(appDatabaseProvider);
     final rows = await db.select(db.appPreferences).get();
     final map = {for (final r in rows) r.key: r.value};
@@ -56,13 +60,13 @@ class SettingsNotifier extends _$SettingsNotifier {
   }
 
   Future<void> _upsert(String key, String value) async {
+    if (ref.read(currentAuthSessionProvider) == null) return;
     final db = ref.read(appDatabaseProvider);
-    await db.into(db.appPreferences).insertOnConflictUpdate(
-      AppPreferencesCompanion(
-        key: Value(key),
-        value: Value(value),
-      ),
-    );
+    await db
+        .into(db.appPreferences)
+        .insertOnConflictUpdate(
+          AppPreferencesCompanion(key: Value(key), value: Value(value)),
+        );
   }
 
   static ThemeMode _parseThemeMode(String? value) => switch (value) {

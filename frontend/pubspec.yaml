@@ -1,7 +1,7 @@
 name: achievements
 description: Achievements - cross-platform Todo app (Windows + Android)
 publish_to: none
-version: 0.0.1+1
+version: 0.0.2+2
 
 environment:
   sdk: ^3.8.1
@@ -29,6 +29,7 @@ dependencies:
 
   # ---- 数据层(远程)----
   dio: ^5.7.0
+  flutter_secure_storage: ^9.2.4
   # retrofit 留到 Phase 2 实装 API 客户端时再装(retrofit/retrofit_generator
   # 的上游版本经常不同步,届时按需锁定到一致的版本对)
 
@@ -36,6 +37,7 @@ dependencies:
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0
   uuid: ^4.5.1
+  crypto: ^3.0.6
   collection: ^1.18.0
 
   # ---- 提醒 / 后台 ----
