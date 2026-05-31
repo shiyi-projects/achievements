@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:achievements/core/sync/sync_coordinator.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
+import 'package:achievements/platform/windows/quit_app.dart';
 import 'package:achievements/platform/windows/shell_commands.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -23,17 +24,15 @@ class AppWindowListener extends WindowListener {
     final isPreventClose = await windowManager.isPreventClose();
     if (!isPreventClose) return;
 
-    final action = _container
-            .read(settingsNotifierProvider)
-            .valueOrNull
-            ?.closeAction ??
+    final action =
+        _container.read(settingsNotifierProvider).valueOrNull?.closeAction ??
         kDefaultSettings.closeAction;
 
     switch (action) {
       case CloseAction.minimizeToTray:
         await windowManager.hide();
       case CloseAction.exitApp:
-        await _destroy();
+        await quitApp();
       case CloseAction.ask:
         await _askAndAct();
     }
@@ -47,23 +46,23 @@ class AppWindowListener extends WindowListener {
 
   Future<void> _askAndAct() async {
     final completer = Completer<CloseAction>();
-    _container.read(shellCommandProvider.notifier).state =
-        AskCloseCommand(completer);
-    final picked = await completer.future;
+    _container.read(shellCommandProvider.notifier).state = AskCloseCommand(
+      completer,
+    );
+    // 安全超时:如果 dialog 无法弹出(上下文已销毁等),30 秒后自动 fallback 到最小化,
+    // 避免 completer 永远不 complete 导致卡死。
+    final picked = await completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () => CloseAction.minimizeToTray,
+    );
     switch (picked) {
       case CloseAction.minimizeToTray:
         await windowManager.hide();
       case CloseAction.exitApp:
-        await _destroy();
+        await quitApp();
       case CloseAction.ask:
         // 防御:ask dialog 不应把 ask 自身作为结果,理论上不会走到
         await windowManager.hide();
     }
-  }
-
-  Future<void> _destroy() async {
-    // preventClose=true 下需先关掉拦截,destroy 才能正常进入退出路径
-    await windowManager.setPreventClose(false);
-    await windowManager.destroy();
   }
 }

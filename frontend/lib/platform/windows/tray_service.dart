@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:achievements/platform/windows/quit_app.dart';
 import 'package:achievements/platform/windows/shell_commands.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +18,7 @@ class TrayService with TrayListener {
 
   late ProviderContainer _container;
   bool _windowVisible = true;
+  bool _disposed = false;
 
   Future<void> init(ProviderContainer container) async {
     if (!_isWindows) return;
@@ -26,7 +30,8 @@ class TrayService with TrayListener {
   }
 
   Future<void> dispose() async {
-    if (!_isWindows) return;
+    if (!_isWindows || _disposed) return;
+    _disposed = true;
     trayManager.removeListener(this);
     await trayManager.destroy();
   }
@@ -36,10 +41,7 @@ class TrayService with TrayListener {
     await trayManager.setContextMenu(
       Menu(
         items: [
-          MenuItem(
-            key: 'toggle',
-            label: _windowVisible ? '隐藏主窗口' : '显示主窗口',
-          ),
+          MenuItem(key: 'toggle', label: _windowVisible ? '隐藏主窗口' : '显示主窗口'),
           MenuItem.separator(),
           MenuItem(key: 'today', label: '今天'),
           MenuItem(key: 'focus', label: '开始专注'),
@@ -55,27 +57,30 @@ class TrayService with TrayListener {
   void onTrayIconMouseDown() => _bringToFront();
 
   @override
-  void onTrayMenuItemClick(MenuItem menuItem) {
+  void onTrayIconRightMouseDown() => trayManager.popUpContextMenu();
+
+  @override
+  // ignore: avoid_void_async
+  void onTrayMenuItemClick(MenuItem menuItem) async {
     switch (menuItem.key) {
       case 'toggle':
-        _toggleWindow();
+        unawaited(_toggleWindow());
       case 'today':
-        _bringToFront();
+        unawaited(_bringToFront());
         _container.read(shellCommandProvider.notifier).state =
             const ShowTodayCommand();
       case 'focus':
-        _bringToFront();
+        unawaited(_bringToFront());
         _container.read(shellCommandProvider.notifier).state =
             const ShowFocusCommand();
       case 'settings':
-        _bringToFront();
+        unawaited(_bringToFront());
         _container.read(shellCommandProvider.notifier).state =
             const OpenSettingsCommand();
       case 'quit':
-        // 用户在托盘里主动选退出 → 真退。绕过 preventClose,以免被关闭设置拦截。
-        windowManager.setPreventClose(false).then((_) {
-          windowManager.destroy();
-        });
+        // 走统一的 quitApp(): tray dispose → setPreventClose(false) → destroy
+        // → exit(0) 兜底。
+        await quitApp();
     }
   }
 

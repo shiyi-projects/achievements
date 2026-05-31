@@ -45,10 +45,7 @@ Widget _fillLayoutBuilder(Widget? currentChild, List<Widget> previousChildren) {
   return SizedBox.expand(
     child: Stack(
       clipBehavior: Clip.none,
-      children: [
-        ...previousChildren,
-        if (currentChild != null) currentChild,
-      ],
+      children: [...previousChildren, if (currentChild != null) currentChild],
     ),
   );
 }
@@ -129,70 +126,71 @@ class AppShell extends ConsumerWidget {
     if (showSidebarInline) {
       return ReminderChecker(
         child: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.keyK, control: true):
-              () => showCommandPalette(context),
-        },
-        child: Focus(
-          autofocus: true,
-          child: Scaffold(
-            body: Row(
-              children: [
-                const SizedBox(width: _kSidebarWidth, child: Sidebar()),
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: scheme.outlineVariant.withValues(alpha: 0.3),
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _ModernAppBar(title: title),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: MotionDurations.normal,
-                          switchInCurve: MotionCurves.emphasizedDecelerate,
-                          switchOutCurve: MotionCurves.emphasizedAccelerate,
-                          transitionBuilder: sharedAxisTransition,
-                          layoutBuilder: _fillLayoutBuilder,
-                          child: KeyedSubtree(
-                            key: ValueKey(view),
-                            child: mainBody,
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.keyK, control: true): () =>
+                showCommandPalette(context),
+          },
+          child: Focus(
+            autofocus: true,
+            child: Scaffold(
+              body: Row(
+                children: [
+                  const SizedBox(width: _kSidebarWidth, child: Sidebar()),
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: scheme.outlineVariant.withValues(alpha: 0.3),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _ModernAppBar(title: title),
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: MotionDurations.normal,
+                            switchInCurve: MotionCurves.emphasizedDecelerate,
+                            switchOutCurve: MotionCurves.emphasizedAccelerate,
+                            transitionBuilder: sharedAxisTransition,
+                            layoutBuilder: _fillLayoutBuilder,
+                            child: KeyedSubtree(
+                              key: ValueKey(view),
+                              child: mainBody,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                // ── 详情面板：带动画的滑入/滑出 ──
-                AnimatedSize(
-                  duration: MotionDurations.normal,
-                  curve: MotionCurves.emphasizedDecelerate,
-                  alignment: Alignment.centerLeft,
-                  child: dockDetail && selectedTaskId != null
-                      ? SizedBox(
-                          width: _kDetailWidth,
-                          child: Row(
-                            children: [
-                              VerticalDivider(
-                                width: 1,
-                                thickness: 1,
-                                color: scheme.outlineVariant.withValues(alpha: 0.3),
-                              ),
-                              const Expanded(child: TaskDetailPanel()),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
+                  // ── 详情面板：带动画的滑入/滑出 ──
+                  AnimatedSize(
+                    duration: MotionDurations.normal,
+                    curve: MotionCurves.emphasizedDecelerate,
+                    alignment: Alignment.centerLeft,
+                    child: dockDetail && selectedTaskId != null
+                        ? SizedBox(
+                            width: _kDetailWidth,
+                            child: Row(
+                              children: [
+                                VerticalDivider(
+                                  width: 1,
+                                  thickness: 1,
+                                  color: scheme.outlineVariant.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
+                                const Expanded(child: TaskDetailPanel()),
+                              ],
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
       );
     }
-
 
     final mobileScaffold = Scaffold(
       appBar: AppBar(
@@ -297,13 +295,11 @@ class AppShell extends ConsumerWidget {
             child: const Text('取消'),
           ),
           TextButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(CloseAction.exitApp),
+            onPressed: () => Navigator.of(ctx).pop(CloseAction.exitApp),
             child: const Text('退出'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(CloseAction.minimizeToTray),
+            onPressed: () => Navigator.of(ctx).pop(CloseAction.minimizeToTray),
             child: const Text('最小化到托盘'),
           ),
         ],
@@ -442,8 +438,9 @@ class _MobileBottomNav extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(currentViewNotifierProvider.notifier);
-    final selectedIndex =
-        _items.indexWhere((e) => e.view == current).clamp(0, _items.length - 1);
+    final selectedIndex = _items
+        .indexWhere((e) => e.view == current)
+        .clamp(0, _items.length - 1);
 
     return NavigationBar(
       selectedIndex: selectedIndex,
