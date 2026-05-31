@@ -29,13 +29,13 @@ services:
       # Linux 上 host.docker.internal 默认不解析,显式声明以保证跨平台一致
       - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
+      - "8084:8084"
     volumes:
       - ./app:/app/app:ro
       - ./alembic:/app/alembic:ro
       - ./alembic.ini:/app/alembic.ini:ro
       - attachments:/app/storage/attachments
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8084", "--reload"]
     restart: unless-stopped
 
   # ----- profile: full -----

@@ -1,9 +1,10 @@
 # 宝塔 VPS 单容器部署 compose。
 #
-# 用法:
-#   1. 服务器上 cd /www/wwwroot/achievements-backend
-#   2. 把 .env.prod 上传到这里(含 Supabase DATABASE_URL 等)
-#   3. docker compose -f docker-compose.baota.yml up -d --build
+# 用法(推荐一键脚本,自动构建 + 迁移 + 启动 + 健康检查):
+#   1. cd /www/wwwroot/achievements-backend
+#   2. cp .env.prod.example .env.prod,填入 Supabase DATABASE_URL 等真实值
+#   3. bash start-baota.sh
+#   手动方式: docker compose -f docker-compose.baota.yml up -d --build(需另跑 alembic 迁移)
 #
 # 与原 docker-compose.prod.yml 的区别:
 # - 不跑 db / redis 容器(DB 走 Supabase;Redis 代码暂未用,后续再加)
@@ -27,15 +28,7 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
-    # 覆盖 Dockerfile 默认 CMD,让容器内 uvicorn 监听 8084(与宿主端口一致)
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8084"]
-    # Dockerfile healthcheck 默认 ping 8000,这里覆盖到 8084
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8084/api/v1/healthz"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
+    # 命令 / 暴露端口 / 健康检查均沿用 Dockerfile 默认(uvicorn 监听 8084)
     ports:
       - "127.0.0.1:8084:8084"  # 宿主 127.0.0.1:8084 → 容器 8084;nginx 反代到这里
     volumes:

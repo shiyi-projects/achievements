@@ -7,7 +7,7 @@ ENV_FILE="${ENV_FILE:-.env.dev}"
 IMAGE="${IMAGE:-achievements/backend:dev}"
 CONTAINER_NAME="${CONTAINER_NAME:-achievements-api}"
 HOST_PORT="${HOST_PORT:-8001}"
-CONTAINER_PORT="${CONTAINER_PORT:-8000}"
+CONTAINER_PORT="${CONTAINER_PORT:-8084}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   cat >&2 <<EOF

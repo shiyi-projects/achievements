@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     app_env: Literal["development", "test", "production"] = "development"
     app_debug: bool = True
     app_host: str = "0.0.0.0"  # noqa: S104 — container/dev only; reverse proxy fronts prod
-    app_port: int = 8000
+    app_port: int = 8084
     app_cors_origins: list[str] = Field(default_factory=list)
 
     # Database

@@ -26,14 +26,14 @@ services:
       - /var/lib/achievements/attachments:/app/storage/attachments
     command: >
       gunicorn app.main:app
-      --bind 0.0.0.0:8000
+      --bind 0.0.0.0:8084
       --workers 4
       --worker-class uvicorn.workers.UvicornWorker
       --access-logfile -
       --error-logfile -
     ports: !reset []
     expose:
-      - "8000"
+      - "8084"
     restart: always
     deploy:
       resources:

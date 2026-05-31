@@ -32,9 +32,19 @@ docker compose --profile full up --build
 ```
 
 访问:
-- API: http://localhost:8000
-- OpenAPI 文档: http://localhost:8000/docs
-- 健康检查: http://localhost:8000/api/v1/healthz
+- API: http://localhost:8084
+- OpenAPI 文档: http://localhost:8084/docs
+- 健康检查: http://localhost:8084/api/v1/healthz
+
+## 宝塔生产部署(Docker + Supabase)
+
+数据库走 Supabase 托管 Postgres,容器只在 `127.0.0.1:8084` 暴露,由宝塔 Nginx 反代到域名。
+
+```bash
+cp .env.prod.example .env.prod   # 填入 Supabase DATABASE_URL / JWT_SECRET / APP_CORS_ORIGINS
+bash start-baota.sh              # 构建 + 迁移 + 启动 + 健康检查
+# 其它:bash start-baota.sh {migrate|restart|logs|down}
+```
 
 ## 代码质量
 

@@ -4,4 +4,4 @@ services:
       - path: .env.dev
         required: true
     ports: !override
-      - "8001:8000"
+      - "8001:8084"
