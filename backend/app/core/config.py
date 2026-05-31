@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     jwt_alg: str = "HS256"
     jwt_access_ttl_min: int = 30
     jwt_refresh_ttl_days: int = 14
-    olib_base_url: str = "https://olib.11xy.cn"
+    olib_base_url: str = "https://wxauth.11xy.cn"
     olib_timeout_seconds: float = 8.0
     auth_profile_cache_ttl_seconds: int = 60
 
