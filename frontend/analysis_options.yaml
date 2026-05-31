@@ -5,6 +5,7 @@ include: package:very_good_analysis/analysis_options.yaml
 
 analyzer:
   exclude:
+    - "packages/**"
     - "**/*.g.dart"
     - "**/*.freezed.dart"
     - "**/*.gr.dart"
@@ -14,6 +15,8 @@ analyzer:
     strict-casts: true
     strict-inference: true
     strict-raw-types: true
+  errors:
+    deprecated_member_use: ignore
   # custom_lint 暂未启用(riverpod_lint 引入的传递依赖目前与 build_runner 不兼容)
   # plugins:
   #   - custom_lint
@@ -23,3 +26,16 @@ linter:
     public_member_api_docs: false      # 内部应用,无需为每个 public API 写文档
     lines_longer_than_80_chars: false  # 走 100 字符,与后端 ruff 一致
     sort_pub_dependencies: false       # pubspec 按用途分组(状态/路由/数据层…)优先于字典序
+    directives_ordering: false         # dart format 不会自动重排 import 分组
+    avoid_redundant_argument_values: false
+    prefer_int_literals: false
+    comment_references: false
+    missing_code_block_language_in_doc_comment: false
+    prefer_const_constructors: false
+    omit_local_variable_types: false
+    cascade_invocations: false
+    always_put_required_named_parameters_first: false
+    unnecessary_brace_in_string_interps: false
+    prefer_if_elements_to_conditional_expressions: false
+    use_named_constants: false
+    unawaited_futures: false

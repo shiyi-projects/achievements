@@ -12,17 +12,17 @@ Future<Map<String, bool>> achievementStatus(Ref ref) async {
 
   // Fetch all metrics in parallel for efficiency.
   final intResults = await Future.wait<int>([
-    repo.totalCompletedTasks(),    // 0
-    repo.streakDays(),             // 1
+    repo.totalCompletedTasks(), // 0
+    repo.streakDays(), // 1
     repo.completedFocusSessions(), // 2
-    repo.todayFocusMinutes(),      // 3
-    repo.totalFocusMinutes(),      // 4
+    repo.todayFocusMinutes(), // 3
+    repo.totalFocusMinutes(), // 4
     repo.maxDailyCompletedTasks(), // 5
   ]);
 
   final boolResults = await Future.wait<bool>([
     repo.hasEarlyCompletion(), // 0
-    repo.hasLateCompletion(),  // 1
+    repo.hasLateCompletion(), // 1
   ]);
 
   final metrics = _AchievementMetrics(
@@ -37,8 +37,7 @@ Future<Map<String, bool>> achievementStatus(Ref ref) async {
   );
 
   return {
-    for (final def in kAchievementDefs)
-      def.code: _isUnlocked(def, metrics),
+    for (final def in kAchievementDefs) def.code: _isUnlocked(def, metrics),
   };
 }
 
@@ -69,9 +68,12 @@ bool _isUnlocked(AchievementDef def, _AchievementMetrics m) {
     AchievementCriteriaType.tasksCompleted => m.totalTasks >= def.threshold,
     AchievementCriteriaType.streakDays => m.streak >= def.threshold,
     AchievementCriteriaType.focusSessions => m.focusSessions >= def.threshold,
-    AchievementCriteriaType.dailyFocusMinutes => m.todayFocusMin >= def.threshold,
-    AchievementCriteriaType.totalFocusMinutes => m.totalFocusMin >= def.threshold,
-    AchievementCriteriaType.dailyTasksCompleted => m.maxDailyTasks >= def.threshold,
+    AchievementCriteriaType.dailyFocusMinutes =>
+      m.todayFocusMin >= def.threshold,
+    AchievementCriteriaType.totalFocusMinutes =>
+      m.totalFocusMin >= def.threshold,
+    AchievementCriteriaType.dailyTasksCompleted =>
+      m.maxDailyTasks >= def.threshold,
     AchievementCriteriaType.earlyCompletion => m.hasEarly,
     AchievementCriteriaType.lateCompletion => m.hasLate,
   };

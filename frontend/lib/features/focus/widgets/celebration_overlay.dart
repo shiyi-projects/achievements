@@ -19,9 +19,7 @@ class CelebrationOverlay extends StatefulWidget {
     final overlay = Overlay.of(context);
     late final OverlayEntry entry;
     entry = OverlayEntry(
-      builder: (_) => CelebrationOverlay(
-        onComplete: () => entry.remove(),
-      ),
+      builder: (_) => CelebrationOverlay(onComplete: () => entry.remove()),
     );
     overlay.insert(entry);
   }
@@ -38,16 +36,14 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: MotionDurations.celebration,
-    )
-      ..forward()
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          widget.onComplete();
-        }
-      });
+    _ctrl =
+        AnimationController(vsync: this, duration: MotionDurations.celebration)
+          ..forward()
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed) {
+              widget.onComplete();
+            }
+          });
 
     final rand = math.Random();
     _particles = List.generate(30, (_) {
@@ -109,10 +105,7 @@ class _CelebParticle {
 }
 
 class _CelebPainter extends CustomPainter {
-  const _CelebPainter({
-    required this.particles,
-    required this.progress,
-  });
+  const _CelebPainter({required this.particles, required this.progress});
 
   final List<_CelebParticle> particles;
   final double progress;

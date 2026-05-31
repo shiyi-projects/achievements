@@ -61,7 +61,8 @@ class _CommandPaletteContent extends ConsumerStatefulWidget {
       _CommandPaletteContentState();
 }
 
-class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> {
+class _CommandPaletteContentState
+    extends ConsumerState<_CommandPaletteContent> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   String _query = '';
@@ -242,7 +243,9 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
                     : ListView.builder(
                         controller: _scrollController,
                         shrinkWrap: true,
-                        padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: Spacing.xs,
+                        ),
                         itemCount: _entries.length,
                         itemExtent: 48,
                         itemBuilder: (_, i) {
@@ -257,7 +260,9 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
                             },
                             child: Container(
                               color: isSelected
-                                  ? scheme.primaryContainer.withValues(alpha: 0.5)
+                                  ? scheme.primaryContainer.withValues(
+                                      alpha: 0.5,
+                                    )
                                   : Colors.transparent,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: Spacing.base,
@@ -269,23 +274,25 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
                                   Expanded(
                                     child: Text(
                                       entry.label,
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: isSelected
-                                            ? scheme.primary
-                                            : scheme.onSurface,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                      ),
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: isSelected
+                                                ? scheme.primary
+                                                : scheme.onSurface,
+                                            fontWeight: isSelected
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                          ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   if (entry.category.isNotEmpty)
                                     Text(
                                       entry.category,
-                                      style: theme.textTheme.labelSmall?.copyWith(
-                                        color: scheme.onSurfaceVariant,
-                                      ),
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
                                     ),
                                 ],
                               ),
@@ -339,9 +346,7 @@ class _CommandPaletteContentState extends ConsumerState<_CommandPaletteContent> 
         category: '导航',
         action: (ctx, ref) {
           final lists = ref.read(allListsProvider).valueOrNull ?? [];
-          final today = lists.where(
-            (l) => l.systemKind == 'today',
-          ).firstOrNull;
+          final today = lists.where((l) => l.systemKind == 'today').firstOrNull;
           if (today != null) {
             ref.read(selectedListIdProvider.notifier).select(today.id);
             ref.read(currentViewNotifierProvider.notifier).showList();

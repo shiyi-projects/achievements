@@ -45,7 +45,8 @@ class _MonthGridState extends ConsumerState<MonthGrid> {
 
   /// 根据月份反算页码。
   int _pageForMonth(DateTime month) {
-    final diff = (month.year - _anchorMonth.year) * 12 +
+    final diff =
+        (month.year - _anchorMonth.year) * 12 +
         (month.month - _anchorMonth.month);
     return _kInitialPage + diff;
   }
@@ -90,7 +91,8 @@ class _MonthGridState extends ConsumerState<MonthGrid> {
         itemBuilder: (context, page) {
           final month = _monthForPage(page);
           // 只有当前聚焦月才用 live 数据, 相邻月用空数据(性能)
-          final isFocused = month.year == focusedMonth.year &&
+          final isFocused =
+              month.year == focusedMonth.year &&
               month.month == focusedMonth.month;
           return _MonthPage(
             month: month,
@@ -188,16 +190,15 @@ class _MonthPage extends ConsumerWidget {
                           ? const SizedBox.shrink()
                           : DayCell(
                               day: d,
-                              isSelected: selected != null &&
+                              isSelected:
+                                  selected != null &&
                                   selected!.year == month.year &&
                                   selected!.month == month.month &&
                                   selected!.day == d,
                               isToday: _isToday(month, d),
                               tasks: byDay[d] ?? const <Task>[],
                               onTap: () {
-                                ref
-                                    .read(selectedDayProvider.notifier)
-                                    .state =
+                                ref.read(selectedDayProvider.notifier).state =
                                     DateTime(month.year, month.month, d);
                               },
                             ),
@@ -212,8 +213,6 @@ class _MonthPage extends ConsumerWidget {
 
   static bool _isToday(DateTime month, int day) {
     final now = DateTime.now();
-    return now.year == month.year &&
-        now.month == month.month &&
-        now.day == day;
+    return now.year == month.year && now.month == month.month && now.day == day;
   }
 }

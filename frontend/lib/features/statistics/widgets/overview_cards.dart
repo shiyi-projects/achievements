@@ -129,70 +129,71 @@ class _CompactStatCard extends StatelessWidget {
     final isLight = scheme.brightness == Brightness.light;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: (gradient as LinearGradient)
-                .colors
-                .first
-                .withValues(alpha: isLight ? 0.25 : 0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Icon circle
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ColorFiltered(
-              colorFilter:
-                  const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-              child: icon,
-            ),
-          ),
-          const SizedBox(height: 10),
-          // Value
-          formatter != null
-              ? Text(
-                  formatter!(value),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.1,
-                  ),
-                )
-              : AnimatedCounter(
-                  value: value,
-                  suffix: suffix,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.1,
-                  ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: (gradient as LinearGradient).colors.first.withValues(
+                  alpha: isLight ? 0.25 : 0.15,
                 ),
-          const SizedBox(height: 2),
-          // Label
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 10,
-            ),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-    )
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon circle
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ColorFiltered(
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
+                  child: icon,
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Value
+              formatter != null
+                  ? Text(
+                      formatter!(value),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.1,
+                      ),
+                    )
+                  : AnimatedCounter(
+                      value: value,
+                      suffix: suffix,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.1,
+                      ),
+                    ),
+              const SizedBox(height: 2),
+              // Label
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        )
         .animate()
         .fadeIn(
           duration: MotionDurations.normal,

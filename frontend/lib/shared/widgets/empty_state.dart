@@ -37,17 +37,17 @@ class EmptyState extends StatelessWidget {
             children: [
               // ── Icon with floating animation ──
               Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  shape: BoxShape.circle,
-                ),
-                child: SizedBox(width: 36, height: 36, child: icon),
-              )
-                  .animate(
-                    onPlay: (ctrl) => ctrl.repeat(reverse: true),
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHighest.withValues(
+                        alpha: 0.5,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: SizedBox(width: 36, height: 36, child: icon),
                   )
+                  .animate(onPlay: (ctrl) => ctrl.repeat(reverse: true))
                   .moveY(
                     begin: 0,
                     end: -6,
@@ -61,9 +61,10 @@ class EmptyState extends StatelessWidget {
                   color: scheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
-              )
-                  .animate()
-                  .fadeIn(duration: MotionDurations.normal, delay: 200.ms),
+              ).animate().fadeIn(
+                duration: MotionDurations.normal,
+                delay: 200.ms,
+              ),
               if (subtitle != null) ...[
                 const SizedBox(height: Spacing.xs),
                 Text(
@@ -72,16 +73,17 @@ class EmptyState extends StatelessWidget {
                     color: scheme.outline,
                   ),
                   textAlign: TextAlign.center,
-                )
-                    .animate()
-                    .fadeIn(duration: MotionDurations.normal, delay: 350.ms),
+                ).animate().fadeIn(
+                  duration: MotionDurations.normal,
+                  delay: 350.ms,
+                ),
               ],
               if (actionLabel != null && onAction != null) ...[
                 const SizedBox(height: Spacing.base),
                 FilledButton.tonal(
-                  onPressed: onAction,
-                  child: Text(actionLabel!),
-                )
+                      onPressed: onAction,
+                      child: Text(actionLabel!),
+                    )
                     .animate()
                     .fadeIn(duration: MotionDurations.normal, delay: 500.ms)
                     .scale(

@@ -83,181 +83,193 @@ class _TaskTileState extends ConsumerState<TaskTile>
     final isHighPriority = priority == TaskPriority.high;
 
     return ScaleTransition(
-      scale: _pressScale,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Spacing.base,
-          vertical: Spacing.xs,
-        ),
-        child: GestureDetector(
-          onTapDown: (_) => _pressCtrl.forward(),
-          onTapUp: (_) => _pressCtrl.reverse(),
-          onTapCancel: () => _pressCtrl.reverse(),
-          child: Material(
-            color: selected
-                ? scheme.secondaryContainer.withValues(alpha: 0.5)
-                : scheme.surfaceContainer,
-            borderRadius: BorderRadius.circular(Radii.card),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(Radii.card),
-              onTap: () =>
-                  ref.read(selectedTaskIdProvider.notifier).select(task.id),
-              onLongPress: () {
-                Haptic.medium();
-                _showContextMenu(context, ref);
-              },
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // ── Priority Color Strip (高优先级发光) ──
-                    if (priority != TaskPriority.none)
-                      AnimatedContainer(
-                        duration: MotionDurations.fast,
-                        width: 4,
-                        decoration: BoxDecoration(
-                          color: priorityColor,
-                          borderRadius: const BorderRadius.horizontal(
-                            left: Radius.circular(Radii.card),
-                          ),
-                          boxShadow: isHighPriority
-                              ? [
-                                  BoxShadow(
-                                    color: priorityColor.withValues(
-                                      alpha: isLight ? 0.4 : 0.6,
-                                    ),
-                                    blurRadius: 6,
-                                    offset: const Offset(2, 0),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                      ),
-
-                    // ── Main Content ──
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          priority != TaskPriority.none
-                              ? Spacing.sm
-                              : Spacing.md,
-                          Spacing.sm,
-                          Spacing.md,
-                          Spacing.sm,
-                        ),
-                        child: Row(
-                          children: [
-                            // ── Checkbox with particles ──
-                            _ParticleCheckbox(
-                              checked: done,
-                              color: done ? scheme.primary : scheme.outline,
-                              onTap: () => ref
-                                  .read(taskRepositoryProvider)
-                                  .setCompleted(task.id, completed: !done),
+          scale: _pressScale,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Spacing.base,
+              vertical: Spacing.xs,
+            ),
+            child: GestureDetector(
+              onTapDown: (_) => _pressCtrl.forward(),
+              onTapUp: (_) => _pressCtrl.reverse(),
+              onTapCancel: () => _pressCtrl.reverse(),
+              child: Material(
+                color: selected
+                    ? scheme.secondaryContainer.withValues(alpha: 0.5)
+                    : scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(Radii.card),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(Radii.card),
+                  onTap: () =>
+                      ref.read(selectedTaskIdProvider.notifier).select(task.id),
+                  onLongPress: () {
+                    Haptic.medium();
+                    _showContextMenu(context, ref);
+                  },
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // ── Priority Color Strip (高优先级发光) ──
+                        if (priority != TaskPriority.none)
+                          AnimatedContainer(
+                            duration: MotionDurations.fast,
+                            width: 4,
+                            decoration: BoxDecoration(
+                              color: priorityColor,
+                              borderRadius: const BorderRadius.horizontal(
+                                left: Radius.circular(Radii.card),
+                              ),
+                              boxShadow: isHighPriority
+                                  ? [
+                                      BoxShadow(
+                                        color: priorityColor.withValues(
+                                          alpha: isLight ? 0.4 : 0.6,
+                                        ),
+                                        blurRadius: 6,
+                                        offset: const Offset(2, 0),
+                                      ),
+                                    ]
+                                  : null,
                             ),
-                            const SizedBox(width: Spacing.md),
+                          ),
 
-                            // ── Title + Meta + Tags ──
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  AnimatedDefaultTextStyle(
-                                    duration: MotionDurations.fast,
-                                    style: (theme.textTheme.bodyLarge ?? const TextStyle()).copyWith(
-                                      decoration: done
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                      color: done ? scheme.outline : scheme.onSurface,
-                                      decorationColor: scheme.outline,
-                                    ),
-                                    child: Text(
-                                      task.title,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  // ── Metadata row: due date / repeat / focus ──
-                                  if (_hasMetadata(task))
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: Spacing.xs,
+                        // ── Main Content ──
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              priority != TaskPriority.none
+                                  ? Spacing.sm
+                                  : Spacing.md,
+                              Spacing.sm,
+                              Spacing.md,
+                              Spacing.sm,
+                            ),
+                            child: Row(
+                              children: [
+                                // ── Checkbox with particles ──
+                                _ParticleCheckbox(
+                                  checked: done,
+                                  color: done ? scheme.primary : scheme.outline,
+                                  onTap: () => ref
+                                      .read(taskRepositoryProvider)
+                                      .setCompleted(task.id, completed: !done),
+                                ),
+                                const SizedBox(width: Spacing.md),
+
+                                // ── Title + Meta + Tags ──
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      AnimatedDefaultTextStyle(
+                                        duration: MotionDurations.fast,
+                                        style:
+                                            (theme.textTheme.bodyLarge ??
+                                                    const TextStyle())
+                                                .copyWith(
+                                                  decoration: done
+                                                      ? TextDecoration
+                                                            .lineThrough
+                                                      : null,
+                                                  color: done
+                                                      ? scheme.outline
+                                                      : scheme.onSurface,
+                                                  decorationColor:
+                                                      scheme.outline,
+                                                ),
+                                        child: Text(
+                                          task.title,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                      child: _MetadataRow(task: task),
-                                    ),
-                                  if (tags.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: Spacing.xs,
-                                      ),
-                                      child: TagsRow(tags: tags),
-                                    ),
-                                  if (stepProgress.total > 0)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: Spacing.xs,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                Radii.circle,
-                                              ),
-                                              child: LinearProgressIndicator(
-                                                value: stepProgress.total == 0
-                                                    ? 0
-                                                    : stepProgress.done /
-                                                        stepProgress.total,
-                                                minHeight: 3,
-                                                backgroundColor: scheme
-                                                    .surfaceContainerHighest
-                                                    .withValues(alpha: 0.6),
-                                                valueColor:
-                                                    AlwaysStoppedAnimation(
-                                                  scheme.primary,
+                                      // ── Metadata row: due date / repeat / focus ──
+                                      if (_hasMetadata(task))
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: Spacing.xs,
+                                          ),
+                                          child: _MetadataRow(task: task),
+                                        ),
+                                      if (tags.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: Spacing.xs,
+                                          ),
+                                          child: TagsRow(tags: tags),
+                                        ),
+                                      if (stepProgress.total > 0)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: Spacing.xs,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        Radii.circle,
+                                                      ),
+                                                  child: LinearProgressIndicator(
+                                                    value:
+                                                        stepProgress.total == 0
+                                                        ? 0
+                                                        : stepProgress.done /
+                                                              stepProgress
+                                                                  .total,
+                                                    minHeight: 3,
+                                                    backgroundColor: scheme
+                                                        .surfaceContainerHighest
+                                                        .withValues(alpha: 0.6),
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation(
+                                                          scheme.primary,
+                                                        ),
+                                                  ),
                                                 ),
                                               ),
-                                            ),
+                                              const SizedBox(width: Spacing.xs),
+                                              Text(
+                                                '${stepProgress.done}/${stepProgress.total}',
+                                                style: theme
+                                                    .textTheme
+                                                    .labelSmall
+                                                    ?.copyWith(
+                                                      color: scheme.outline,
+                                                      fontSize: 10,
+                                                    ),
+                                              ),
+                                            ],
                                           ),
-                                          const SizedBox(width: Spacing.xs),
-                                          Text(
-                                            '${stepProgress.done}/${stepProgress.total}',
-                                            style: theme.textTheme.labelSmall
-                                                ?.copyWith(
-                                              color: scheme.outline,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
 
-                            // ── Trailing ──
-                            ..._buildTrailing(
-                              theme,
-                              scheme,
-                              priority,
-                              hasFutureReminder,
+                                // ── Trailing ──
+                                ..._buildTrailing(
+                                  theme,
+                                  scheme,
+                                  priority,
+                                  hasFutureReminder,
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
-    )
+        )
         .animate()
         .fadeIn(duration: MotionDurations.fast)
         .slideX(
@@ -381,7 +393,10 @@ class _TaskTileState extends ConsumerState<TaskTile>
                 onTap: () {
                   Navigator.pop(context);
                   Haptic.light();
-                  repo.update(widget.task.id, starred: Value(!widget.task.starred));
+                  repo.update(
+                    widget.task.id,
+                    starred: Value(!widget.task.starred),
+                  );
                 },
               ),
               const Divider(height: Spacing.sm),
@@ -397,10 +412,7 @@ class _TaskTileState extends ConsumerState<TaskTile>
                     child: AppIcons.svgIcon(AppIcons.delete, size: 18),
                   ),
                 ),
-                title: Text(
-                  '移到回收站',
-                  style: TextStyle(color: scheme.error),
-                ),
+                title: Text('移到回收站', style: TextStyle(color: scheme.error)),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(Radii.input),
                 ),
@@ -464,9 +476,7 @@ class _MetadataRow extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isOverdue
-                  ? Icons.event_busy_rounded
-                  : Icons.event_rounded,
+              isOverdue ? Icons.event_busy_rounded : Icons.event_rounded,
               size: 13,
               color: dateColor,
             ),
@@ -486,13 +496,7 @@ class _MetadataRow extends StatelessWidget {
 
     // ── 2. 重复标识 ──
     if (task.repeatRule != null && task.repeatRule!.isNotEmpty) {
-      items.add(
-        Icon(
-          Icons.repeat_rounded,
-          size: 13,
-          color: scheme.outline,
-        ),
-      );
+      items.add(Icon(Icons.repeat_rounded, size: 13, color: scheme.outline));
     }
 
     // ── 3. 专注进度 ──
@@ -592,13 +596,14 @@ class _ParticleCheckboxState extends State<_ParticleCheckbox>
       vsync: this,
       duration: MotionDurations.fast,
     );
-    _scale = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1, end: 1.4), weight: 35),
-      TweenSequenceItem(tween: Tween(begin: 1.4, end: 0.9), weight: 30),
-      TweenSequenceItem(tween: Tween(begin: 0.9, end: 1.0), weight: 35),
-    ]).animate(
-      CurvedAnimation(parent: _scaleCtrl, curve: MotionCurves.bouncySpring),
-    );
+    _scale =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 1, end: 1.4), weight: 35),
+          TweenSequenceItem(tween: Tween(begin: 1.4, end: 0.9), weight: 30),
+          TweenSequenceItem(tween: Tween(begin: 0.9, end: 1.0), weight: 35),
+        ]).animate(
+          CurvedAnimation(parent: _scaleCtrl, curve: MotionCurves.bouncySpring),
+        );
 
     _particleCtrl = AnimationController(
       vsync: this,
@@ -679,10 +684,8 @@ class _ParticleCheckboxState extends State<_ParticleCheckbox>
                 ),
                 child: AnimatedSwitcher(
                   duration: MotionDurations.fast,
-                  transitionBuilder: (child, anim) => ScaleTransition(
-                    scale: anim,
-                    child: child,
-                  ),
+                  transitionBuilder: (child, anim) =>
+                      ScaleTransition(scale: anim, child: child),
                   child: widget.checked
                       ? SizedBox(
                           key: const ValueKey('check'),
@@ -743,6 +746,5 @@ class _ParticlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ParticlePainter old) =>
-      old.progress != progress;
+  bool shouldRepaint(_ParticlePainter old) => old.progress != progress;
 }

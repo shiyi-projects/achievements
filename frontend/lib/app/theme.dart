@@ -90,9 +90,7 @@ ThemeData _buildTheme(ColorScheme scheme) {
         borderRadius: BorderRadius.circular(Radii.card),
         side: isLight
             ? BorderSide.none
-            : BorderSide(
-                color: scheme.outlineVariant.withValues(alpha: 0.15),
-              ),
+            : BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.15)),
       ),
       color: isLight ? scheme.surfaceContainerLow : scheme.surfaceContainer,
       margin: const EdgeInsets.symmetric(
@@ -142,17 +140,13 @@ ThemeData _buildTheme(ColorScheme scheme) {
         borderRadius: BorderRadius.circular(Radii.input),
         borderSide: isLight
             ? BorderSide.none
-            : BorderSide(
-                color: scheme.outlineVariant.withValues(alpha: 0.1),
-              ),
+            : BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.1)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(Radii.input),
         borderSide: isLight
             ? BorderSide.none
-            : BorderSide(
-                color: scheme.outlineVariant.withValues(alpha: 0.1),
-              ),
+            : BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(Radii.input),
@@ -188,7 +182,10 @@ ThemeData _buildTheme(ColorScheme scheme) {
         fontFamilyFallback: _kFontFallback,
       ),
       actionsPadding: const EdgeInsets.fromLTRB(
-        Spacing.xl, 0, Spacing.xl, Spacing.lg,
+        Spacing.xl,
+        0,
+        Spacing.xl,
+        Spacing.lg,
       ),
     ),
 
@@ -377,9 +374,7 @@ ThemeData _buildTheme(ColorScheme scheme) {
     // ── Tooltip — 暗色模式下更明亮 ──
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
-        color: isLight
-            ? scheme.inverseSurface
-            : scheme.surfaceContainerHighest,
+        color: isLight ? scheme.inverseSurface : scheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(Radii.chip),
       ),
       textStyle: TextStyle(

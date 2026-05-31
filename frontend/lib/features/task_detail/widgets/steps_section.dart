@@ -112,8 +112,8 @@ class _StepsSectionState extends ConsumerState<StepsSection> {
                     child: LinearProgressIndicator(
                       value: total == 0 ? 0 : done / total,
                       minHeight: 4,
-                      backgroundColor:
-                          scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                      backgroundColor: scheme.surfaceContainerHighest
+                          .withValues(alpha: 0.6),
                       valueColor: AlwaysStoppedAnimation(scheme.primary),
                     ),
                   ),
@@ -177,8 +177,9 @@ class _StepsSectionState extends ConsumerState<StepsSection> {
                   style: theme.textTheme.bodyMedium,
                   decoration: InputDecoration(
                     hintText: '添加步骤',
-                    hintStyle: theme.textTheme.bodyMedium
-                        ?.copyWith(color: scheme.outline),
+                    hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.outline,
+                    ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -306,10 +307,8 @@ class _StepRowState extends State<_StepRow> {
           children: [
             // ── Checkbox ──
             GestureDetector(
-              onTap: () => widget.repo.toggleStep(
-                widget.step.id,
-                completed: !done,
-              ),
+              onTap: () =>
+                  widget.repo.toggleStep(widget.step.id, completed: !done),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 width: 20,
@@ -323,8 +322,11 @@ class _StepRowState extends State<_StepRow> {
                   ),
                 ),
                 child: done
-                    ? const Icon(Icons.check_rounded,
-                        size: 13, color: Colors.white)
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 13,
+                        color: Colors.white,
+                      )
                     : null,
               ),
             ),

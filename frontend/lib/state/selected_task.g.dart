@@ -6,7 +6,7 @@ part of 'selected_task.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$currentTaskHash() => r'4a45bd2230cc4fcbaf83bbd029358626ef71047b';
+String _$currentTaskHash() => r'451d7a2025835d9b712ca09ceb18a5e6b230b70a';
 
 /// 解析为真实 [Task] 行的流;选中 ID 为 null 时 yield null。
 ///
@@ -15,8 +15,9 @@ String _$currentTaskHash() => r'4a45bd2230cc4fcbaf83bbd029358626ef71047b';
 final currentTaskProvider = AutoDisposeStreamProvider<Task?>.internal(
   currentTask,
   name: r'currentTaskProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$currentTaskHash,
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$currentTaskHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
@@ -24,7 +25,7 @@ final currentTaskProvider = AutoDisposeStreamProvider<Task?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentTaskRef = AutoDisposeStreamProviderRef<Task?>;
-String _$parentTaskHash() => r'84e26e891b5657e3345bb714206cd1fc04aa231d';
+String _$parentTaskHash() => r'084061965e8e3a4d8cd567caf443219a0a86baff';
 
 /// 当前任务的父任务（面包屑导航用）。
 ///
@@ -36,8 +37,9 @@ String _$parentTaskHash() => r'84e26e891b5657e3345bb714206cd1fc04aa231d';
 final parentTaskProvider = AutoDisposeStreamProvider<Task?>.internal(
   parentTask,
   name: r'parentTaskProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$parentTaskHash,
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$parentTaskHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
@@ -58,14 +60,14 @@ String _$selectedTaskIdHash() => r'ef6ba962267ce25c31995c20205cbc5ce58922a6';
 @ProviderFor(SelectedTaskId)
 final selectedTaskIdProvider =
     NotifierProvider<SelectedTaskId, String?>.internal(
-  SelectedTaskId.new,
-  name: r'selectedTaskIdProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$selectedTaskIdHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+      SelectedTaskId.new,
+      name: r'selectedTaskIdProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$selectedTaskIdHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 typedef _$SelectedTaskId = Notifier<String?>;
 // ignore_for_file: type=lint

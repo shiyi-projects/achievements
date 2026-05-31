@@ -5,7 +5,14 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'stats_providers.g.dart';
 
 @riverpod
-Future<({int totalCompleted, int todayCompleted, int streakDays, int totalFocusMinutes})>
+Future<
+  ({
+    int totalCompleted,
+    int todayCompleted,
+    int streakDays,
+    int totalFocusMinutes,
+  })
+>
 statsOverview(Ref ref) async {
   final repo = ref.watch(statsRepositoryProvider);
   final results = await Future.wait<int>([
@@ -31,5 +38,6 @@ Future<List<({String date, int sessions, int minutes})>> statsFocus(Ref ref) =>
     ref.watch(statsRepositoryProvider).focusStats();
 
 @riverpod
-Future<List<({String date, int completed, int created})>> statsTrends(Ref ref) =>
-    ref.watch(statsRepositoryProvider).completionTrends();
+Future<List<({String date, int completed, int created})>> statsTrends(
+  Ref ref,
+) => ref.watch(statsRepositoryProvider).completionTrends();

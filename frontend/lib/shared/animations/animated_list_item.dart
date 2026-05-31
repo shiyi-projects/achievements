@@ -44,13 +44,9 @@ class _AnimatedListItemState extends State<AnimatedListItem>
       curve: MotionCurves.emphasizedDecelerate,
     );
     final offset = StaggerHelper.slideOffset(widget.index);
-    _slide = Tween<Offset>(
-      begin: Offset(0, offset),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _ctrl,
-      curve: MotionCurves.emphasizedDecelerate,
-    ));
+    _slide = Tween<Offset>(begin: Offset(0, offset), end: Offset.zero).animate(
+      CurvedAnimation(parent: _ctrl, curve: MotionCurves.emphasizedDecelerate),
+    );
 
     Future.delayed(StaggerHelper.delay(widget.index), () {
       if (mounted) _ctrl.forward();
@@ -67,10 +63,7 @@ class _AnimatedListItemState extends State<AnimatedListItem>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _opacity,
-      child: SlideTransition(
-        position: _slide,
-        child: widget.child,
-      ),
+      child: SlideTransition(position: _slide, child: widget.child),
     );
   }
 }

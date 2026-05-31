@@ -52,10 +52,7 @@ final selectedDayTasksProvider = Provider<List<Task>>((ref) {
 
 /// 月度统计数据。
 class MonthStats {
-  const MonthStats({
-    required this.total,
-    required this.completed,
-  });
+  const MonthStats({required this.total, required this.completed});
 
   final int total;
   final int completed;

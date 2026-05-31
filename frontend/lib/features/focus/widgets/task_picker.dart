@@ -9,11 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 根据任务 ID 查询任务的 provider。
-final _taskByIdProvider =
-    StreamProvider.family.autoDispose<Task?, String>((ref, taskId) {
+final _taskByIdProvider = StreamProvider.family.autoDispose<Task?, String>((
+  ref,
+  taskId,
+) {
   final db = ref.watch(appDatabaseProvider);
-  return (db.select(db.tasks)..where((t) => t.id.equals(taskId)))
-      .watchSingleOrNull();
+  return (db.select(
+    db.tasks,
+  )..where((t) => t.id.equals(taskId))).watchSingleOrNull();
 });
 
 /// 专注会话关联任务区域。
@@ -32,7 +35,8 @@ class TaskPicker extends ConsumerWidget {
     final currentTaskAsync = ref.watch(currentTaskProvider);
 
     final associatedId = timerState.taskId;
-    final isActive = timerState.phase == FocusPhase.working ||
+    final isActive =
+        timerState.phase == FocusPhase.working ||
         timerState.phase == FocusPhase.shortBreak;
 
     // ── 已关联任务 ──
@@ -62,9 +66,7 @@ class TaskPicker extends ConsumerWidget {
     }
 
     // ── 无任何关联 ──
-    return _EmptyCard(
-      onTap: () => _showTaskSelector(context, ref),
-    );
+    return _EmptyCard(onTap: () => _showTaskSelector(context, ref));
   }
 
   void _showTaskSelector(BuildContext context, WidgetRef ref) {
@@ -137,12 +139,12 @@ class _AssociatedCard extends StatelessWidget {
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: Icon(
-                isActive ? Icons.local_fire_department_rounded : Icons.task_alt_rounded,
+                isActive
+                    ? Icons.local_fire_department_rounded
+                    : Icons.task_alt_rounded,
                 key: ValueKey(isActive),
                 size: 22,
-                color: isActive
-                    ? const Color(0xFFFF6D00)
-                    : scheme.primary,
+                color: isActive ? const Color(0xFFFF6D00) : scheme.primary,
               ),
             ),
             const SizedBox(width: Spacing.md),
@@ -366,8 +368,7 @@ class _TaskSelectorSheet extends ConsumerStatefulWidget {
   const _TaskSelectorSheet();
 
   @override
-  ConsumerState<_TaskSelectorSheet> createState() =>
-      _TaskSelectorSheetState();
+  ConsumerState<_TaskSelectorSheet> createState() => _TaskSelectorSheetState();
 }
 
 class _TaskSelectorSheetState extends ConsumerState<_TaskSelectorSheet> {
@@ -429,27 +430,26 @@ class _TaskSelectorSheetState extends ConsumerState<_TaskSelectorSheet> {
           // ── 列表 ──
           Expanded(
             child: StreamBuilder<List<Task>>(
-              stream: (db.select(db.tasks)
-                    ..where(
-                      (t) =>
-                          t.deletedAt.isNull() &
-                          t.completedAt.isNull() &
-                          t.parentId.isNull(),
-                    )
-                    ..orderBy([
-                      (t) => OrderingTerm(
+              stream:
+                  (db.select(db.tasks)
+                        ..where(
+                          (t) =>
+                              t.deletedAt.isNull() &
+                              t.completedAt.isNull() &
+                              t.parentId.isNull(),
+                        )
+                        ..orderBy([
+                          (t) => OrderingTerm(
                             expression: t.updatedAt,
                             mode: OrderingMode.desc,
                           ),
-                    ])
-                    ..limit(50))
-                  .watch(),
+                        ])
+                        ..limit(50))
+                      .watch(),
               builder: (context, snap) {
                 final tasks = (snap.data ?? []).where((t) {
                   if (_search.isEmpty) return true;
-                  return t.title
-                      .toLowerCase()
-                      .contains(_search.toLowerCase());
+                  return t.title.toLowerCase().contains(_search.toLowerCase());
                 }).toList();
 
                 if (tasks.isEmpty) {
@@ -462,9 +462,7 @@ class _TaskSelectorSheetState extends ConsumerState<_TaskSelectorSheet> {
                 }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: Spacing.sm,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
                   itemCount: tasks.length,
                   itemBuilder: (context, i) {
                     final task = tasks[i];

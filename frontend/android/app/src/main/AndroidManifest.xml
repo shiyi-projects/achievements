@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 网络:同步引擎走 HTTPS 调后端,release 包必须显式声明
+         (debug/profile manifest 各自带了一份,合并后只覆盖那两个 buildType) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- 通知所需权限(Android 13+ 需要运行时申请 POST_NOTIFICATIONS) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />

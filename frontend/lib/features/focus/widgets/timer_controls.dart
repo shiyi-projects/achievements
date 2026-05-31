@@ -41,41 +41,46 @@ class TimerControls extends ConsumerWidget {
   ) {
     return switch (state.phase) {
       FocusPhase.idle => _StartButton(
-          key: const ValueKey('idle'),
-          notifier: notifier,
-        ),
+        key: const ValueKey('idle'),
+        notifier: notifier,
+      ),
       FocusPhase.working => _CircularControls(
-          key: const ValueKey('working'),
-          isRunning: state.isRunning,
-          onMainTap: state.isRunning ? notifier.pause : notifier.start,
-          mainIcon: state.isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          mainLabel: state.isRunning ? '暂停' : '继续',
-          onSecondary: notifier.stop,
-          secondaryIcon: Icons.stop_rounded,
-          secondaryLabel: '放弃',
-        ),
+        key: const ValueKey('working'),
+        isRunning: state.isRunning,
+        onMainTap: state.isRunning ? notifier.pause : notifier.start,
+        mainIcon: state.isRunning
+            ? Icons.pause_rounded
+            : Icons.play_arrow_rounded,
+        mainLabel: state.isRunning ? '暂停' : '继续',
+        onSecondary: notifier.stop,
+        secondaryIcon: Icons.stop_rounded,
+        secondaryLabel: '放弃',
+      ),
       FocusPhase.shortBreak => _CircularControls(
-          key: const ValueKey('break'),
-          isRunning: state.isRunning,
-          onMainTap: state.isRunning ? notifier.pause : notifier.start,
-          mainIcon: state.isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          mainLabel: state.isRunning ? '暂停' : '继续',
-          onSecondary: notifier.reset,
-          secondaryIcon: Icons.skip_next_rounded,
-          secondaryLabel: '跳过',
-        ),
-      FocusPhase.done => state.mode == FocusMode.pomodoro
-          ? _DoneButtons(
-              key: const ValueKey('done-pomo'),
-              onBreak: notifier.startBreak,
-              onSkip: notifier.reset,
-            )
-          : _StartButton(
-              key: const ValueKey('done-free'),
-              notifier: notifier,
-              label: '再来一轮',
-              onTap: notifier.reset,
-            ),
+        key: const ValueKey('break'),
+        isRunning: state.isRunning,
+        onMainTap: state.isRunning ? notifier.pause : notifier.start,
+        mainIcon: state.isRunning
+            ? Icons.pause_rounded
+            : Icons.play_arrow_rounded,
+        mainLabel: state.isRunning ? '暂停' : '继续',
+        onSecondary: notifier.reset,
+        secondaryIcon: Icons.skip_next_rounded,
+        secondaryLabel: '跳过',
+      ),
+      FocusPhase.done =>
+        state.mode == FocusMode.pomodoro
+            ? _DoneButtons(
+                key: const ValueKey('done-pomo'),
+                onBreak: notifier.startBreak,
+                onSkip: notifier.reset,
+              )
+            : _StartButton(
+                key: const ValueKey('done-free'),
+                notifier: notifier,
+                label: '再来一轮',
+                onTap: notifier.reset,
+              ),
     };
   }
 }
@@ -146,10 +151,7 @@ class _StartButtonState extends State<_StartButton>
         onPressed: widget.onTap ?? widget.notifier.start,
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: Spacing.md + 2),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         child: Text(widget.label),
       ),
@@ -287,11 +289,7 @@ class _CircleButton extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _DoneButtons extends StatelessWidget {
-  const _DoneButtons({
-    super.key,
-    required this.onBreak,
-    required this.onSkip,
-  });
+  const _DoneButtons({super.key, required this.onBreak, required this.onSkip});
 
   final VoidCallback onBreak;
   final VoidCallback onSkip;
@@ -316,9 +314,7 @@ class _DoneButtons extends StatelessWidget {
             onPressed: onSkip,
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: Spacing.md),
-              side: BorderSide(
-                color: scheme.outline.withValues(alpha: 0.3),
-              ),
+              side: BorderSide(color: scheme.outline.withValues(alpha: 0.3)),
               foregroundColor: scheme.onSurface.withValues(alpha: 0.7),
             ),
             child: const Text('跳过'),

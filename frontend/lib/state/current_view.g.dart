@@ -13,14 +13,14 @@ String _$currentViewNotifierHash() =>
 @ProviderFor(CurrentViewNotifier)
 final currentViewNotifierProvider =
     NotifierProvider<CurrentViewNotifier, AppView>.internal(
-  CurrentViewNotifier.new,
-  name: r'currentViewNotifierProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$currentViewNotifierHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+      CurrentViewNotifier.new,
+      name: r'currentViewNotifierProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$currentViewNotifierHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 typedef _$CurrentViewNotifier = Notifier<AppView>;
 // ignore_for_file: type=lint

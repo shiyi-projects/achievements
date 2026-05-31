@@ -154,12 +154,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     final notes = _dirtyNotes;
     _dirtyTitle = const Value.absent();
     _dirtyNotes = const Value.absent();
-    _repo.update(
-      taskId,
-      knownVersion: version,
-      title: title,
-      notes: notes,
-    );
+    _repo.update(taskId, knownVersion: version, title: title, notes: notes);
   }
 
   /// 立即保存（Ctrl+S 触发），跳过 debounce。
@@ -210,9 +205,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
         color: scheme.onSurface,
         fontWeight: FontWeight.w600,
       ),
-      dayTextStyle: textTheme.bodyMedium?.copyWith(
-        color: scheme.onSurface,
-      ),
+      dayTextStyle: textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
       selectedDayTextStyle: textTheme.bodyMedium?.copyWith(
         color: scheme.onPrimary,
         fontWeight: FontWeight.w600,
@@ -249,7 +242,10 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
       borderRadius: BorderRadius.circular(Radii.sheet),
       value: [initial],
     );
-    if (results == null || results.isEmpty || results.first == null || !mounted) {
+    if (results == null ||
+        results.isEmpty ||
+        results.first == null ||
+        !mounted) {
       return;
     }
     final picked = results.first!;
@@ -271,7 +267,10 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
       borderRadius: BorderRadius.circular(Radii.sheet),
       value: [initial],
     );
-    if (results == null || results.isEmpty || results.first == null || !mounted) {
+    if (results == null ||
+        results.isEmpty ||
+        results.first == null ||
+        !mounted) {
       return;
     }
     final date = results.first!;
@@ -384,7 +383,10 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(
-                      Spacing.xl, Spacing.base, Spacing.xl, Spacing.xl,
+                      Spacing.xl,
+                      Spacing.base,
+                      Spacing.xl,
+                      Spacing.xl,
                     ),
                     children: [
                       // ── Title (完成状态反馈) ──
@@ -396,8 +398,9 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                           decoration: task.completedAt != null
                               ? TextDecoration.lineThrough
                               : null,
-                          color:
-                              task.completedAt != null ? scheme.outline : null,
+                          color: task.completedAt != null
+                              ? scheme.outline
+                              : null,
                           decorationColor: scheme.outline,
                         ),
                         textInputAction: TextInputAction.done,
@@ -508,31 +511,35 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                             children: [
                               DateChip(
                                 date: task.dueAt,
-                                icon: AppIcons.svgIcon(AppIcons.planned,
-                                    size: 16),
+                                icon: AppIcons.svgIcon(
+                                  AppIcons.planned,
+                                  size: 16,
+                                ),
                                 emptyLabel: '截止日期',
                                 onTap: _pickDueDate,
                                 onClear: task.dueAt != null
                                     ? () => _repo.update(
-                                          task.id,
-                                          knownVersion: task.version,
-                                          dueAt: const Value(null),
-                                        )
+                                        task.id,
+                                        knownVersion: task.version,
+                                        dueAt: const Value(null),
+                                      )
                                     : null,
                               ),
                               DateChip(
                                 date: task.remindAt,
-                                icon: AppIcons.svgIcon(AppIcons.reminder,
-                                    size: 16),
+                                icon: AppIcons.svgIcon(
+                                  AppIcons.reminder,
+                                  size: 16,
+                                ),
                                 emptyLabel: '提醒',
                                 showTime: true,
                                 onTap: _pickRemind,
                                 onClear: task.remindAt != null
                                     ? () => _repo.update(
-                                          task.id,
-                                          knownVersion: task.version,
-                                          remindAt: const Value(null),
-                                        )
+                                        task.id,
+                                        knownVersion: task.version,
+                                        remindAt: const Value(null),
+                                      )
                                     : null,
                               ),
                               _EstimatedDurationRow(

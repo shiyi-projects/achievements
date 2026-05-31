@@ -16,14 +16,14 @@ String _$expandedFoldersHash() => r'2015bdd8db976af652a3b54d33eabd2712b222de';
 @ProviderFor(ExpandedFolders)
 final expandedFoldersProvider =
     NotifierProvider<ExpandedFolders, Set<String>>.internal(
-  ExpandedFolders.new,
-  name: r'expandedFoldersProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$expandedFoldersHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+      ExpandedFolders.new,
+      name: r'expandedFoldersProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$expandedFoldersHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 typedef _$ExpandedFolders = Notifier<Set<String>>;
 // ignore_for_file: type=lint

@@ -58,15 +58,15 @@ class FocusTimerState {
 
   /// 默认初始状态：番茄钟，空闲，25 分钟。
   factory FocusTimerState.initial() => const FocusTimerState(
-        mode: FocusMode.pomodoro,
-        phase: FocusPhase.idle,
-        remaining: Duration(minutes: 25),
-        elapsed: Duration.zero,
-        isRunning: false,
-        workDuration: Duration(minutes: 25),
-        breakDuration: Duration(minutes: 5),
-        completedPomodoros: 0,
-      );
+    mode: FocusMode.pomodoro,
+    phase: FocusPhase.idle,
+    remaining: Duration(minutes: 25),
+    elapsed: Duration.zero,
+    isRunning: false,
+    workDuration: Duration(minutes: 25),
+    breakDuration: Duration(minutes: 5),
+    completedPomodoros: 0,
+  );
 
   final FocusMode mode;
   final FocusPhase phase;
@@ -145,10 +145,7 @@ class FocusTimer extends _$FocusTimer {
   /// 设置工作时长（仅在 idle 阶段有效）。
   void setWorkDuration(Duration duration) {
     if (state.phase != FocusPhase.idle) return;
-    state = state.copyWith(
-      workDuration: duration,
-      remaining: duration,
-    );
+    state = state.copyWith(workDuration: duration, remaining: duration);
   }
 
   /// 设置休息时长（仅在 idle 阶段有效）。
@@ -196,7 +193,10 @@ class FocusTimer extends _$FocusTimer {
     final dueAt = task.dueAt;
     if (dueAt != null) {
       // 有截止日：剩余量 ÷ 剩余天数
-      final remainingDays = dueAt.difference(DateTime.now()).inDays.clamp(1, 365);
+      final remainingDays = dueAt
+          .difference(DateTime.now())
+          .inDays
+          .clamp(1, 365);
       dailyMinutes = (remainingMinutes / remainingDays).ceil().clamp(5, 90);
     } else {
       // 无截止日：取剩余量和 45 分钟的较小值

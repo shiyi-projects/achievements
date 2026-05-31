@@ -36,10 +36,10 @@ class _ViewNavTileState extends State<ViewNavTile> {
     final bgColor = widget.selected
         ? scheme.secondaryContainer
         : _hovering
-            ? (isLight
-                ? scheme.surfaceContainerHigh.withValues(alpha: 0.5)
-                : scheme.surfaceContainerHigh.withValues(alpha: 0.3))
-            : Colors.transparent;
+        ? (isLight
+              ? scheme.surfaceContainerHigh.withValues(alpha: 0.5)
+              : scheme.surfaceContainerHigh.withValues(alpha: 0.3))
+        : Colors.transparent;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
@@ -103,8 +103,9 @@ class _ViewNavTileState extends State<ViewNavTile> {
                           Text(
                             widget.label,
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight:
-                                  widget.selected ? FontWeight.w600 : FontWeight.w400,
+                              fontWeight: widget.selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
                               color: widget.selected
                                   ? scheme.onSecondaryContainer
                                   : scheme.onSurface,

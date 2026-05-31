@@ -76,10 +76,6 @@ abstract final class AppIcons {
   ///
   /// [size] 同时约束 width/height,默认 20。
   static Widget svgIcon(String assetPath, {double size = 20}) {
-    return SvgPicture.asset(
-      assetPath,
-      width: size,
-      height: size,
-    );
+    return SvgPicture.asset(assetPath, width: size, height: size);
   }
 }

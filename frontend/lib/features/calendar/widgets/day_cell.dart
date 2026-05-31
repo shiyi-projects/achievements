@@ -53,7 +53,9 @@ class _DayCellState extends State<DayCell> {
       bgColor = scheme.primaryContainer.withValues(alpha: isLight ? 0.45 : 0.3);
       fgColor = scheme.onPrimaryContainer;
     } else if (_hovering) {
-      bgColor = scheme.surfaceContainerHigh.withValues(alpha: isLight ? 0.6 : 0.3);
+      bgColor = scheme.surfaceContainerHigh.withValues(
+        alpha: isLight ? 0.6 : 0.3,
+      );
       fgColor = scheme.onSurface;
     } else {
       bgColor = Colors.transparent;
@@ -119,10 +121,7 @@ class _DayCellState extends State<DayCell> {
                       const SizedBox(height: 2),
                       // ── Task dots or today marker ──
                       if (hasTasks)
-                        _TaskDots(
-                          count: taskCount,
-                          color: dotColor,
-                        )
+                        _TaskDots(count: taskCount, color: dotColor)
                       else if (widget.isToday && !widget.isSelected)
                         Container(
                           width: 4,
@@ -181,10 +180,7 @@ class _TaskDots extends StatelessWidget {
             width: 4,
             height: 4,
             margin: const EdgeInsets.symmetric(horizontal: 0.5),
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
         ),
       );

@@ -51,9 +51,10 @@ class _ReminderAlarmScreenState extends ConsumerState<ReminderAlarmScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
+    _pulseAnim = Tween<double>(
+      begin: 1.0,
+      end: 1.15,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
 
     // ── Entrance animation ──
     _entranceCtrl = AnimationController(
@@ -64,13 +65,13 @@ class _ReminderAlarmScreenState extends ConsumerState<ReminderAlarmScreen>
       parent: _entranceCtrl,
       curve: const Interval(0, 0.4, curve: Curves.easeOut),
     );
-    _contentSlide = Tween<Offset>(
-      begin: const Offset(0, 0.15),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _entranceCtrl,
-      curve: const Interval(0.2, 0.8, curve: Curves.easeOutCubic),
-    ));
+    _contentSlide =
+        Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _entranceCtrl,
+            curve: const Interval(0.2, 0.8, curve: Curves.easeOutCubic),
+          ),
+        );
     _contentFade = CurvedAnimation(
       parent: _entranceCtrl,
       curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
@@ -95,19 +96,20 @@ class _ReminderAlarmScreenState extends ConsumerState<ReminderAlarmScreen>
   }
 
   Future<void> _completeTask() async {
-    await ref.read(taskRepositoryProvider).setCompleted(
-      widget.task.id,
-      completed: true,
-    );
+    await ref
+        .read(taskRepositoryProvider)
+        .setCompleted(widget.task.id, completed: true);
     _dismiss();
   }
 
   Future<void> _snooze(Duration delay) async {
-    await ref.read(taskRepositoryProvider).update(
-      widget.task.id,
-      knownVersion: widget.task.version,
-      remindAt: Value(DateTime.now().add(delay)),
-    );
+    await ref
+        .read(taskRepositoryProvider)
+        .update(
+          widget.task.id,
+          knownVersion: widget.task.version,
+          remindAt: Value(DateTime.now().add(delay)),
+        );
     _dismiss();
   }
 
@@ -120,10 +122,7 @@ class _ReminderAlarmScreenState extends ConsumerState<ReminderAlarmScreen>
           children: [
             Padding(
               padding: const EdgeInsets.all(Spacing.base),
-              child: Text(
-                '稍后提醒',
-                style: Theme.of(ctx).textTheme.titleMedium,
-              ),
+              child: Text('稍后提醒', style: Theme.of(ctx).textTheme.titleMedium),
             ),
             ListTile(
               leading: AppIcons.svgIcon(AppIcons.focusTimer),
@@ -221,10 +220,7 @@ class _ReminderAlarmScreenState extends ConsumerState<ReminderAlarmScreen>
                                 gradient: LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
-                                  colors: [
-                                    scheme.primary,
-                                    scheme.tertiary,
-                                  ],
+                                  colors: [scheme.primary, scheme.tertiary],
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -236,7 +232,10 @@ class _ReminderAlarmScreenState extends ConsumerState<ReminderAlarmScreen>
                                   ),
                                 ],
                               ),
-                              child: AppIcons.svgIcon(AppIcons.reminder, size: 48),
+                              child: AppIcons.svgIcon(
+                                AppIcons.reminder,
+                                size: 48,
+                              ),
                             ),
                           ),
 
@@ -291,10 +290,12 @@ class _ReminderAlarmScreenState extends ConsumerState<ReminderAlarmScreen>
                             Container(
                               padding: const EdgeInsets.all(Spacing.base),
                               decoration: BoxDecoration(
-                                color: scheme.surfaceContainerHigh
-                                    .withValues(alpha: 0.5),
-                                borderRadius:
-                                    BorderRadius.circular(Radii.input),
+                                color: scheme.surfaceContainerHigh.withValues(
+                                  alpha: 0.5,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  Radii.input,
+                                ),
                               ),
                               child: Text(
                                 task.notes!,
@@ -374,9 +375,8 @@ class _ReminderAlarmScreenState extends ConsumerState<ReminderAlarmScreen>
 
   String _formatDateTime(DateTime dt) {
     final now = DateTime.now();
-    final isToday = dt.year == now.year &&
-        dt.month == now.month &&
-        dt.day == now.day;
+    final isToday =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
     final h = dt.hour.toString().padLeft(2, '0');
     final m = dt.minute.toString().padLeft(2, '0');
     if (isToday) return '今天 $h:$m';

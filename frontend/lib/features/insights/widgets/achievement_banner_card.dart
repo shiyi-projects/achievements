@@ -103,8 +103,9 @@ class _AchievementBannerCardState extends State<AchievementBannerCard> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onPrimaryContainer
-                              .withValues(alpha: 0.7),
+                          color: scheme.onPrimaryContainer.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                     ],
@@ -114,8 +115,10 @@ class _AchievementBannerCardState extends State<AchievementBannerCard> {
 
                 // ── Unlocked badge ──
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: scheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),

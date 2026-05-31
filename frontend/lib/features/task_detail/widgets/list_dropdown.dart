@@ -32,8 +32,9 @@ class ListDropdown extends ConsumerWidget {
         '—';
 
     final inbox = lists.where((l) => l.isSystem).toList();
-    final rootLists =
-        lists.where((l) => !l.isSystem && l.folderId == null).toList();
+    final rootLists = lists
+        .where((l) => !l.isSystem && l.folderId == null)
+        .toList();
     final folderIds = folders.map((f) => f.id).toSet();
     final byFolder = <String, List<TaskList>>{};
     for (final l in lists.where((l) => !l.isSystem && l.folderId != null)) {
@@ -52,8 +53,7 @@ class ListDropdown extends ConsumerWidget {
           if (id != currentListId) onChanged(id);
         },
         offset: const Offset(0, 36),
-        constraints:
-            const BoxConstraints(maxHeight: 400, minWidth: 200),
+        constraints: const BoxConstraints(maxHeight: 400, minWidth: 200),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Radii.input),
         ),
@@ -100,11 +100,7 @@ class ListDropdown extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: Spacing.xs),
-              Icon(
-                Icons.unfold_more_rounded,
-                size: 16,
-                color: scheme.outline,
-              ),
+              Icon(Icons.unfold_more_rounded, size: 16, color: scheme.outline),
             ],
           ),
         ),

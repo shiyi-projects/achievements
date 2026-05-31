@@ -16,12 +16,8 @@ class FocusBackground extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final phase = ref.watch(
-      focusTimerProvider.select((s) => s.phase),
-    );
-    final isRunning = ref.watch(
-      focusTimerProvider.select((s) => s.isRunning),
-    );
+    final phase = ref.watch(focusTimerProvider.select((s) => s.phase));
+    final isRunning = ref.watch(focusTimerProvider.select((s) => s.isRunning));
     final scheme = Theme.of(context).colorScheme;
     final isLight = Theme.of(context).brightness == Brightness.light;
 
@@ -54,30 +50,30 @@ class FocusBackground extends ConsumerWidget {
 
       return switch (phase) {
         FocusPhase.idle => [
-            base,
-            Color.lerp(base, scheme.primaryContainer, 0.05)!,
-            edge,
-          ],
+          base,
+          Color.lerp(base, scheme.primaryContainer, 0.05)!,
+          edge,
+        ],
         FocusPhase.working when isRunning => [
-            Color.lerp(base, scheme.primaryContainer, 0.12)!,
-            Color.lerp(base, scheme.primaryContainer, 0.06)!,
-            edge,
-          ],
+          Color.lerp(base, scheme.primaryContainer, 0.12)!,
+          Color.lerp(base, scheme.primaryContainer, 0.06)!,
+          edge,
+        ],
         FocusPhase.working => [
-            Color.lerp(base, scheme.surfaceContainerHigh, 0.08)!,
-            base,
-            edge,
-          ],
+          Color.lerp(base, scheme.surfaceContainerHigh, 0.08)!,
+          base,
+          edge,
+        ],
         FocusPhase.shortBreak => [
-            Color.lerp(base, scheme.tertiaryContainer, 0.1)!,
-            Color.lerp(base, scheme.tertiaryContainer, 0.04)!,
-            edge,
-          ],
+          Color.lerp(base, scheme.tertiaryContainer, 0.1)!,
+          Color.lerp(base, scheme.tertiaryContainer, 0.04)!,
+          edge,
+        ],
         FocusPhase.done => [
-            Color.lerp(base, const Color(0xFFFFF8E1), 0.15)!,
-            Color.lerp(base, const Color(0xFFFFF8E1), 0.06)!,
-            edge,
-          ],
+          Color.lerp(base, const Color(0xFFFFF8E1), 0.15)!,
+          Color.lerp(base, const Color(0xFFFFF8E1), 0.06)!,
+          edge,
+        ],
       };
     } else {
       // 暗色模式: 深色渐变
@@ -86,30 +82,30 @@ class FocusBackground extends ConsumerWidget {
 
       return switch (phase) {
         FocusPhase.idle => [
-            Color.lerp(base, Colors.black, 0.3)!,
-            Color.lerp(base, Colors.black, 0.4)!,
-            darkEdge,
-          ],
+          Color.lerp(base, Colors.black, 0.3)!,
+          Color.lerp(base, Colors.black, 0.4)!,
+          darkEdge,
+        ],
         FocusPhase.working when isRunning => [
-            Color.lerp(base, scheme.primary, 0.08)!,
-            Color.lerp(base, Colors.black, 0.35)!,
-            darkEdge,
-          ],
+          Color.lerp(base, scheme.primary, 0.08)!,
+          Color.lerp(base, Colors.black, 0.35)!,
+          darkEdge,
+        ],
         FocusPhase.working => [
-            Color.lerp(base, scheme.outline, 0.05)!,
-            Color.lerp(base, Colors.black, 0.4)!,
-            darkEdge,
-          ],
+          Color.lerp(base, scheme.outline, 0.05)!,
+          Color.lerp(base, Colors.black, 0.4)!,
+          darkEdge,
+        ],
         FocusPhase.shortBreak => [
-            Color.lerp(base, scheme.tertiary, 0.06)!,
-            Color.lerp(base, Colors.black, 0.35)!,
-            darkEdge,
-          ],
+          Color.lerp(base, scheme.tertiary, 0.06)!,
+          Color.lerp(base, Colors.black, 0.35)!,
+          darkEdge,
+        ],
         FocusPhase.done => [
-            Color.lerp(base, const Color(0xFFFFD700), 0.06)!,
-            Color.lerp(base, Colors.black, 0.35)!,
-            darkEdge,
-          ],
+          Color.lerp(base, const Color(0xFFFFD700), 0.06)!,
+          Color.lerp(base, Colors.black, 0.35)!,
+          darkEdge,
+        ],
       };
     }
   }

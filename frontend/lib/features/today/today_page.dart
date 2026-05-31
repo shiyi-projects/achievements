@@ -26,8 +26,7 @@ class TodayPage extends ConsumerWidget {
       children: [
         Expanded(
           child: RefreshIndicator(
-            onRefresh: () =>
-                ref.read(syncCoordinatorProvider).runFullSync(),
+            onRefresh: () => ref.read(syncCoordinatorProvider).runFullSync(),
             child: tasksAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, st) => Center(
@@ -250,10 +249,7 @@ class _WelcomeCard extends StatelessWidget {
             // ── Greeting ──
             Row(
               children: [
-                Text(
-                  emoji,
-                  style: const TextStyle(fontSize: 28),
-                ),
+                Text(emoji, style: const TextStyle(fontSize: 28)),
                 const SizedBox(width: Spacing.sm),
                 Expanded(
                   child: Text(
@@ -293,7 +289,9 @@ class _WelcomeCard extends StatelessWidget {
                           backgroundColor: scheme.onPrimaryContainer.withValues(
                             alpha: 0.12,
                           ),
-                          valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            scheme.primary,
+                          ),
                         );
                       },
                     ),
@@ -321,9 +319,7 @@ class _WelcomeCard extends StatelessWidget {
 
             // ── Summary ──
             Text(
-              total == 0
-                  ? '今天没有待办任务'
-                  : '$pending 个待完成 · $completed 个已完成',
+              total == 0 ? '今天没有待办任务' : '$pending 个待完成 · $completed 个已完成',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.onPrimaryContainer.withValues(alpha: 0.7),
               ),

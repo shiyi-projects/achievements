@@ -28,22 +28,22 @@ class ListPage extends ConsumerWidget {
       orElse: () => null,
     );
 
-    final canQuickCreate = current != null &&
+    final canQuickCreate =
+        current != null &&
         (!current.isSystem ||
             SystemListKind.fromValue(current.systemKind) ==
                 SystemListKind.inbox);
 
-    final isTrash = current != null &&
+    final isTrash =
+        current != null &&
         current.isSystem &&
-        SystemListKind.fromValue(current.systemKind) ==
-            SystemListKind.trash;
+        SystemListKind.fromValue(current.systemKind) == SystemListKind.trash;
 
     return Column(
       children: [
         Expanded(
           child: RefreshIndicator(
-            onRefresh: () =>
-                ref.read(syncCoordinatorProvider).runFullSync(),
+            onRefresh: () => ref.read(syncCoordinatorProvider).runFullSync(),
             child: tasksAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, st) => Center(
@@ -68,7 +68,8 @@ class ListPage extends ConsumerWidget {
 
         if (canQuickCreate)
           QuickCreateInput(
-            hint: '添加任务到「${displayNameOfList(systemKind: current.systemKind, fallback: current.name)}」…',
+            hint:
+                '添加任务到「${displayNameOfList(systemKind: current.systemKind, fallback: current.name)}」…',
             onSubmit: (title) => ref
                 .read(taskRepositoryProvider)
                 .createTask(listId: current.id, title: title),
@@ -117,7 +118,10 @@ class _TrashList extends ConsumerWidget {
         if (index == 0) {
           return Padding(
             padding: const EdgeInsets.fromLTRB(
-              Spacing.xl, Spacing.sm, Spacing.base, Spacing.xs,
+              Spacing.xl,
+              Spacing.sm,
+              Spacing.base,
+              Spacing.xs,
             ),
             child: Text(
               '已删除 (${tasks.length})',

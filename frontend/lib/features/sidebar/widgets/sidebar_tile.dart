@@ -52,11 +52,7 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
     );
   }
 
-  Widget _buildTile(
-    BuildContext context,
-    ThemeData theme,
-    ColorScheme scheme,
-  ) {
+  Widget _buildTile(BuildContext context, ThemeData theme, ColorScheme scheme) {
     final isLight = scheme.brightness == Brightness.light;
     final countAsync = ref.watch(taskCountForListIdProvider(widget.list.id));
     final count = countAsync.maybeWhen(data: (n) => n, orElse: () => 0);
@@ -64,16 +60,15 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
     final bgColor = widget.selected
         ? scheme.secondaryContainer
         : _hovering
-            ? (isLight
-                ? scheme.surfaceContainerHigh.withValues(alpha: 0.5)
-                : scheme.surfaceContainerHigh.withValues(alpha: 0.3))
-            : Colors.transparent;
+        ? (isLight
+              ? scheme.surfaceContainerHigh.withValues(alpha: 0.5)
+              : scheme.surfaceContainerHigh.withValues(alpha: 0.3))
+        : Colors.transparent;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
       child: GestureDetector(
-        onSecondaryTapDown: (d) =>
-            _showMenu(context, ref, d.globalPosition),
+        onSecondaryTapDown: (d) => _showMenu(context, ref, d.globalPosition),
         onLongPress: () => _showMenu(context, ref, null),
         child: MouseRegion(
           onEnter: (_) => setState(() => _hovering = true),
@@ -93,9 +88,12 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
                 borderRadius: BorderRadius.circular(Radii.input),
                 onTap: () {
                   ref.read(currentViewNotifierProvider.notifier).showList();
-                  ref.read(selectedListIdProvider.notifier).select(widget.list.id);
+                  ref
+                      .read(selectedListIdProvider.notifier)
+                      .select(widget.list.id);
                   final scaffold = Scaffold.maybeOf(context);
-                  if ((scaffold?.hasDrawer ?? false) && scaffold!.isDrawerOpen) {
+                  if ((scaffold?.hasDrawer ?? false) &&
+                      scaffold!.isDrawerOpen) {
                     Navigator.of(context).pop();
                   }
                 },
@@ -162,7 +160,9 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
                                           alpha: 0.12,
                                         )
                                       : scheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(Radii.circle),
+                                  borderRadius: BorderRadius.circular(
+                                    Radii.circle,
+                                  ),
                                 ),
                                 child: Text(
                                   '$count',
@@ -249,11 +249,16 @@ class _SidebarTileState extends ConsumerState<SidebarTile> {
           value: 'delete',
           child: Row(
             children: [
-              Icon(Icons.delete_outline_rounded, size: 18,
-                color: Theme.of(context).colorScheme.error),
+              Icon(
+                Icons.delete_outline_rounded,
+                size: 18,
+                color: Theme.of(context).colorScheme.error,
+              ),
               const SizedBox(width: Spacing.md),
-              Text('删除',
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                '删除',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
           ),
         ),

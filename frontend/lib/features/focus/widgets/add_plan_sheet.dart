@@ -65,10 +65,7 @@ class _AddPlanSheetState extends State<AddPlanSheet> {
             padding: const EdgeInsets.all(Spacing.base),
             child: Row(
               children: [
-                Text(
-                  '添加专注计划',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
+                Text('添加专注计划', style: Theme.of(context).textTheme.titleSmall),
                 const Spacer(),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
@@ -101,36 +98,35 @@ class _AddPlanSheetState extends State<AddPlanSheet> {
               builder: (context, ref, _) {
                 final db = ref.watch(appDatabaseProvider);
                 return StreamBuilder<List<Task>>(
-                  stream: (db.select(db.tasks)
-                        ..where(
-                          (t) =>
-                              t.deletedAt.isNull() &
-                              t.completedAt.isNull() &
-                              t.parentId.isNull(),
-                        )
-                        ..orderBy([
-                          (t) => OrderingTerm(
+                  stream:
+                      (db.select(db.tasks)
+                            ..where(
+                              (t) =>
+                                  t.deletedAt.isNull() &
+                                  t.completedAt.isNull() &
+                                  t.parentId.isNull(),
+                            )
+                            ..orderBy([
+                              (t) => OrderingTerm(
                                 expression: t.updatedAt,
                                 mode: OrderingMode.desc,
                               ),
-                        ])
-                        ..limit(50))
-                      .watch(),
+                            ])
+                            ..limit(50))
+                          .watch(),
                   builder: (context, snap) {
                     final tasks = (snap.data ?? []).where((t) {
                       if (_searchQuery.isEmpty) return true;
-                      return t.title
-                          .toLowerCase()
-                          .contains(_searchQuery.toLowerCase());
+                      return t.title.toLowerCase().contains(
+                        _searchQuery.toLowerCase(),
+                      );
                     }).toList();
 
                     if (tasks.isEmpty) {
                       return Center(
                         child: Text(
                           '没有可用任务',
-                          style: TextStyle(
-                            color: scheme.onSurfaceVariant,
-                          ),
+                          style: TextStyle(color: scheme.onSurfaceVariant),
                         ),
                       );
                     }
@@ -157,12 +153,12 @@ class _AddPlanSheetState extends State<AddPlanSheet> {
                               color: isSelected
                                   ? scheme.primary.withValues(alpha: 0.12)
                                   : Colors.transparent,
-                              borderRadius:
-                                  BorderRadius.circular(Radii.chip),
+                              borderRadius: BorderRadius.circular(Radii.chip),
                               border: isSelected
                                   ? Border.all(
-                                      color: scheme.primary
-                                          .withValues(alpha: 0.3),
+                                      color: scheme.primary.withValues(
+                                        alpha: 0.3,
+                                      ),
                                     )
                                   : null,
                             ),
@@ -185,8 +181,9 @@ class _AddPlanSheetState extends State<AddPlanSheet> {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: scheme.onSurface
-                                          .withValues(alpha: 0.8),
+                                      color: scheme.onSurface.withValues(
+                                        alpha: 0.8,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -195,8 +192,9 @@ class _AddPlanSheetState extends State<AddPlanSheet> {
                                     '${task.estimatedMinutes}m',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: scheme.onSurface
-                                          .withValues(alpha: 0.3),
+                                      color: scheme.onSurface.withValues(
+                                        alpha: 0.3,
+                                      ),
                                     ),
                                   ),
                               ],
@@ -247,13 +245,12 @@ class _AddPlanSheetState extends State<AddPlanSheet> {
                                 ? scheme.onPrimary
                                 : scheme.onSurfaceVariant,
                           ),
-                          selectedColor:
-                              scheme.primary.withValues(alpha: 0.3),
-                          backgroundColor:
-                              scheme.onSurface.withValues(alpha: 0.05),
+                          selectedColor: scheme.primary.withValues(alpha: 0.3),
+                          backgroundColor: scheme.onSurface.withValues(
+                            alpha: 0.05,
+                          ),
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(Radii.chip),
+                            borderRadius: BorderRadius.circular(Radii.chip),
                           ),
                           side: BorderSide.none,
                           visualDensity: VisualDensity.compact,

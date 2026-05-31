@@ -106,7 +106,9 @@ class _QuickCreateInputState extends State<QuickCreateInput>
         boxShadow: _hasFocus
             ? [
                 BoxShadow(
-                  color: scheme.primary.withValues(alpha: isLight ? 0.08 : 0.15),
+                  color: scheme.primary.withValues(
+                    alpha: isLight ? 0.08 : 0.15,
+                  ),
                   blurRadius: 12,
                   offset: const Offset(0, -4),
                 ),
@@ -176,17 +178,20 @@ class _QuickCreateInputState extends State<QuickCreateInput>
                 else
                   AnimatedSwitcher(
                     duration: MotionDurations.fast,
-                    transitionBuilder: (child, anim) => ScaleTransition(
-                      scale: anim,
-                      child: child,
-                    ),
+                    transitionBuilder: (child, anim) =>
+                        ScaleTransition(scale: anim, child: child),
                     child: _showSuccess
                         ? IconButton(
                             key: const ValueKey('success'),
-                            icon: AppIcons.svgIcon(AppIcons.completedStatus, size: 20),
+                            icon: AppIcons.svgIcon(
+                              AppIcons.completedStatus,
+                              size: 20,
+                            ),
                             onPressed: null,
                             style: IconButton.styleFrom(
-                              backgroundColor: Colors.green.shade400.withValues(alpha: 0.15),
+                              backgroundColor: Colors.green.shade400.withValues(
+                                alpha: 0.15,
+                              ),
                               shape: const CircleBorder(),
                               padding: const EdgeInsets.all(Spacing.sm),
                               minimumSize: const Size(34, 34),

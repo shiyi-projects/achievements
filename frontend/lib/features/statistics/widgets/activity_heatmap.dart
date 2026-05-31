@@ -6,11 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 ///
 /// 采用多层绿色渐变色阶，紧凑布局，带月份标签和图例。
 class ActivityHeatmap extends StatelessWidget {
-  const ActivityHeatmap({
-    required this.data,
-    this.days = 365,
-    super.key,
-  });
+  const ActivityHeatmap({required this.data, this.days = 365, super.key});
 
   /// Map from ISO date string ('2025-01-15') to task completion count.
   final Map<String, int> data;
@@ -130,8 +126,7 @@ class ActivityHeatmap extends StatelessWidget {
                           final cell = cells[idx];
                           final color = cell.count == 0
                               ? emptyColor
-                              : _levelColor(
-                                  cell.count, maxCount, levelColors);
+                              : _levelColor(cell.count, maxCount, levelColors);
                           return Tooltip(
                             message:
                                 '${_formatDate(cell.date)}: ${cell.count} 个任务',
@@ -148,14 +143,10 @@ class ActivityHeatmap extends StatelessWidget {
                         }(),
                     ],
                   ),
-                )
-                    .animate()
-                    .fadeIn(
-                      duration: MotionDurations.fast,
-                      delay: Duration(
-                        milliseconds: (w * 6).clamp(0, 250),
-                      ),
-                    ),
+                ).animate().fadeIn(
+                  duration: MotionDurations.fast,
+                  delay: Duration(milliseconds: (w * 6).clamp(0, 250)),
+                ),
             ],
           ),
         ),
@@ -165,18 +156,12 @@ class ActivityHeatmap extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Text(
-              '少',
-              style: TextStyle(fontSize: 9, color: scheme.outline),
-            ),
+            Text('少', style: TextStyle(fontSize: 9, color: scheme.outline)),
             const SizedBox(width: 4),
             _LegendCell(color: emptyColor),
             for (final c in levelColors) _LegendCell(color: c),
             const SizedBox(width: 4),
-            Text(
-              '多',
-              style: TextStyle(fontSize: 9, color: scheme.outline),
-            ),
+            Text('多', style: TextStyle(fontSize: 9, color: scheme.outline)),
           ],
         ),
       ],
@@ -186,7 +171,10 @@ class ActivityHeatmap extends StatelessWidget {
   Color _levelColor(int count, int maxCount, List<Color> colors) {
     if (maxCount == 0 || count == 0) return colors.first;
     final ratio = count / maxCount;
-    final idx = (ratio * (colors.length - 1)).round().clamp(0, colors.length - 1);
+    final idx = (ratio * (colors.length - 1)).round().clamp(
+      0,
+      colors.length - 1,
+    );
     return colors[idx];
   }
 
@@ -218,14 +206,14 @@ class _LegendCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 10,
-        height: 10,
-        margin: const EdgeInsets.symmetric(horizontal: 1),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
+    width: 10,
+    height: 10,
+    margin: const EdgeInsets.symmetric(horizontal: 1),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(2),
+    ),
+  );
 }
 
 class _Cell {

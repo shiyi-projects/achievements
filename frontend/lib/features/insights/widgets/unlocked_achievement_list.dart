@@ -21,56 +21,56 @@ class UnlockedAchievementList extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '已获得成就',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+              // Header
+              Row(
+                children: [
+                  Text(
+                    '已获得成就',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${unlocked.length} / $total',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.outline,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-              const Spacer(),
-              Text(
-                '${unlocked.length} / $total',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: scheme.outline,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(height: 12),
+
+              if (unlocked.isEmpty)
+                _EmptyState()
+              else
+                Column(
+                  children: [
+                    for (var i = 0; i < unlocked.length; i++) ...[
+                      _AchievementTile(def: unlocked[i], index: i),
+                      if (i < unlocked.length - 1)
+                        Divider(
+                          height: 1,
+                          color: scheme.outlineVariant.withValues(alpha: 0.15),
+                        ),
+                    ],
+                  ],
                 ),
-              ),
             ],
           ),
-          const SizedBox(height: 12),
-
-          if (unlocked.isEmpty)
-            _EmptyState()
-          else
-            Column(
-              children: [
-                for (var i = 0; i < unlocked.length; i++) ...[
-                  _AchievementTile(def: unlocked[i], index: i),
-                  if (i < unlocked.length - 1)
-                    Divider(
-                      height: 1,
-                      color: scheme.outlineVariant.withValues(alpha: 0.15),
-                    ),
-                ],
-              ],
-            ),
-        ],
-      ),
-    )
+        )
         .animate()
         .fadeIn(duration: MotionDurations.normal)
         .slideY(
@@ -101,93 +101,96 @@ class _AchievementTileState extends State<_AchievementTile> {
     final isLight = scheme.brightness == Brightness.light;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: AnimatedContainer(
-        duration: MotionDurations.fast,
-        color: _hovering
-            ? scheme.primary.withValues(alpha: 0.04)
-            : Colors.transparent,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        child: Row(
-          children: [
-            // SVG icon in circle
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: isLight
-                    ? const Color(0xFFF0F4FF)
-                    : scheme.surfaceContainerHighest,
-                shape: BoxShape.circle,
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: widget.def.hasSvg
-                  ? SvgPicture.asset(
-                      widget.def.svgAsset,
-                      width: 42,
-                      height: 42,
-                      fit: BoxFit.cover,
-                    )
-                  : Center(
-                      child: Text(
-                        widget.def.icon,
-                        style: const TextStyle(fontSize: 20),
-                      ),
-                    ),
-            ),
-            const SizedBox(width: 12),
-
-            // Name + description
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.def.name,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+          onEnter: (_) => setState(() => _hovering = true),
+          onExit: (_) => setState(() => _hovering = false),
+          child: AnimatedContainer(
+            duration: MotionDurations.fast,
+            color: _hovering
+                ? scheme.primary.withValues(alpha: 0.04)
+                : Colors.transparent,
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            child: Row(
+              children: [
+                // SVG icon in circle
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: isLight
+                        ? const Color(0xFFF0F4FF)
+                        : scheme.surfaceContainerHighest,
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.def.description,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.outline,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: isLight
-                    ? const Color(0xFFE8F5E9)
-                    : const Color(0xFF1B5E20).withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '已解锁',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: isLight
-                      ? const Color(0xFF2E7D32)
-                      : const Color(0xFF81C784),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 10,
+                  clipBehavior: Clip.antiAlias,
+                  child: widget.def.hasSvg
+                      ? SvgPicture.asset(
+                          widget.def.svgAsset,
+                          width: 42,
+                          height: 42,
+                          fit: BoxFit.cover,
+                        )
+                      : Center(
+                          child: Text(
+                            widget.def.icon,
+                            style: const TextStyle(fontSize: 20),
+                          ),
+                        ),
                 ),
-              ),
+                const SizedBox(width: 12),
+
+                // Name + description
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.def.name,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.def.description,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.outline,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isLight
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFF1B5E20).withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '已解锁',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: isLight
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFF81C784),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    )
+          ),
+        )
         .animate()
         .fadeIn(
           duration: MotionDurations.normal,
@@ -217,9 +220,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '完成任务来解锁成就吧',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.outline,
-              ),
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),
             ),
           ],
         ),

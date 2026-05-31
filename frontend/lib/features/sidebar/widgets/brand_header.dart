@@ -28,13 +28,13 @@ class BrandHeader extends StatelessWidget {
         children: [
           // ── Logo with shimmer ──
           ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: SvgPicture.asset(
-              AppIcons.appIcon,
-              width: 36,
-              height: 36,
-            ),
-          )
+                borderRadius: BorderRadius.circular(10),
+                child: SvgPicture.asset(
+                  AppIcons.appIcon,
+                  width: 36,
+                  height: 36,
+                ),
+              )
               .animate(onPlay: (ctrl) => ctrl.stop())
               .scale(
                 begin: const Offset(0.5, 0.5),
@@ -117,11 +117,7 @@ class _SyncStatusIndicatorState extends ConsumerState<SyncStatusIndicator>
         theme.colorScheme.outline.withValues(alpha: 0.6),
         '已同步',
       ),
-      SyncStatus.syncing => (
-        AppIcons.sync,
-        theme.colorScheme.primary,
-        '同步中…',
-      ),
+      SyncStatus.syncing => (AppIcons.sync, theme.colorScheme.primary, '同步中…'),
       SyncStatus.error => (
         AppIcons.cloudError,
         theme.colorScheme.error,

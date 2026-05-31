@@ -32,15 +32,9 @@ class CollapsibleMeta extends StatelessWidget {
           _MetaLine(label: '创建', value: relativeTimeCn(task.createdAt)),
           _MetaLine(label: '更新', value: relativeTimeCn(task.updatedAt)),
           if (task.completedAt != null)
-            _MetaLine(
-              label: '完成',
-              value: relativeTimeCn(task.completedAt!),
-            ),
+            _MetaLine(label: '完成', value: relativeTimeCn(task.completedAt!)),
           if (task.deletedAt != null)
-            _MetaLine(
-              label: '删除',
-              value: relativeTimeCn(task.deletedAt!),
-            ),
+            _MetaLine(label: '删除', value: relativeTimeCn(task.deletedAt!)),
         ],
       ),
     );

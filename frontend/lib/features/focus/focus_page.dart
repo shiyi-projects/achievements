@@ -31,8 +31,8 @@ class FocusPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final phase = ref.watch(focusTimerProvider.select((s) => s.phase));
-    final isActive = phase == FocusPhase.working ||
-        phase == FocusPhase.shortBreak;
+    final isActive =
+        phase == FocusPhase.working || phase == FocusPhase.shortBreak;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -50,10 +50,7 @@ class FocusPage extends ConsumerWidget {
             // ── Layer 2: 内容 ──
             SafeArea(
               child: isDesktop
-                  ? _DesktopLayout(
-                      panelWidth: _panelWidth,
-                      isActive: isActive,
-                    )
+                  ? _DesktopLayout(panelWidth: _panelWidth, isActive: isActive)
                   : _MobileLayout(isActive: isActive),
             ),
           ],
@@ -68,10 +65,7 @@ class FocusPage extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _DesktopLayout extends StatelessWidget {
-  const _DesktopLayout({
-    required this.panelWidth,
-    required this.isActive,
-  });
+  const _DesktopLayout({required this.panelWidth, required this.isActive});
 
   final double panelWidth;
   final bool isActive;
@@ -82,10 +76,8 @@ class _DesktopLayout extends StatelessWidget {
 
     return AnimatedSwitcher(
       duration: MotionDurations.normal,
-      transitionBuilder: (child, anim) => FadeTransition(
-        opacity: anim,
-        child: child,
-      ),
+      transitionBuilder: (child, anim) =>
+          FadeTransition(opacity: anim, child: child),
       child: isActive
           // ── 专注中：全屏计时器 ──
           ? const _TimerSection(key: ValueKey('timer-only'))
@@ -177,9 +169,7 @@ class _MobileLayoutState extends State<_MobileLayout> {
                     ),
                     const Spacer(),
                     Icon(
-                      _panelExpanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
+                      _panelExpanded ? Icons.expand_less : Icons.expand_more,
                       size: 18,
                       color: scheme.outline,
                     ),
@@ -191,10 +181,7 @@ class _MobileLayoutState extends State<_MobileLayout> {
               firstChild: const SizedBox.shrink(),
               secondChild: Padding(
                 padding: const EdgeInsets.only(top: Spacing.sm),
-                child: SizedBox(
-                  height: 300,
-                  child: const FocusTaskPanel(),
-                ),
+                child: SizedBox(height: 300, child: const FocusTaskPanel()),
               ),
               crossFadeState: _panelExpanded
                   ? CrossFadeState.showSecond

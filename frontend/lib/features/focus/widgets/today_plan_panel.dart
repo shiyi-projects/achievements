@@ -91,9 +91,11 @@ class _PanelContent extends StatelessWidget {
     final totalPlanned = plans.fold<int>(0, (s, p) => s + p.plannedMinutes);
     final totalActual = plans.fold<int>(0, (s, p) => s + p.actualSeconds);
     final totalPlannedSecs = totalPlanned * 60;
-    final progress =
-        totalPlannedSecs > 0 ? (totalActual / totalPlannedSecs).clamp(0.0, 1.0) : 0.0;
-    final allDone = plans.isNotEmpty &&
+    final progress = totalPlannedSecs > 0
+        ? (totalActual / totalPlannedSecs).clamp(0.0, 1.0)
+        : 0.0;
+    final allDone =
+        plans.isNotEmpty &&
         plans.every((p) => p.actualSeconds >= p.plannedMinutes * 60);
 
     return Column(
@@ -146,12 +148,9 @@ class _PanelContent extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: progress,
                       minHeight: 4,
-                      backgroundColor:
-                          scheme.onSurface.withValues(alpha: 0.06),
+                      backgroundColor: scheme.onSurface.withValues(alpha: 0.06),
                       valueColor: AlwaysStoppedAnimation(
-                        allDone
-                            ? const Color(0xFF4CAF50)
-                            : scheme.primary,
+                        allDone ? const Color(0xFF4CAF50) : scheme.primary,
                       ),
                     ),
                   ),
@@ -178,9 +177,8 @@ class _PanelContent extends StatelessWidget {
           _EmptyState(ref: ref)
         else ...[
           ...plans.map((plan) {
-            final taskTitle = ref
-                    .watch(_taskTitleProvider(plan.taskId))
-                    .valueOrNull ??
+            final taskTitle =
+                ref.watch(_taskTitleProvider(plan.taskId)).valueOrNull ??
                 '加载中...';
             return Padding(
               padding: const EdgeInsets.only(
@@ -194,8 +192,7 @@ class _PanelContent extends StatelessWidget {
                 isActive: plan.taskId == activeTaskId,
                 onStart: () => _startFocusForPlan(plan),
                 onDelete: () => _deletePlan(plan.id),
-                onEditDuration: () =>
-                    _showEditDuration(context, plan),
+                onEditDuration: () => _showEditDuration(context, plan),
               ),
             );
           }),
@@ -229,10 +226,7 @@ class _PanelContent extends StatelessWidget {
         // ── 过期未完成 ──
         if (overduePlans.isNotEmpty) ...[
           const SizedBox(height: Spacing.sm),
-          _OverdueSection(
-            plans: overduePlans,
-            ref: ref,
-          ),
+          _OverdueSection(plans: overduePlans, ref: ref),
         ],
       ],
     );
@@ -265,9 +259,7 @@ class _PanelContent extends StatelessWidget {
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             suffixText: '分钟',
-            suffixStyle: TextStyle(
-              color: scheme.onSurfaceVariant,
-            ),
+            suffixStyle: TextStyle(color: scheme.onSurfaceVariant),
           ),
         ),
         actions: [
@@ -279,7 +271,9 @@ class _PanelContent extends StatelessWidget {
             onPressed: () {
               final minutes = int.tryParse(controller.text);
               if (minutes != null && minutes > 0) {
-                ref.read(focusPlanRepositoryProvider).upsertPlan(
+                ref
+                    .read(focusPlanRepositoryProvider)
+                    .upsertPlan(
                       taskId: plan.taskId,
                       date: plan.date,
                       plannedMinutes: minutes,
@@ -346,9 +340,7 @@ class _EmptyState extends StatelessWidget {
             icon: const Icon(Icons.add, size: 16),
             label: const Text('添加计划'),
             style: OutlinedButton.styleFrom(
-              side: BorderSide(
-                color: scheme.outline.withValues(alpha: 0.3),
-              ),
+              side: BorderSide(color: scheme.outline.withValues(alpha: 0.3)),
               padding: const EdgeInsets.symmetric(
                 horizontal: Spacing.base,
                 vertical: Spacing.sm,
@@ -401,9 +393,7 @@ class _OverdueSectionState extends State<_OverdueSection> {
                 ),
                 const SizedBox(width: Spacing.xs),
                 Icon(
-                  _expanded
-                      ? Icons.expand_less
-                      : Icons.expand_more,
+                  _expanded ? Icons.expand_less : Icons.expand_more,
                   size: 16,
                   color: scheme.outline,
                 ),
@@ -413,9 +403,8 @@ class _OverdueSectionState extends State<_OverdueSection> {
         ),
         if (_expanded)
           ...widget.plans.map((plan) {
-            final taskTitle = widget.ref
-                    .watch(_taskTitleProvider(plan.taskId))
-                    .valueOrNull ??
+            final taskTitle =
+                widget.ref.watch(_taskTitleProvider(plan.taskId)).valueOrNull ??
                 '...';
             return Padding(
               padding: const EdgeInsets.only(
@@ -441,8 +430,10 @@ class _OverdueSectionState extends State<_OverdueSection> {
 }
 
 /// 根据 taskId 获取任务标题的 provider。
-final _taskTitleProvider =
-    StreamProvider.family.autoDispose<String?, String>((ref, taskId) {
+final _taskTitleProvider = StreamProvider.family.autoDispose<String?, String>((
+  ref,
+  taskId,
+) {
   final db = ref.watch(appDatabaseProvider);
   return (db.select(db.tasks)..where((t) => t.id.equals(taskId)))
       .watchSingleOrNull()

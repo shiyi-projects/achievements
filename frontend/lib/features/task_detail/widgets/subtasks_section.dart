@@ -83,8 +83,9 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
                     decoration: BoxDecoration(
                       color: done == total && total > 0
                           ? scheme.primary.withValues(alpha: 0.15)
-                          : scheme.surfaceContainerHighest
-                              .withValues(alpha: 0.5),
+                          : scheme.surfaceContainerHighest.withValues(
+                              alpha: 0.5,
+                            ),
                       borderRadius: BorderRadius.circular(Radii.circle),
                     ),
                     child: Text(
@@ -190,9 +191,7 @@ class _SubtaskRow extends ConsumerWidget {
                     width: 1.5,
                   ),
                 ),
-                child: done
-                    ? AppIcons.svgIcon(AppIcons.check, size: 14)
-                    : null,
+                child: done ? AppIcons.svgIcon(AppIcons.check, size: 14) : null,
               ),
             ),
             const SizedBox(width: Spacing.md),
@@ -219,9 +218,8 @@ class _SubtaskRow extends ConsumerWidget {
                   color: scheme.outline,
                 ),
                 tooltip: '删除子任务',
-                onPressed: () => ref
-                    .read(taskRepositoryProvider)
-                    .softDelete(sub.id),
+                onPressed: () =>
+                    ref.read(taskRepositoryProvider).softDelete(sub.id),
               ),
             ),
             // ── Navigate arrow ──

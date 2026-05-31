@@ -32,7 +32,10 @@ class CalendarHeader extends ConsumerWidget {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(
-        Spacing.base, Spacing.sm, Spacing.base, 0,
+        Spacing.base,
+        Spacing.sm,
+        Spacing.base,
+        0,
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -51,12 +54,13 @@ class CalendarHeader extends ConsumerWidget {
         borderRadius: BorderRadius.circular(Radii.card),
         border: isLight
             ? null
-            : Border.all(
-                color: scheme.primaryContainer.withValues(alpha: 0.2),
-              ),
+            : Border.all(color: scheme.primaryContainer.withValues(alpha: 0.2)),
       ),
       padding: const EdgeInsets.fromLTRB(
-        Spacing.sm, Spacing.sm, Spacing.sm, Spacing.sm,
+        Spacing.sm,
+        Spacing.sm,
+        Spacing.sm,
+        Spacing.sm,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -114,10 +118,15 @@ class CalendarHeader extends ConsumerWidget {
               _TodayPill(
                 onTap: () {
                   final now = DateTime.now();
-                  ref.read(focusedMonthProvider.notifier).state =
-                      DateTime(now.year, now.month);
-                  ref.read(selectedDayProvider.notifier).state =
-                      DateTime(now.year, now.month, now.day);
+                  ref.read(focusedMonthProvider.notifier).state = DateTime(
+                    now.year,
+                    now.month,
+                  );
+                  ref.read(selectedDayProvider.notifier).state = DateTime(
+                    now.year,
+                    now.month,
+                    now.day,
+                  );
                 },
               ),
             ],
@@ -131,7 +140,9 @@ class CalendarHeader extends ConsumerWidget {
                 duration: MotionDurations.fast,
                 child: Text(
                   '${stats.total} 个任务 · ${stats.completed} 已完成 · ${stats.daysWithTasks} 天活跃',
-                  key: ValueKey('${stats.total}-${stats.completed}-${stats.daysWithTasks}'),
+                  key: ValueKey(
+                    '${stats.total}-${stats.completed}-${stats.daysWithTasks}',
+                  ),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: scheme.onPrimaryContainer.withValues(alpha: 0.65),
                     letterSpacing: 0.3,
@@ -213,9 +224,9 @@ class _TodayPill extends StatelessWidget {
           child: Text(
             '今天',
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: scheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),

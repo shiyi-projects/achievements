@@ -108,12 +108,8 @@ class _DurationPickerSheetState extends ConsumerState<DurationPickerSheet> {
             child: FilledButton(
               onPressed: () {
                 final notifier = ref.read(focusTimerProvider.notifier);
-                notifier.setWorkDuration(
-                  Duration(minutes: _workMinutes),
-                );
-                notifier.setBreakDuration(
-                  Duration(minutes: _breakMinutes),
-                );
+                notifier.setWorkDuration(Duration(minutes: _workMinutes));
+                notifier.setBreakDuration(Duration(minutes: _breakMinutes));
                 Navigator.pop(context);
               },
               style: FilledButton.styleFrom(
@@ -173,8 +169,9 @@ class _PresetRow extends StatelessWidget {
                   '$v$unit',
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight:
-                        selected == v ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: selected == v
+                        ? FontWeight.w600
+                        : FontWeight.w400,
                     color: selected == v
                         ? scheme.onSurface
                         : scheme.onSurface.withValues(alpha: 0.5),

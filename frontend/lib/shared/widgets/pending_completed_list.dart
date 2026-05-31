@@ -68,8 +68,7 @@ class PendingCompletedList extends ConsumerWidget {
             ),
           ),
 
-        for (final t in pending)
-          _SwipeableTaskTile(task: t, isPending: true),
+        for (final t in pending) _SwipeableTaskTile(task: t, isPending: true),
 
         // ── Completed section ──
         if (completed.isNotEmpty)
@@ -127,7 +126,9 @@ class _SwipeableTaskTile extends ConsumerWidget {
       // Right swipe: complete (pending) or restore (completed)
       background: _SwipeBackground(
         color: scheme.primaryContainer,
-        icon: isPending ? AppIcons.svgIcon(AppIcons.completedStatus, size: 24) : AppIcons.svgIcon(AppIcons.undo, size: 24),
+        icon: isPending
+            ? AppIcons.svgIcon(AppIcons.completedStatus, size: 24)
+            : AppIcons.svgIcon(AppIcons.undo, size: 24),
         label: isPending ? '完成' : '恢复',
         alignment: Alignment.centerLeft,
       ),

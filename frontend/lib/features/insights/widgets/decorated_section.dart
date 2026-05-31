@@ -27,37 +27,34 @@ class DecoratedSection extends StatelessWidget {
     final color = accentColor ?? theme.colorScheme.primary;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 4,
-              height: 18,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2),
-              ),
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                if (trailing != null) ...[const Spacer(), trailing!],
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-            if (trailing != null) ...[
-              const Spacer(),
-              trailing!,
-            ],
+            const SizedBox(height: 12),
+            child,
           ],
-        ),
-        const SizedBox(height: 12),
-        child,
-      ],
-    )
+        )
         .animate()
         .fadeIn(duration: MotionDurations.normal)
         .slideY(

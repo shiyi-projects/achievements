@@ -136,9 +136,7 @@ class _ReminderCheckerState extends ConsumerState<ReminderChecker>
                 fresh.completedAt != null ||
                 fresh.deletedAt != null ||
                 fresh.remindAt == null) {
-              debugPrint(
-                '[ReminderChecker] ⏭ 定时器触发但任务已失效,跳过: taskId=$taskId',
-              );
+              debugPrint('[ReminderChecker] ⏭ 定时器触发但任务已失效,跳过: taskId=$taskId');
               return;
             }
             _enqueue(fresh);
@@ -188,17 +186,13 @@ class _ReminderCheckerState extends ConsumerState<ReminderChecker>
     // 弹窗前最后一次复核:从 DB 重新拉,任务可能已被完成/删除/清掉提醒。
     // _reconcile 已尽量清理 pendingQueue,但 stream emit 和 _processQueue 调度
     // 之间仍有可能错过一拍,这里兜底。
-    final fresh = await ref
-        .read(taskRepositoryProvider)
-        .getById(task.id);
+    final fresh = await ref.read(taskRepositoryProvider).getById(task.id);
     if (!mounted) return;
     if (fresh == null ||
         fresh.completedAt != null ||
         fresh.deletedAt != null ||
         fresh.remindAt == null) {
-      debugPrint(
-        '[ReminderChecker] ⏭ 出队时已失效,跳过: "${task.title}"',
-      );
+      debugPrint('[ReminderChecker] ⏭ 出队时已失效,跳过: "${task.title}"');
       _shownIds.add(task.id); // 防止再次入队
       unawaited(Future<void>.microtask(_processQueue));
       return;
@@ -209,10 +203,9 @@ class _ReminderCheckerState extends ConsumerState<ReminderChecker>
 
     // 闹钟关闭后处理下一个
     if (mounted && _pendingQueue.isNotEmpty) {
-      unawaited(Future<void>.delayed(
-        const Duration(milliseconds: 500),
-        _processQueue,
-      ));
+      unawaited(
+        Future<void>.delayed(const Duration(milliseconds: 500), _processQueue),
+      );
     }
   }
 

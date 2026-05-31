@@ -54,7 +54,9 @@ class FolderGroup extends ConsumerWidget {
               ),
               decoration: BoxDecoration(
                 color: over
-                    ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.5)
+                    ? theme.colorScheme.secondaryContainer.withValues(
+                        alpha: 0.5,
+                      )
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(Radii.input),
                 border: over
@@ -135,11 +137,16 @@ class FolderGroup extends ConsumerWidget {
           value: 'delete',
           child: Row(
             children: [
-              Icon(Icons.delete_outline_rounded, size: 18,
-                color: Theme.of(context).colorScheme.error),
+              Icon(
+                Icons.delete_outline_rounded,
+                size: 18,
+                color: Theme.of(context).colorScheme.error,
+              ),
               const SizedBox(width: Spacing.md),
-              Text('删除',
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                '删除',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
           ),
         ),

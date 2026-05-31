@@ -63,11 +63,7 @@ class TaskDetailTopBar extends StatelessWidget {
           // ── 面包屑：显示父任务名，可一键返回 ──
           if (parentTaskTitle != null) ...[
             const SizedBox(width: Spacing.xs),
-            Icon(
-              Icons.chevron_left_rounded,
-              size: 16,
-              color: scheme.outline,
-            ),
+            Icon(Icons.chevron_left_rounded, size: 16, color: scheme.outline),
             Flexible(
               child: InkWell(
                 borderRadius: BorderRadius.circular(Radii.chip),
@@ -124,10 +120,7 @@ class TaskDetailTopBar extends StatelessWidget {
                         curve: MotionCurves.bouncySpring,
                       ),
                     ),
-                    child: ScaleTransition(
-                      scale: anim,
-                      child: child,
-                    ),
+                    child: ScaleTransition(scale: anim, child: child),
                   );
                 },
                 child: starred
@@ -172,11 +165,13 @@ class TaskDetailTopBar extends StatelessWidget {
                       value: 'del',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline_rounded, size: 18,
-                            color: errColor),
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: errColor,
+                          ),
                           const SizedBox(width: Spacing.md),
-                          Text('移至回收站',
-                            style: TextStyle(color: errColor)),
+                          Text('移至回收站', style: TextStyle(color: errColor)),
                         ],
                       ),
                     )
@@ -195,11 +190,13 @@ class TaskDetailTopBar extends StatelessWidget {
                       value: 'hdel',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_forever_rounded, size: 18,
-                            color: errColor),
+                          Icon(
+                            Icons.delete_forever_rounded,
+                            size: 18,
+                            color: errColor,
+                          ),
                           const SizedBox(width: Spacing.md),
-                          Text('永久删除',
-                            style: TextStyle(color: errColor)),
+                          Text('永久删除', style: TextStyle(color: errColor)),
                         ],
                       ),
                     ),

@@ -14,14 +14,14 @@ String _$achievementStatusHash() => r'251ffe1c515d6bb9dc087ab5e2d380e9c772db03';
 @ProviderFor(achievementStatus)
 final achievementStatusProvider =
     AutoDisposeFutureProvider<Map<String, bool>>.internal(
-  achievementStatus,
-  name: r'achievementStatusProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$achievementStatusHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+      achievementStatus,
+      name: r'achievementStatusProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$achievementStatusHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element

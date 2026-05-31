@@ -76,7 +76,8 @@ class FocusPlanService {
       final existing = existingPlans
           .where((p) => _startOfDay(p.date) == date)
           .toList();
-      if (existing.isNotEmpty && (existing.first.actualSeconds / 60).floor() >= planned) {
+      if (existing.isNotEmpty &&
+          (existing.first.actualSeconds / 60).floor() >= planned) {
         continue; // 已完成量超过分配量，跳过
       }
 

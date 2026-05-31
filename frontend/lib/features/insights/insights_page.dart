@@ -36,8 +36,9 @@ class InsightsPage extends ConsumerWidget {
           loading: () => const _Loading(),
           error: (e, _) => _ErrorText(e),
           data: (status) {
-            final unlockedCount =
-                kAchievementDefs.where((d) => status[d.code] ?? false).length;
+            final unlockedCount = kAchievementDefs
+                .where((d) => status[d.code] ?? false)
+                .length;
             return AchievementOverviewCard(
               unlocked: unlockedCount,
               total: kAchievementDefs.length,
@@ -93,35 +94,34 @@ class _TwoColumnSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left column
-          Expanded(
-            flex: 3,
-            child: Column(
-              children: [
-                // Compact heatmap
-                heatmap.when(
-                  loading: () => const _Loading(),
-                  error: (e, _) => _ErrorText(e),
-                  data: (d) => CompactHeatmap(data: d),
-                ),
-                const SizedBox(height: 14),
-                // Weekly focus chart in card
-                _FocusChartCard(focus: focus),
-              ],
-            ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left column
+        Expanded(
+          flex: 3,
+          child: Column(
+            children: [
+              // Compact heatmap
+              heatmap.when(
+                loading: () => const _Loading(),
+                error: (e, _) => _ErrorText(e),
+                data: (d) => CompactHeatmap(data: d),
+              ),
+              const SizedBox(height: 14),
+              // Weekly focus chart in card
+              _FocusChartCard(focus: focus),
+            ],
           ),
-          const SizedBox(width: 14),
-          // Right column
-          Expanded(
-            flex: 2,
-            child: _AchievementListSection(statusAsync: statusAsync),
-          ),
-        ],
-      );
+        ),
+        const SizedBox(width: 14),
+        // Right column
+        Expanded(
+          flex: 2,
+          child: _AchievementListSection(statusAsync: statusAsync),
+        ),
+      ],
+    );
   }
 }
 
@@ -167,32 +167,32 @@ class _FocusChartCard extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '本周专注',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.2),
             ),
           ),
-          const SizedBox(height: 12),
-          focus.when(
-            loading: () => const _Loading(),
-            error: (e, _) => _ErrorText(e),
-            data: (d) => WeeklyFocusChart(data: d),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '本周专注',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              focus.when(
+                loading: () => const _Loading(),
+                error: (e, _) => _ErrorText(e),
+                data: (d) => WeeklyFocusChart(data: d),
+              ),
+            ],
           ),
-        ],
-      ),
-    )
+        )
         .animate()
         .fadeIn(duration: MotionDurations.normal)
         .slideY(
@@ -218,8 +218,9 @@ class _AchievementListSection extends StatelessWidget {
       loading: () => const _Loading(),
       error: (e, _) => _ErrorText(e),
       data: (status) {
-        final unlocked =
-            kAchievementDefs.where((d) => status[d.code] ?? false).toList();
+        final unlocked = kAchievementDefs
+            .where((d) => status[d.code] ?? false)
+            .toList();
         final lockedCount = kAchievementDefs.length - unlocked.length;
 
         return Column(
@@ -231,41 +232,39 @@ class _AchievementListSection extends StatelessWidget {
             if (lockedCount > 0) ...[
               const SizedBox(height: 10),
               Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerHighest
-                        .withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.lock_outline_rounded,
-                        size: 12,
-                        color: scheme.outline,
+                child:
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 5,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '还有 $lockedCount 个成就等待解锁',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.outline,
-                          fontSize: 10,
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest.withValues(
+                          alpha: 0.4,
                         ),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    ],
-                  ),
-                )
-                    .animate()
-                    .fadeIn(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.lock_outline_rounded,
+                            size: 12,
+                            color: scheme.outline,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '还有 $lockedCount 个成就等待解锁',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.outline,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(
                       duration: MotionDurations.slow,
-                      delay: Duration(
-                        milliseconds: 60 * unlocked.length + 200,
-                      ),
+                      delay: Duration(milliseconds: 60 * unlocked.length + 200),
                     ),
               ),
             ],
@@ -280,15 +279,15 @@ class _Loading extends StatelessWidget {
   const _Loading();
   @override
   Widget build(BuildContext context) => const SizedBox(
-        height: 60,
-        child: Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
+    height: 60,
+    child: Center(
+      child: SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    ),
+  );
 }
 
 class _ErrorText extends StatelessWidget {

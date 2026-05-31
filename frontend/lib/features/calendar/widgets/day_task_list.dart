@@ -59,7 +59,10 @@ class DayTaskList extends ConsumerWidget {
           // ── Date label + badge ──
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              Spacing.base, Spacing.sm, Spacing.base, Spacing.xs,
+              Spacing.base,
+              Spacing.sm,
+              Spacing.base,
+              Spacing.xs,
             ),
             child: Row(
               children: [
@@ -119,7 +122,8 @@ class DayTaskList extends ConsumerWidget {
                   horizontal: Spacing.base,
                   vertical: Spacing.xs,
                 ),
-                itemCount: pending.length +
+                itemCount:
+                    pending.length +
                     (completed.isNotEmpty ? 1 + completed.length : 0),
                 itemBuilder: (context, index) {
                   // Pending tasks
@@ -168,10 +172,7 @@ class _AnimatedTaskEntryState extends State<_AnimatedTaskEntry>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: MotionDurations.normal,
-    );
+    _ctrl = AnimationController(vsync: this, duration: MotionDurations.normal);
     final curve = CurvedAnimation(
       parent: _ctrl,
       curve: MotionCurves.emphasizedDecelerate,
@@ -199,10 +200,7 @@ class _AnimatedTaskEntryState extends State<_AnimatedTaskEntry>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _fadeAnim,
-      child: SlideTransition(
-        position: _slideAnim,
-        child: widget.child,
-      ),
+      child: SlideTransition(position: _slideAnim, child: widget.child),
     );
   }
 }
@@ -218,10 +216,7 @@ class _CompletedHeader extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.only(
-        top: Spacing.sm,
-        bottom: Spacing.xs,
-      ),
+      padding: const EdgeInsets.only(top: Spacing.sm, bottom: Spacing.xs),
       child: Row(
         children: [
           Container(
@@ -243,9 +238,7 @@ class _CompletedHeader extends StatelessWidget {
           const SizedBox(width: Spacing.xs),
           Text(
             '$count',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: scheme.outline,
-            ),
+            style: theme.textTheme.labelSmall?.copyWith(color: scheme.outline),
           ),
           const SizedBox(width: Spacing.sm),
           Expanded(

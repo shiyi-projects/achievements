@@ -52,7 +52,9 @@ class CalendarTaskTile extends ConsumerWidget {
         background: _SwipeBackground(
           alignment: Alignment.centerLeft,
           color: scheme.primary,
-          icon: done ? AppIcons.svgIcon(AppIcons.undo, size: 20) : AppIcons.svgIcon(AppIcons.check, size: 20),
+          icon: done
+              ? AppIcons.svgIcon(AppIcons.undo, size: 20)
+              : AppIcons.svgIcon(AppIcons.check, size: 20),
           label: done ? '恢复' : '完成',
         ),
         // ── 左滑: 删除 ──
@@ -124,26 +126,29 @@ class CalendarTaskTile extends ConsumerWidget {
                                       : null,
                                   color: done ? scheme.outline : null,
                                   decorationColor: scheme.outline,
-                                  fontWeight:
-                                      done ? FontWeight.w400 : FontWeight.w500,
+                                  fontWeight: done
+                                      ? FontWeight.w400
+                                      : FontWeight.w500,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               if (timeLabel != null)
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.only(top: Spacing.xs),
+                                  padding: const EdgeInsets.only(
+                                    top: Spacing.xs,
+                                  ),
                                   child: Row(
                                     children: [
-                                      AppIcons.svgIcon(AppIcons.planned, size: 12),
+                                      AppIcons.svgIcon(
+                                        AppIcons.planned,
+                                        size: 12,
+                                      ),
                                       const SizedBox(width: 3),
                                       Text(
                                         timeLabel,
                                         style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                          color: scheme.outline,
-                                        ),
+                                            ?.copyWith(color: scheme.outline),
                                       ),
                                     ],
                                   ),
@@ -155,7 +160,10 @@ class CalendarTaskTile extends ConsumerWidget {
                         // ── Trailing indicators ──
                         if (showTrailing)
                           ..._buildTrailing(
-                              scheme, priority, hasFutureReminder),
+                            scheme,
+                            priority,
+                            hasFutureReminder,
+                          ),
                       ],
                     );
                   },
@@ -242,18 +250,18 @@ class _BouncyCheckboxState extends State<_BouncyCheckbox>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: MotionDurations.fast,
-    );
-    _scaleAnim = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.8), weight: 40),
-      TweenSequenceItem(tween: Tween(begin: 0.8, end: 1.15), weight: 35),
-      TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0), weight: 25),
-    ]).animate(CurvedAnimation(
-      parent: _ctrl,
-      curve: MotionCurves.emphasizedDecelerate,
-    ));
+    _ctrl = AnimationController(vsync: this, duration: MotionDurations.fast);
+    _scaleAnim =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.8), weight: 40),
+          TweenSequenceItem(tween: Tween(begin: 0.8, end: 1.15), weight: 35),
+          TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0), weight: 25),
+        ]).animate(
+          CurvedAnimation(
+            parent: _ctrl,
+            curve: MotionCurves.emphasizedDecelerate,
+          ),
+        );
   }
 
   @override

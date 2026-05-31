@@ -25,15 +25,14 @@ class WeeklyFocusChart extends StatelessWidget {
       final key =
           '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
       final entry = data.where((e) => e.date == key).firstOrNull;
-      weekData.add(_DayData(
-        date: d,
-        minutes: entry?.minutes ?? 0,
-        isToday: i == 0,
-      ));
+      weekData.add(
+        _DayData(date: d, minutes: entry?.minutes ?? 0, isToday: i == 0),
+      );
     }
 
-    final maxMinutes =
-        weekData.map((e) => e.minutes).fold(0, (a, b) => a > b ? a : b);
+    final maxMinutes = weekData
+        .map((e) => e.minutes)
+        .fold(0, (a, b) => a > b ? a : b);
     final displayMax = (maxMinutes * 1.3).clamp(10.0, double.infinity);
 
     if (maxMinutes == 0) {
@@ -42,83 +41,78 @@ class WeeklyFocusChart extends StatelessWidget {
         child: Center(
           child: Text(
             '本周暂无专注记录',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.outline,
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),
           ),
         ),
       );
     }
 
     return SizedBox(
-      height: 100,
-      child: BarChart(
-        BarChartData(
-          maxY: displayMax,
-          barGroups: [
-            for (var i = 0; i < weekData.length; i++)
-              BarChartGroupData(
-                x: i,
-                barRods: [
-                  BarChartRodData(
-                    toY: weekData[i].minutes.toDouble(),
-                    color: weekData[i].isToday
-                        ? scheme.primary
-                        : scheme.primary.withValues(alpha: 0.35),
-                    width: 14,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(4),
-                    ),
+          height: 100,
+          child: BarChart(
+            BarChartData(
+              maxY: displayMax,
+              barGroups: [
+                for (var i = 0; i < weekData.length; i++)
+                  BarChartGroupData(
+                    x: i,
+                    barRods: [
+                      BarChartRodData(
+                        toY: weekData[i].minutes.toDouble(),
+                        color: weekData[i].isToday
+                            ? scheme.primary
+                            : scheme.primary.withValues(alpha: 0.35),
+                        width: 14,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(4),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+              ],
+              titlesData: FlTitlesData(
+                leftTitles: const AxisTitles(),
+                rightTitles: const AxisTitles(),
+                topTitles: const AxisTitles(),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 20,
+                    getTitlesWidget: (v, _) {
+                      final idx = v.toInt();
+                      if (idx < 0 || idx >= weekData.length) {
+                        return const SizedBox();
+                      }
+                      final label = _weekdayLabel(weekData[idx].date.weekday);
+                      return Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: weekData[idx].isToday
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          color: weekData[idx].isToday
+                              ? scheme.primary
+                              : scheme.outline,
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
-          ],
-          titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(),
-            rightTitles: const AxisTitles(),
-            topTitles: const AxisTitles(),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 20,
-                getTitlesWidget: (v, _) {
-                  final idx = v.toInt();
-                  if (idx < 0 || idx >= weekData.length) {
-                    return const SizedBox();
-                  }
-                  final label = _weekdayLabel(weekData[idx].date.weekday);
-                  return Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: weekData[idx].isToday
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      color: weekData[idx].isToday
-                          ? scheme.primary
-                          : scheme.outline,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          gridData: const FlGridData(show: false),
-          borderData: FlBorderData(show: false),
-          barTouchData: BarTouchData(
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipItem: (group, _, rod, __) => BarTooltipItem(
-                '${rod.toY.toInt()} 分钟',
-                TextStyle(
-                  color: scheme.onInverseSurface,
-                  fontSize: 11,
+              gridData: const FlGridData(show: false),
+              borderData: FlBorderData(show: false),
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, _, rod, __) => BarTooltipItem(
+                    '${rod.toY.toInt()} 分钟',
+                    TextStyle(color: scheme.onInverseSurface, fontSize: 11),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
-    )
+        )
         .animate()
         .fadeIn(duration: MotionDurations.normal)
         .slideY(

@@ -6,7 +6,11 @@ import 'package:flutter/material.dart';
 
 /// 优先级选择器 — 紧凑 ChoiceChip 行，带颜色圆点指示 + 选中弹性动效。
 class PriorityChips extends StatelessWidget {
-  const PriorityChips({required this.priority, required this.onChanged, super.key});
+  const PriorityChips({
+    required this.priority,
+    required this.onChanged,
+    super.key,
+  });
   final TaskPriority priority;
   final ValueChanged<TaskPriority> onChanged;
 
@@ -63,15 +67,15 @@ class PriorityChips extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(Radii.chip),
                 ),
-                selectedColor: color?.withValues(alpha: 0.15) ??
+                selectedColor:
+                    color?.withValues(alpha: 0.15) ??
                     scheme.surfaceContainerHighest,
                 side: priority == p && color != null
                     ? BorderSide(color: color.withValues(alpha: 0.4))
                     : null,
                 labelStyle: TextStyle(
                   fontSize: 12,
-                  fontWeight:
-                      priority == p ? FontWeight.w600 : FontWeight.w400,
+                  fontWeight: priority == p ? FontWeight.w600 : FontWeight.w400,
                   color: priority == p
                       ? (color ?? scheme.onSurface)
                       : scheme.onSurfaceVariant,

@@ -88,9 +88,7 @@ class _TimerDisplayState extends ConsumerState<TimerDisplay>
         AnimatedBuilder(
           animation: Listenable.merge([_breathCtrl, _pulseCtrl]),
           builder: (context, _) {
-            final breathStroke = isIdle
-                ? 7.0 + _breathCtrl.value * 2.0
-                : 8.0;
+            final breathStroke = isIdle ? 7.0 + _breathCtrl.value * 2.0 : 8.0;
             final pulseScale = 1.0 + _pulseCtrl.value * 0.05;
 
             return Transform.scale(
@@ -132,7 +130,9 @@ class _TimerDisplayState extends ConsumerState<TimerDisplay>
                             curve: MotionCurves.bouncySpring,
                             builder: (context, scale, child) {
                               return Transform.scale(
-                                  scale: scale, child: child);
+                                scale: scale,
+                                child: child,
+                              );
                             },
                             child: Text(
                               timeText,
@@ -283,37 +283,21 @@ class _TimerDisplayState extends ConsumerState<TimerDisplay>
       FocusPhase.idle => '准备就绪',
       FocusPhase.working => '专注中',
       FocusPhase.shortBreak => '休息中',
-      FocusPhase.done =>
-        state.mode == FocusMode.pomodoro ? '专注完成 🎉' : '已停止',
+      FocusPhase.done => state.mode == FocusMode.pomodoro ? '专注完成 🎉' : '已停止',
     };
   }
 
   String? _motivationText(FocusTimerState state) {
     final texts = switch (state.phase) {
-      FocusPhase.idle => const [
-          '深呼吸，准备好了就开始',
-          '今天也要加油 💪',
-          '一次只做一件事',
-        ],
+      FocusPhase.idle => const ['深呼吸，准备好了就开始', '今天也要加油 💪', '一次只做一件事'],
       FocusPhase.working when state.isRunning => const [
-          '保持专注，你正在变好',
-          '沉浸其中，享受心流',
-          '每一分钟都在积累',
-        ],
-      FocusPhase.working => const [
-          '休息一下也没关系',
-          '准备好了就继续',
-        ],
-      FocusPhase.shortBreak => const [
-          '站起来活动活动',
-          '闭眼放松一下',
-          '喝口水吧',
-        ],
-      FocusPhase.done => const [
-          '太棒了！又完成一个番茄',
-          '你的努力不会白费',
-          '坚持就是胜利',
-        ],
+        '保持专注，你正在变好',
+        '沉浸其中，享受心流',
+        '每一分钟都在积累',
+      ],
+      FocusPhase.working => const ['休息一下也没关系', '准备好了就继续'],
+      FocusPhase.shortBreak => const ['站起来活动活动', '闭眼放松一下', '喝口水吧'],
+      FocusPhase.done => const ['太棒了！又完成一个番茄', '你的努力不会白费', '坚持就是胜利'],
     };
     // 基于当前秒数选一条，让它不频繁切换
     final index = (DateTime.now().minute ~/ 5) % texts.length;

@@ -84,7 +84,10 @@ class _GentleSpringCurve extends Curve {
 /// ```
 abstract final class StaggerHelper {
   /// 第 [index] 项的入场延迟。最大 cap 在 400ms 防止列表太长时等太久。
-  static Duration delay(int index, {Duration base = MotionDurations.staggerBase}) {
+  static Duration delay(
+    int index, {
+    Duration base = MotionDurations.staggerBase,
+  }) {
     final ms = (base.inMilliseconds * index).clamp(0, 400);
     return Duration(milliseconds: ms);
   }
@@ -99,8 +102,8 @@ abstract final class StaggerHelper {
 ///
 /// 使用方式：在 StatefulWidget 的 State 中 `with PressScaleMixin`，
 /// 然后在 build 中用 `buildPressScale(child: ..., onTap: ...)` 包裹内容。
-mixin PressScaleMixin<T extends StatefulWidget> on State<T>,
-    SingleTickerProviderStateMixin<T> {
+mixin PressScaleMixin<T extends StatefulWidget>
+    on State<T>, SingleTickerProviderStateMixin<T> {
   late final AnimationController _pressCtrl = AnimationController(
     vsync: this,
     duration: MotionDurations.fast,
@@ -108,13 +111,10 @@ mixin PressScaleMixin<T extends StatefulWidget> on State<T>,
     upperBound: 1.0,
   );
 
-  late final Animation<double> _pressScale = Tween<double>(
-    begin: 1.0,
-    end: 0.96,
-  ).animate(CurvedAnimation(
-    parent: _pressCtrl,
-    curve: MotionCurves.gentleSpring,
-  ));
+  late final Animation<double> _pressScale =
+      Tween<double>(begin: 1.0, end: 0.96).animate(
+        CurvedAnimation(parent: _pressCtrl, curve: MotionCurves.gentleSpring),
+      );
 
   @override
   void dispose() {

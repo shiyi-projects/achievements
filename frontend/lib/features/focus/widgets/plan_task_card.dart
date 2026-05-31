@@ -39,10 +39,10 @@ class PlanTaskCard extends StatelessWidget {
     final statusColor = isOverdue
         ? const Color(0xFFFF9800)
         : isComplete
-            ? const Color(0xFF4CAF50)
-            : isActive
-                ? scheme.primary
-                : scheme.onSurface.withValues(alpha: 0.3);
+        ? const Color(0xFF4CAF50)
+        : isActive
+        ? scheme.primary
+        : scheme.onSurface.withValues(alpha: 0.3);
 
     return Dismissible(
       key: ValueKey(plan.id),
@@ -100,8 +100,9 @@ class PlanTaskCard extends StatelessWidget {
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                         color: scheme.onSurface.withValues(alpha: 0.85),
-                        decoration:
-                            isComplete ? TextDecoration.lineThrough : null,
+                        decoration: isComplete
+                            ? TextDecoration.lineThrough
+                            : null,
                         decorationColor: scheme.outline,
                       ),
                     ),

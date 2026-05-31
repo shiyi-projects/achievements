@@ -74,133 +74,141 @@ class CompactHeatmap extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '活跃记录',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+              // Header
+              Row(
+                children: [
+                  Text(
+                    '活跃记录',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '过去 12 周',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.outline,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Most active day (inline in header)
+                  if (bestCount > 0)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '本周最活跃  ',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.outline,
+                            fontSize: 10,
+                          ),
+                        ),
+                        Text(
+                          bestDay,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '  完成 $bestCount 项',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.outline,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                '过去 12 周',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: scheme.outline,
-                ),
+              const SizedBox(height: 12),
+
+              // Heatmap — auto-sized cells via LayoutBuilder
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableWidth = constraints.maxWidth;
+                  // gap between cells
+                  const gap = 3.0;
+                  // Calculate cell size to fill the width exactly
+                  final cellSize =
+                      (availableWidth - (weekCount - 1) * gap) / weekCount;
+                  // Clamp to reasonable range
+                  final size = cellSize.clamp(6.0, 16.0);
+                  final actualGap = weekCount > 1
+                      ? (availableWidth - size * weekCount) / (weekCount - 1)
+                      : 0.0;
+
+                  return SizedBox(
+                    height: size * 7 + actualGap * 6,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (var w = 0; w < weekCount; w++)
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (var d = 0; d < 7; d++)
+                                () {
+                                  final idx = w * 7 + d - paddingBefore;
+                                  if (idx < 0 || idx >= cells.length) {
+                                    return SizedBox(
+                                      width: size,
+                                      height:
+                                          size +
+                                          (d < 6
+                                              ? actualGap.clamp(1.0, 4.0)
+                                              : 0),
+                                    );
+                                  }
+                                  final cell = cells[idx];
+                                  final color = cell.count == 0
+                                      ? emptyColor
+                                      : _levelColor(
+                                          cell.count,
+                                          maxCount,
+                                          levelColors,
+                                        );
+                                  return Tooltip(
+                                    message:
+                                        '${_fmtDate(cell.date)}: ${cell.count} 个任务',
+                                    child: Container(
+                                      width: size,
+                                      height: size,
+                                      margin: EdgeInsets.only(
+                                        bottom: d < 6
+                                            ? actualGap.clamp(1.0, 4.0)
+                                            : 0,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: color,
+                                        borderRadius: BorderRadius.circular(
+                                          size * 0.2,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }(),
+                            ],
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
-              const Spacer(),
-              // Most active day (inline in header)
-              if (bestCount > 0)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '本周最活跃  ',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.outline,
-                        fontSize: 10,
-                      ),
-                    ),
-                    Text(
-                      bestDay,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      '  完成 $bestCount 项',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.outline,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ),
             ],
           ),
-          const SizedBox(height: 12),
-
-          // Heatmap — auto-sized cells via LayoutBuilder
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final availableWidth = constraints.maxWidth;
-              // gap between cells
-              const gap = 3.0;
-              // Calculate cell size to fill the width exactly
-              final cellSize =
-                  (availableWidth - (weekCount - 1) * gap) / weekCount;
-              // Clamp to reasonable range
-              final size = cellSize.clamp(6.0, 16.0);
-              final actualGap = weekCount > 1
-                  ? (availableWidth - size * weekCount) / (weekCount - 1)
-                  : 0.0;
-
-              return SizedBox(
-                height: size * 7 + actualGap * 6,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var w = 0; w < weekCount; w++)
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (var d = 0; d < 7; d++)
-                            () {
-                              final idx = w * 7 + d - paddingBefore;
-                              if (idx < 0 || idx >= cells.length) {
-                                return SizedBox(
-                                  width: size,
-                                  height: size +
-                                      (d < 6 ? actualGap.clamp(1.0, 4.0) : 0),
-                                );
-                              }
-                              final cell = cells[idx];
-                              final color = cell.count == 0
-                                  ? emptyColor
-                                  : _levelColor(
-                                      cell.count, maxCount, levelColors);
-                              return Tooltip(
-                                message:
-                                    '${_fmtDate(cell.date)}: ${cell.count} 个任务',
-                                child: Container(
-                                  width: size,
-                                  height: size,
-                                  margin: EdgeInsets.only(
-                                    bottom:
-                                        d < 6 ? actualGap.clamp(1.0, 4.0) : 0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    borderRadius:
-                                        BorderRadius.circular(size * 0.2),
-                                  ),
-                                ),
-                              );
-                            }(),
-                        ],
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    )
+        )
         .animate()
         .fadeIn(duration: MotionDurations.normal)
         .slideY(
@@ -213,8 +221,10 @@ class CompactHeatmap extends StatelessWidget {
   Color _levelColor(int count, int maxCount, List<Color> colors) {
     if (maxCount == 0 || count == 0) return colors.first;
     final ratio = count / maxCount;
-    final idx =
-        (ratio * (colors.length - 1)).round().clamp(0, colors.length - 1);
+    final idx = (ratio * (colors.length - 1)).round().clamp(
+      0,
+      colors.length - 1,
+    );
     return colors[idx];
   }
 
@@ -222,15 +232,15 @@ class CompactHeatmap extends StatelessWidget {
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   static String _weekdayName(int wd) => switch (wd) {
-        1 => '周一',
-        2 => '周二',
-        3 => '周三',
-        4 => '周四',
-        5 => '周五',
-        6 => '周六',
-        7 => '周日',
-        _ => '',
-      };
+    1 => '周一',
+    2 => '周二',
+    3 => '周三',
+    4 => '周四',
+    5 => '周五',
+    6 => '周六',
+    7 => '周日',
+    _ => '',
+  };
 }
 
 class _Cell {

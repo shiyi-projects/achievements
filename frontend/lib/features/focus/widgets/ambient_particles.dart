@@ -42,12 +42,8 @@ class _AmbientParticlesState extends ConsumerState<AmbientParticles>
 
   @override
   Widget build(BuildContext context) {
-    final phase = ref.watch(
-      focusTimerProvider.select((s) => s.phase),
-    );
-    final isRunning = ref.watch(
-      focusTimerProvider.select((s) => s.isRunning),
-    );
+    final phase = ref.watch(focusTimerProvider.select((s) => s.phase));
+    final isRunning = ref.watch(focusTimerProvider.select((s) => s.isRunning));
     final scheme = Theme.of(context).colorScheme;
 
     final baseOpacity = switch (phase) {
@@ -122,8 +118,16 @@ class _FloatingParticle {
   final double phase;
 
   Offset positionAt(double t, double speed) {
-    final tx = (x + speedX * t * speed * 60 + math.sin(t * math.pi * 2 + phase) * 0.02) % 1.0;
-    final ty = (y + speedY * t * speed * 60 + math.cos(t * math.pi * 2 + phase * 1.3) * 0.015) % 1.0;
+    final tx =
+        (x +
+            speedX * t * speed * 60 +
+            math.sin(t * math.pi * 2 + phase) * 0.02) %
+        1.0;
+    final ty =
+        (y +
+            speedY * t * speed * 60 +
+            math.cos(t * math.pi * 2 + phase * 1.3) * 0.015) %
+        1.0;
     return Offset(tx, ty);
   }
 

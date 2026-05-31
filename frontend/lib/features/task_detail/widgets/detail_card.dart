@@ -41,10 +41,7 @@ class DetailCard extends StatelessWidget {
           if (title != null) ...[
             Row(
               children: [
-                if (icon != null) ...[
-                  icon!,
-                  const SizedBox(width: Spacing.sm),
-                ],
+                if (icon != null) ...[icon!, const SizedBox(width: Spacing.sm)],
                 Expanded(
                   child: Text(
                     title!,

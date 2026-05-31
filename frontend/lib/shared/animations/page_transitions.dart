@@ -36,10 +36,7 @@ class SharedAxisTransitionBuilder extends StatelessWidget {
       parent: secondaryAnimation,
       curve: MotionCurves.emphasizedAccelerate,
     );
-    final scaleOut = Tween<double>(
-      begin: 1.0,
-      end: 0.92,
-    ).animate(fadeOut);
+    final scaleOut = Tween<double>(begin: 1.0, end: 0.92).animate(fadeOut);
 
     return FadeTransition(
       opacity: Tween<double>(begin: 0, end: 1).animate(fadeIn),
@@ -49,10 +46,7 @@ class SharedAxisTransitionBuilder extends StatelessWidget {
           scale: Tween<double>(begin: 1.0, end: 1.0).animate(animation),
           child: FadeTransition(
             opacity: Tween<double>(begin: 1, end: 0.6).animate(fadeOut),
-            child: ScaleTransition(
-              scale: scaleOut,
-              child: child,
-            ),
+            child: ScaleTransition(scale: scaleOut, child: child),
           ),
         ),
       ),

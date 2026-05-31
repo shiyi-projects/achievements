@@ -34,9 +34,7 @@ class FocusProgressRow extends StatelessWidget {
           Row(
             children: [
               Icon(
-                isComplete
-                    ? Icons.check_circle_rounded
-                    : Icons.timer_outlined,
+                isComplete ? Icons.check_circle_rounded : Icons.timer_outlined,
                 size: 16,
                 color: isComplete ? scheme.primary : scheme.outline,
               ),
@@ -45,8 +43,9 @@ class FocusProgressRow extends StatelessWidget {
                 child: Text(
                   '已专注 ${_formatMinutes(focusedMinutes)} / ${_formatMinutes(estimatedMinutes)}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color:
-                        isComplete ? scheme.primary : scheme.onSurfaceVariant,
+                    color: isComplete
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
                     fontWeight: isComplete ? FontWeight.w600 : null,
                   ),
                 ),
@@ -80,8 +79,9 @@ class FocusProgressRow extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 4,
-              backgroundColor:
-                  scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+              backgroundColor: scheme.surfaceContainerHighest.withValues(
+                alpha: 0.6,
+              ),
               valueColor: AlwaysStoppedAnimation(
                 isComplete ? scheme.primary : scheme.tertiary,
               ),

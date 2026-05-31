@@ -1,5 +1,5 @@
 import 'package:achievements/data/local/database.dart';
-import 'package:achievements/data/local/database_provider.dart';
+import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -30,10 +30,8 @@ Stream<Task?> currentTask(Ref ref) async* {
     yield null;
     return;
   }
-  final db = ref.watch(appDatabaseProvider);
-  yield* (db.select(
-    db.tasks,
-  )..where((t) => t.id.equals(id))).watchSingleOrNull();
+  final repo = ref.watch(taskRepositoryProvider);
+  yield await repo.getById(id);
 }
 
 /// 当前任务的父任务（面包屑导航用）。
@@ -47,8 +45,6 @@ Stream<Task?> parentTask(Ref ref) async* {
     yield null;
     return;
   }
-  final db = ref.watch(appDatabaseProvider);
-  yield* (db.select(db.tasks)
-        ..where((t) => t.id.equals(current.parentId!)))
-      .watchSingleOrNull();
+  final repo = ref.watch(taskRepositoryProvider);
+  yield await repo.getById(current.parentId!);
 }

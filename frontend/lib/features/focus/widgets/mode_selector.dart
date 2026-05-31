@@ -51,17 +51,14 @@ class ModeSelector extends ConsumerWidget {
                     width: itemWidth,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primaryContainer
-                            .withValues(alpha: 0.3),
-                        borderRadius:
-                            BorderRadius.circular(Radii.button - 3),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(Radii.button - 3),
                         border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.2),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.2),
                         ),
                       ),
                     ),
@@ -86,7 +83,9 @@ class ModeSelector extends ConsumerWidget {
                                     size: 16,
                                     color: selectedIndex == i
                                         ? scheme.onSurface
-                                        : scheme.onSurface.withValues(alpha: 0.5),
+                                        : scheme.onSurface.withValues(
+                                            alpha: 0.5,
+                                          ),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -98,7 +97,9 @@ class ModeSelector extends ConsumerWidget {
                                           : FontWeight.w400,
                                       color: selectedIndex == i
                                           ? scheme.onSurface
-                                          : scheme.onSurface.withValues(alpha: 0.5),
+                                          : scheme.onSurface.withValues(
+                                              alpha: 0.5,
+                                            ),
                                     ),
                                   ),
                                 ],

@@ -165,11 +165,13 @@ class Sidebar extends ConsumerWidget {
                               ? BoxDecoration(
                                   color: theme.colorScheme.secondaryContainer
                                       .withValues(alpha: 0.35),
-                                  borderRadius:
-                                      BorderRadius.circular(Radii.input),
+                                  borderRadius: BorderRadius.circular(
+                                    Radii.input,
+                                  ),
                                   border: Border.all(
-                                    color: theme.colorScheme.primary
-                                        .withValues(alpha: 0.4),
+                                    color: theme.colorScheme.primary.withValues(
+                                      alpha: 0.4,
+                                    ),
                                     width: 1.5,
                                   ),
                                 )
@@ -246,5 +248,4 @@ class Sidebar extends ConsumerWidget {
     };
     return AppIcons.svgIcon(path);
   }
-
 }

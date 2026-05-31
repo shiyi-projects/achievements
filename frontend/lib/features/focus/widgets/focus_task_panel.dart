@@ -36,7 +36,10 @@ class _FocusTaskPanelState extends ConsumerState<FocusTaskPanel> {
         // ── 标题 ──
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            Spacing.base, Spacing.md, Spacing.base, Spacing.sm,
+            Spacing.base,
+            Spacing.md,
+            Spacing.base,
+            Spacing.sm,
           ),
           child: Text(
             '选择专注任务',
@@ -74,10 +77,7 @@ class _FocusTaskPanelState extends ConsumerState<FocusTaskPanel> {
 
         // ── 任务列表 ──
         Expanded(
-          child: _TaskList(
-            range: _range,
-            activeTaskId: activeTaskId,
-          ),
+          child: _TaskList(range: _range, activeTaskId: activeTaskId),
         ),
       ],
     );
@@ -102,9 +102,7 @@ class _TaskList extends ConsumerWidget {
       stream: _buildQuery(db).watch(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          );
+          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
         }
 
         final tasks = snap.data ?? [];
@@ -137,36 +135,35 @@ class _TaskList extends ConsumerWidget {
     final today = DateTime(now.year, now.month, now.day);
 
     final q = db.select(db.tasks)
-      ..where((t) =>
-          t.deletedAt.isNull() &
-          t.completedAt.isNull() &
-          t.parentId.isNull());
+      ..where(
+        (t) =>
+            t.deletedAt.isNull() & t.completedAt.isNull() & t.parentId.isNull(),
+      );
 
     // 按筛选范围过滤
     switch (range) {
       case _FilterRange.today:
         final tomorrow = today.add(const Duration(days: 1));
-        q.where((t) =>
-            t.dueAt.isBetweenValues(today, tomorrow) |
-            t.dueAt.isNull()); // 今日到期 + 无截止日
+        q.where(
+          (t) => t.dueAt.isBetweenValues(today, tomorrow) | t.dueAt.isNull(),
+        ); // 今日到期 + 无截止日
       case _FilterRange.week:
         final weekEnd = today.add(const Duration(days: 7));
-        q.where((t) =>
-            t.dueAt.isSmallerOrEqualValue(weekEnd) | t.dueAt.isNull());
+        q.where(
+          (t) => t.dueAt.isSmallerOrEqualValue(weekEnd) | t.dueAt.isNull(),
+        );
       case _FilterRange.month:
         final monthEnd = today.add(const Duration(days: 30));
-        q.where((t) =>
-            t.dueAt.isSmallerOrEqualValue(monthEnd) | t.dueAt.isNull());
+        q.where(
+          (t) => t.dueAt.isSmallerOrEqualValue(monthEnd) | t.dueAt.isNull(),
+        );
       case _FilterRange.all:
         break; // 不加额外过滤
     }
 
     q.orderBy([
       // 有截止日的排前面，按截止日升序
-      (t) => OrderingTerm(
-            expression: t.dueAt.isNull(),
-            mode: OrderingMode.asc,
-          ),
+      (t) => OrderingTerm(expression: t.dueAt.isNull(), mode: OrderingMode.asc),
       (t) => OrderingTerm(expression: t.dueAt, mode: OrderingMode.asc),
       (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
     ]);
@@ -229,9 +226,7 @@ class _TaskRow extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  isActive
-                      ? Icons.radio_button_checked
-                      : Icons.circle_outlined,
+                  isActive ? Icons.radio_button_checked : Icons.circle_outlined,
                   size: 16,
                   color: isActive
                       ? scheme.primary
@@ -263,9 +258,7 @@ class _TaskRow extends StatelessWidget {
                   minHeight: 3,
                   backgroundColor: scheme.onSurface.withValues(alpha: 0.06),
                   valueColor: AlwaysStoppedAnimation(
-                    progress >= 1.0
-                        ? const Color(0xFF4CAF50)
-                        : scheme.primary,
+                    progress >= 1.0 ? const Color(0xFF4CAF50) : scheme.primary,
                   ),
                 ),
               ),
@@ -287,7 +280,8 @@ class _TaskRow extends StatelessWidget {
                 if (hasEstimate)
                   _Label(
                     icon: Icons.schedule,
-                    text: '预估 ${formatFocusDuration(task.estimatedMinutes! * 60)}',
+                    text:
+                        '预估 ${formatFocusDuration(task.estimatedMinutes! * 60)}',
                     color: scheme.onSurfaceVariant,
                   ),
                 // 截止日
@@ -350,11 +344,7 @@ class _TaskRow extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _Label extends StatelessWidget {
-  const _Label({
-    required this.icon,
-    required this.text,
-    required this.color,
-  });
+  const _Label({required this.icon, required this.text, required this.color});
 
   final IconData icon;
   final String text;
