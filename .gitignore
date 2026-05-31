@@ -119,6 +119,9 @@ temp/
 # ----- Build/deploy artifacts -----
 achievements-backend.zip
 *.tar.gz
+# Inno Setup / 安装包输出目录(只提交 .iss 脚本,不提交产物)
+frontend/installer/Output/
+*.exe
 
 # ----- Claude Code local settings -----
 # 不加前导斜线,匹配仓库内任意路径下的 .claude/ 目录(如 frontend/.claude/)
