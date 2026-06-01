@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+<defs>
+  <linearGradient id="purpleGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#7C6CFF"/>
+    <stop offset="1" stop-color="#4F46E5"/>
+  </linearGradient>
+  <linearGradient id="blueGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#60A5FA"/>
+    <stop offset="1" stop-color="#3B82F6"/>
+  </linearGradient>
+  <linearGradient id="greenGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#34D399"/>
+    <stop offset="1" stop-color="#10B981"/>
+  </linearGradient>
+  <linearGradient id="yellowGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FCD34D"/>
+    <stop offset="1" stop-color="#F59E0B"/>
+  </linearGradient>
+  <linearGradient id="redGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FF7A66"/>
+    <stop offset="1" stop-color="#FF4D4F"/>
+  </linearGradient>
+  <linearGradient id="tealGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#2DD4BF"/>
+    <stop offset="1" stop-color="#14B8A6"/>
+  </linearGradient>
+  <linearGradient id="lavenderGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#D8CCFF"/>
+    <stop offset="1" stop-color="#BCAEFF"/>
+  </linearGradient>
+  <linearGradient id="grayGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#94A3B8"/>
+    <stop offset="1" stop-color="#64748B"/>
+  </linearGradient>
+</defs>
+
+<rect x="48" y="52" width="40" height="40" rx="12" fill="url(#purpleGrad)"/>
+<rect x="48" y="164" width="40" height="40" rx="12" fill="url(#purpleGrad)"/>
+<rect x="168" y="108" width="40" height="40" rx="12" fill="url(#purpleGrad)"/>
+<path d="M 88 72 H 122 C 144 72 158 86 158 108 V 128 H 168" fill="none" stroke="#9C95FF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 88 184 H 122 C 144 184 158 170 158 148 V 128" fill="none" stroke="#9C95FF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+<defs>
+  <linearGradient id="purpleGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#7C6CFF"/>
+    <stop offset="1" stop-color="#4F46E5"/>
+  </linearGradient>
+  <linearGradient id="blueGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#60A5FA"/>
+    <stop offset="1" stop-color="#3B82F6"/>
+  </linearGradient>
+  <linearGradient id="redGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FF7A66"/>
+    <stop offset="1" stop-color="#FF4D4F"/>
+  </linearGradient>
+  <linearGradient id="grayGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#94A3B8"/>
+    <stop offset="1" stop-color="#64748B"/>
+  </linearGradient>
+</defs>
+<path d="M 82 178 H 176 C 198 178 212 162 212 142 C 212 122 196 108 178 108 C 172 84 152 68 128 68 C 104 68 84 82 78 106 C 58 108 44 124 44 144 C 44 164 60 178 82 178 Z" fill="#EEF2FF"/><path d="M 82 178 H 176 C 198 178 212 162 212 142 C 212 122 196 108 178 108 C 172 84 152 68 128 68 C 104 68 84 82 78 106 C 58 108 44 124 44 144 C 44 164 60 178 82 178 Z" fill="none" stroke="url(#blueGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="184" cy="78" r="24" fill="url(#redGrad)" stroke="white" stroke-width="5"/>
+<path d="M 184 66 V 82" stroke="white" stroke-width="10" stroke-linecap="round"/>
+<circle cx="184" cy="92" r="5" fill="white"/>
+<path d="M 128 102 V 140" stroke="url(#redGrad)" stroke-width="14" stroke-linecap="round"/>
+<circle cx="128" cy="160" r="8" fill="url(#redGrad)"/>
+</svg>

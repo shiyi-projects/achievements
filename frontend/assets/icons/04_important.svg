@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+<defs>
+  <linearGradient id="purpleGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#7C6CFF"/>
+    <stop offset="1" stop-color="#4F46E5"/>
+  </linearGradient>
+  <linearGradient id="blueGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#60A5FA"/>
+    <stop offset="1" stop-color="#3B82F6"/>
+  </linearGradient>
+  <linearGradient id="greenGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#34D399"/>
+    <stop offset="1" stop-color="#10B981"/>
+  </linearGradient>
+  <linearGradient id="yellowGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FCD34D"/>
+    <stop offset="1" stop-color="#F59E0B"/>
+  </linearGradient>
+  <linearGradient id="redGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FF7A66"/>
+    <stop offset="1" stop-color="#FF4D4F"/>
+  </linearGradient>
+  <linearGradient id="tealGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#2DD4BF"/>
+    <stop offset="1" stop-color="#14B8A6"/>
+  </linearGradient>
+  <linearGradient id="lavenderGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#D8CCFF"/>
+    <stop offset="1" stop-color="#BCAEFF"/>
+  </linearGradient>
+  <linearGradient id="folderGrad" x1="48" y1="56" x2="208" y2="200" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#6EA8FF"/>
+    <stop offset="1" stop-color="#4F46E5"/>
+  </linearGradient>
+</defs>
+
+<circle cx="154" cy="158" r="42" fill="#C7C3FF" opacity="0.55"/>
+<polygon points="128.00,48.00 146.81,94.11 196.48,97.75 158.43,129.89 170.32,178.25 128.00,152.00 85.68,178.25 97.57,129.89 59.52,97.75 109.19,94.11" fill="url(#yellowGrad)"/>
+</svg>
