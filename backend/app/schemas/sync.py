@@ -24,12 +24,16 @@ class TaskTagRead(BaseModel):
     task_id: UUID
     tag_id: UUID
     created_at: datetime
+    updated_at: datetime
+    # 非空表示该关联已被移除(删除墓碑),客户端据此物理删本地关联行。
+    deleted_at: datetime | None
 
 
 class SyncPullResponse(BaseModel):
     """`since` 为空时为首次同步;非空只回 updated_at > since 的增量。
 
-    所有返回行 **包含软删条目** (deleted_at != null),客户端据此本地软删。
+    所有返回行 **包含软删 (deleted_at != null) 与永久删除墓碑 (purged_at != null)**:
+    软删行客户端据此置回收站态;墓碑行客户端据此物理删本地行。
     `cursor` 是服务端拉取这一瞬的 ``now``,客户端下一次 pull 时回传。
     """
 
@@ -45,7 +49,8 @@ class SyncPullResponse(BaseModel):
 
 
 MutationEntity = Literal["folder", "list", "task", "tag", "task_tag"]
-MutationOp = Literal["upsert", "delete"]
+# upsert:创建或更新; delete:软删(移入回收站,可恢复); purge:永久删除(写墓碑)。
+MutationOp = Literal["upsert", "delete", "purge"]
 
 
 class Mutation(BaseModel):

@@ -15,11 +15,11 @@ Phase 2 step 1:增量 pull + push(LWW 冲突解决)。
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Folder, Tag, Task, TaskList, TaskTag
@@ -38,10 +38,16 @@ from app.schemas.sync_payload import (
     TagPayload,
     TaskListPayload,
     TaskPayload,
+    TaskTagPayload,
 )
 from app.schemas.tag import TagRead
 from app.schemas.task import TaskRead
 from app.schemas.task_list import TaskListRead
+
+# 永久删除墓碑的保留期。超过此时长的 purged_at / task_tag.deleted_at 行,
+# 在 pull 时被惰性 GC 物理清除。需 ≥ 任意设备最长可能离线时长,否则离线设备
+# 回来时拿不到墓碑(它仍持有本地副本,无害,只是不会被远端清掉)。
+PURGE_RETENTION = timedelta(days=30)
 
 
 async def pull(
@@ -49,8 +55,13 @@ async def pull(
     user_id: UUID,
     since: datetime | None,
 ) -> SyncPullResponse:
-    """返回 [since, now) 区间内所有可同步实体的变更。"""
+    """返回 [since, now) 区间内所有可同步实体的变更。
+
+    返回前先做一次惰性 GC:物理清除超过保留期的永久删除墓碑,避免墓碑无限堆积。
+    """
     cursor = datetime.now(UTC)
+
+    await _gc_purged(session, user_id=user_id, now=cursor)
 
     folders = await _delta(session, Folder, user_id=user_id, since=since)
     lists = await _delta(session, TaskList, user_id=user_id, since=since)
@@ -90,8 +101,9 @@ async def _task_tags_delta(
     user_id: UUID,
     since: datetime | None,
 ) -> list[TaskTag]:
-    """TaskTag 没有独立 user_id / updated_at,通过 join 到 tasks 拿 user 归属;
-    增量条件用 ``created_at > since``(关联表只增不改)。"""
+    """TaskTag 没有独立 user_id,通过 join 到 tasks 拿 user 归属;增量条件用
+    ``updated_at > since`` —— 关联建立/删除(置 deleted_at)都会 bump updated_at,
+    删除墓碑据此下发给各端。"""
     query = (
         select(TaskTag)
         .join(Task, Task.id == TaskTag.task_id)
@@ -100,10 +112,44 @@ async def _task_tags_delta(
         )
     )
     if since is not None:
-        query = query.where(TaskTag.created_at > since)
-    query = query.order_by(TaskTag.created_at)
+        query = query.where(TaskTag.updated_at > since)
+    query = query.order_by(TaskTag.updated_at)
     result = await session.execute(query)
     return list(result.scalars().all())
+
+
+async def _gc_purged(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    now: datetime,
+) -> None:
+    """物理清除超过保留期的删除墓碑(purged_at / task_tag.deleted_at)。
+
+    保留期内的墓碑仍随 delta 下发,确保各端都能 pull 到并物理删本地行;到期后
+    认为已传播完毕,物理删除以免无限堆积。FK 的 ON DELETE CASCADE 会带走子行。
+    """
+    threshold = now - PURGE_RETENTION
+
+    for model in (Folder, TaskList, Task, Tag):
+        await session.execute(
+            delete(model).where(
+                model.user_id == user_id,
+                model.purged_at.is_not(None),
+                model.purged_at < threshold,
+            )
+        )
+
+    # task_tags 无 user_id,通过 task 归属过滤;删除墓碑用 deleted_at。
+    await session.execute(
+        delete(TaskTag).where(
+            TaskTag.deleted_at.is_not(None),
+            TaskTag.deleted_at < threshold,
+            TaskTag.task_id.in_(select(Task.id).where(Task.user_id == user_id)),
+        )
+    )
+
+    await session.commit()
 
 
 # ---- push -----------------------------------------------------------------
@@ -178,8 +224,7 @@ async def _apply_one(
     mut: Mutation,
 ) -> MutationResult:
     if mut.entity == "task_tag":
-        # Phase 2 step 1 暂不支持 task_tag 同步,后续单独 commit 接入
-        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+        return await _apply_task_tag(session, user_id, mut)
 
     model = _ENTITY_MODEL.get(mut.entity)
     if model is None:
@@ -206,7 +251,8 @@ async def _apply_one(
             existing = await session.get(model, mut.id)
 
             if existing is None:
-                if mut.op == "delete":
+                if mut.op in ("delete", "purge"):
+                    # 行已不存在 → 删除/永久删除幂等成功。
                     return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=1)
 
                 # Validate required fields before INSERT to avoid DB NOT-NULL violations
@@ -248,6 +294,10 @@ async def _apply_one(
 
             if mut.op == "delete":
                 existing.deleted_at = datetime.now(UTC)
+            elif mut.op == "purge":
+                # 永久删除:写墓碑。客户端 pull 到 purged_at 非空后物理删本地行,
+                # 服务端保留至超过保留期再被 _gc_purged 物理清除。
+                existing.purged_at = datetime.now(UTC)
             else:
                 _assign(existing, parsed)
             existing.version += 1
@@ -262,6 +312,71 @@ async def _apply_one(
         logging.getLogger(__name__).warning(
             "sync: mutation %s/%s rejected due to %s: %s",
             mut.entity,
+            mut.id,
+            type(exc).__name__,
+            exc,
+        )
+        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+
+
+async def _apply_task_tag(
+    session: AsyncSession,
+    user_id: UUID,
+    mut: Mutation,
+) -> MutationResult:
+    """task_tag 关联同步:复合键 (task_id, tag_id) 取自 payload,不用 Mutation.id。
+
+    - upsert:建立关联(已存在则恢复 deleted_at=None),幂等。
+    - delete / purge:置 deleted_at 墓碑;不存在则幂等成功。
+
+    归属校验:task 与 tag 都须属于当前 user,否则 rejected。关联表无 version,
+    不参与乐观并发,version 字段回 1 占位。
+    """
+    try:
+        payload = TaskTagPayload.model_validate(mut.payload)
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "sync: task_tag %s rejected (payload validation): %s: %s",
+            mut.id,
+            type(exc).__name__,
+            exc,
+        )
+        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+
+    try:
+        async with session.begin_nested():
+            task = await session.get(Task, payload.task_id)
+            tag = await session.get(Tag, payload.tag_id)
+            if (
+                task is None
+                or task.user_id != user_id
+                or tag is None
+                or tag.user_id != user_id
+            ):
+                return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+
+            existing = await session.get(TaskTag, (payload.task_id, payload.tag_id))
+
+            if mut.op in ("delete", "purge"):
+                if existing is not None:
+                    existing.deleted_at = datetime.now(UTC)
+                    await session.flush()
+                return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=1)
+
+            # upsert:建立或恢复关联(墓碑复活)
+            if existing is None:
+                session.add(TaskTag(task_id=payload.task_id, tag_id=payload.tag_id))
+            else:
+                existing.deleted_at = None
+            await session.flush()
+            return MutationResult(entity=mut.entity, id=mut.id, status="applied", version=1)
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "sync: task_tag %s rejected due to %s: %s",
             mut.id,
             type(exc).__name__,
             exc,
