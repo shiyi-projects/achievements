@@ -26,4 +26,6 @@ class FolderRead(BaseModel):
     sort_order: int
     created_at: datetime
     updated_at: datetime
+    deleted_at: datetime | None
+    purged_at: datetime | None
     version: int

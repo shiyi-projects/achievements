@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import Task
 
 
 async def _create_list(client: AsyncClient, name: str = "Inbox") -> UUID:
@@ -193,3 +196,166 @@ async def test_push_delete_soft_deletes(client: AsyncClient) -> None:
     assert push.json()["results"][0]["status"] == "applied"
     fetched = await client.get(f"/api/v1/tasks/{task_id}")
     assert fetched.json()["deleted_at"] is not None
+
+
+# ---- purge (永久删除墓碑) --------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_push_purge_writes_tombstone(client: AsyncClient) -> None:
+    """purge 写 purged_at 墓碑;pull 仍下发(保留期内),供各端物理删除本地行。"""
+    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    task_id = (
+        await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "gone"})
+    ).json()["id"]
+
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task",
+                    "op": "purge",
+                    "id": task_id,
+                    "base_version": 1,
+                    "payload": {},
+                }
+            ]
+        },
+    )
+    assert push.json()["results"][0]["status"] == "applied"
+
+    pull = (await client.get("/api/v1/sync/pull")).json()
+    purged = next(t for t in pull["tasks"] if t["id"] == task_id)
+    assert purged["purged_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_push_purge_nonexistent_is_idempotent(client: AsyncClient) -> None:
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task",
+                    "op": "purge",
+                    "id": str(uuid4()),
+                    "base_version": 1,
+                    "payload": {},
+                }
+            ]
+        },
+    )
+    result = push.json()["results"][0]
+    assert result["status"] == "applied"
+    assert result["version"] == 1
+
+
+@pytest.mark.asyncio
+async def test_pull_gc_removes_purged_beyond_retention(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """purged_at 超过保留期的行,在 pull 时被惰性 GC 物理清除,不再下发。"""
+    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    task_id = (
+        await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "ancient"})
+    ).json()["id"]
+
+    # 直接把墓碑时间改到保留期之外
+    task = await session.get(Task, UUID(task_id))
+    assert task is not None
+    task.purged_at = datetime.now(UTC) - timedelta(days=40)
+    await session.commit()
+
+    pull = (await client.get("/api/v1/sync/pull")).json()
+    assert all(t["id"] != task_id for t in pull["tasks"])
+
+
+# ---- task_tag 同步 --------------------------------------------------------
+
+
+async def _create_tag(client: AsyncClient, name: str = "urgent") -> str:
+    resp = await client.post("/api/v1/tags", json={"name": name})
+    assert resp.status_code == 201
+    return resp.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_task_tag_upsert_then_delete_sync(client: AsyncClient) -> None:
+    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    task_id = (
+        await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "t"})
+    ).json()["id"]
+    tag_id = await _create_tag(client)
+
+    payload = {"task_id": task_id, "tag_id": tag_id}
+
+    # upsert 建立关联
+    up = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task_tag",
+                    "op": "upsert",
+                    "id": task_id,
+                    "base_version": 0,
+                    "payload": payload,
+                }
+            ]
+        },
+    )
+    assert up.json()["results"][0]["status"] == "applied"
+
+    pull = (await client.get("/api/v1/sync/pull")).json()
+    tt = next(
+        x
+        for x in pull["task_tags"]
+        if x["task_id"] == task_id and x["tag_id"] == tag_id
+    )
+    assert tt["deleted_at"] is None
+
+    # delete 置墓碑
+    rm = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task_tag",
+                    "op": "delete",
+                    "id": task_id,
+                    "base_version": 0,
+                    "payload": payload,
+                }
+            ]
+        },
+    )
+    assert rm.json()["results"][0]["status"] == "applied"
+
+    pull2 = (await client.get("/api/v1/sync/pull")).json()
+    tt2 = next(
+        x
+        for x in pull2["task_tags"]
+        if x["task_id"] == task_id and x["tag_id"] == tag_id
+    )
+    assert tt2["deleted_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_task_tag_rejected_when_not_owned(client: AsyncClient) -> None:
+    """task / tag 不属于当前用户(此处用根本不存在的 id)→ rejected。"""
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task_tag",
+                    "op": "upsert",
+                    "id": str(uuid4()),
+                    "base_version": 0,
+                    "payload": {"task_id": str(uuid4()), "tag_id": str(uuid4())},
+                }
+            ]
+        },
+    )
+    assert push.json()["results"][0]["status"] == "rejected"

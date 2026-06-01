@@ -119,23 +119,40 @@ class TagRepository {
     });
   }
 
-  // TODO(sync): task_tag mutations 服务端目前直接 rejected
-  //   (sync_service.py:_apply_one),addToTask/removeFromTask 暂只走本地。
-  //   待后端补完 task_tag 同步后,这里再 enqueue。
+  // task_tag 是复合键,后端 Mutation.id 仍要求合法 UUID,故 entityId 用 taskId
+  // 占位,真正的 (task_id, tag_id) 放进 payload;服务端按 payload 定位关联行。
   Future<void> addToTask(String taskId, String tagId) async {
     if (!await _ownsTaskAndTag(taskId, tagId)) return;
-    await _db
-        .into(_db.taskTags)
-        .insertOnConflictUpdate(
-          TaskTagsCompanion.insert(taskId: taskId, tagId: tagId),
-        );
+    await _db.transaction(() async {
+      await _db
+          .into(_db.taskTags)
+          .insertOnConflictUpdate(
+            TaskTagsCompanion.insert(taskId: taskId, tagId: tagId),
+          );
+      await _outbox.enqueue(
+        entity: 'task_tag',
+        op: 'upsert',
+        entityId: taskId,
+        baseVersion: 0,
+        payload: {'task_id': taskId, 'tag_id': tagId},
+      );
+    });
   }
 
   Future<void> removeFromTask(String taskId, String tagId) async {
     if (!await _ownsTaskAndTag(taskId, tagId)) return;
-    await (_db.delete(
-      _db.taskTags,
-    )..where((tt) => tt.taskId.equals(taskId) & tt.tagId.equals(tagId))).go();
+    await _db.transaction(() async {
+      await (_db.delete(
+        _db.taskTags,
+      )..where((tt) => tt.taskId.equals(taskId) & tt.tagId.equals(tagId))).go();
+      await _outbox.enqueue(
+        entity: 'task_tag',
+        op: 'delete',
+        entityId: taskId,
+        baseVersion: 0,
+        payload: {'task_id': taskId, 'tag_id': tagId},
+      );
+    });
   }
 
   Future<bool> _ownsTaskAndTag(String taskId, String tagId) async {

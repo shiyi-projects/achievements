@@ -14,16 +14,18 @@ part 'sync_coordinator.g.dart';
 
 /// 同步触发协调器。
 ///
-/// 负责把 [SyncEngine] 的 pull / push 接到多个触发源:
-///   1. **启动**:bootstrap 调用 [runFullSync] 跑 pull → push。
-///   2. **本地写入**:监听 outbox.watchPendingCount,500ms debounce 后跑 push。
-///   3. **网络恢复**:connectivity_plus 监听到 offline → online 后跑 pull + push。
-///   4. **App 切回前台**:WidgetsBindingObserver.resumed → 节流的 full sync。
-///   5. **窗口获得焦点**:由 AppWindowListener 调 [triggerIfStale] 触发。
-///   6. **30s 轮询**:每轮成功后排下一次。
+/// 触发策略(类 git 的「有改动才推、不每次打开都同」):
+///   1. **启动**:bootstrap 调用 [runFullSync] 跑 pull → push,**拉取仅此一次**。
+///   2. **本地写入**:监听 outbox.watchPendingCount,500ms debounce 后跑 push;
+///      没有改动(outbox 空)就什么都不发。
+///   3. **网络恢复**:offline → online 边沿 **只 flush 未推送的本地改动(push)**,
+///      不自动 pull。
+///   4. **手动**:下拉刷新 / 设置页「立即同步」直接调 [runFullSync](pull + push)。
+///   5. **失败重试**:pull/push 报 error/offline 时延时重试,直到成功。
 ///
-/// 全部触发都会把 [SyncStatusController] 写入 syncing → idle / error / offline。
-/// 同一时间只允许一次 sync 在跑(_inFlight 闸门),并发触发被合并。
+/// 不再有 resume / 窗口聚焦 / 周期轮询触发的自动 pull —— 远端变更靠启动拉取或
+/// 用户手动刷新获取。全部触发都会把 [SyncStatusController] 写入
+/// syncing → idle / error / offline。同一时间只允许一次 sync 在跑,并发触发被合并。
 class SyncCoordinator extends WidgetsBindingObserver {
   SyncCoordinator({
     required SyncEngine engine,
@@ -56,15 +58,11 @@ class SyncCoordinator extends WidgetsBindingObserver {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _debounce;
   Timer? _retryTimer;
-  Timer? _pollTimer;
   Future<void>? _activeRun;
   CancelToken? _cancelToken;
   bool _stopping = false;
   bool _wasOffline = false;
   bool _lifecycleObserverRegistered = false;
-  DateTime? _lastFullSyncStartAt;
-
-  static const Duration _kPollInterval = Duration(seconds: 30);
 
   /// 启动触发监听。bootstrap 阶段调用一次。
   void start() {
@@ -101,8 +99,6 @@ class SyncCoordinator extends WidgetsBindingObserver {
     _debounce = null;
     _retryTimer?.cancel();
     _retryTimer = null;
-    _pollTimer?.cancel();
-    _pollTimer = null;
     if (_lifecycleObserverRegistered) {
       WidgetsBinding.instance.removeObserver(this);
       _lifecycleObserverRegistered = false;
@@ -113,60 +109,36 @@ class SyncCoordinator extends WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_stopping && state == AppLifecycleState.resumed) {
-      unawaited(triggerIfStale());
-    }
+    // 切回前台不再自动 pull(按「不每次打开都同」的策略)。本地改动仍由
+    // outbox 监听驱动 push,远端变更靠启动拉取或手动刷新获取。
   }
 
-  /// 节流的 full sync 触发。
-  ///
-  /// 若距上次 full sync 启动不到 [minAge] 不重复跑(避免短时间内 resume+focus
-  /// 等多个事件叠着触发);否则跑 [runFullSync]。
-  Future<void> triggerIfStale({
-    Duration minAge = const Duration(seconds: 10),
-  }) async {
-    if (_stopping) return;
-    final last = _lastFullSyncStartAt;
-    if (last != null && DateTime.now().difference(last) < minAge) {
-      return;
-    }
-    await runFullSync();
-  }
-
-  /// 完整同步:pull 增量,再把 outbox 推完。bootstrap / 网络恢复时用。
+  /// 完整同步:pull 增量,再把 outbox 推完。启动 / 手动刷新 / 设置页「立即同步」用。
   Future<void> runFullSync() async {
     if (_stopping || _activeRun != null) return;
     _retryTimer?.cancel();
     _retryTimer = null;
-    _pollTimer?.cancel();
-    _pollTimer = null;
-    _lastFullSyncStartAt = DateTime.now();
     _activeRun = _gate
         .runForAccount(_userId, _currentUserId, () async {
           if (_stopping) return;
-          try {
-            _status.set(SyncStatus.syncing);
-            final token = _cancelToken = CancelToken();
-            final pullResult = await _engine.pullOnce(cancelToken: token);
-            if (_stopping) return;
-            if (pullResult != SyncStatus.idle) {
-              _status.set(pullResult);
-              _scheduleRetry(runFullSync);
-              return;
-            }
-            final pushResult = await _engine.pushOnce(cancelToken: token);
-            if (_stopping) return;
-            _status.set(pushResult);
-            if (pushResult == SyncStatus.idle) {
-              await _stampLastSyncAt();
-            }
-            if (pushResult == SyncStatus.error ||
-                pushResult == SyncStatus.offline) {
-              _scheduleRetry(runFullSync);
-            }
-          } finally {
-            // 无论成功还是失败(错误路径已有 retry),都在 30s 后再轮询。
-            if (!_stopping && _retryTimer == null) _schedulePoll();
+          _status.set(SyncStatus.syncing);
+          final token = _cancelToken = CancelToken();
+          final pullResult = await _engine.pullOnce(cancelToken: token);
+          if (_stopping) return;
+          if (pullResult != SyncStatus.idle) {
+            _status.set(pullResult);
+            _scheduleRetry(runFullSync);
+            return;
+          }
+          final pushResult = await _engine.pushOnce(cancelToken: token);
+          if (_stopping) return;
+          _status.set(pushResult);
+          if (pushResult == SyncStatus.idle) {
+            await _stampLastSyncAt();
+          }
+          if (pushResult == SyncStatus.error ||
+              pushResult == SyncStatus.offline) {
+            _scheduleRetry(runFullSync);
           }
         })
         .then((_) {});
@@ -210,14 +182,6 @@ class SyncCoordinator extends WidgetsBindingObserver {
     );
   }
 
-  void _schedulePoll() {
-    if (_stopping) return;
-    _pollTimer?.cancel();
-    _pollTimer = Timer(_kPollInterval, () {
-      if (!_stopping) unawaited(runFullSync());
-    });
-  }
-
   /// error / offline 时 30s 后重跑 [callback]。
   void _scheduleRetry(Future<void> Function() callback, {SyncStatus? only}) {
     if (_stopping) return;
@@ -241,9 +205,9 @@ class SyncCoordinator extends WidgetsBindingObserver {
     final isOffline =
         results.isEmpty || results.every((r) => r == ConnectivityResult.none);
     if (!_stopping && _wasOffline && !isOffline) {
-      // 离线 → 在线的边沿触发一次全量 sync。
-      debugPrint('sync: connectivity restored, kicking full sync');
-      unawaited(runFullSync());
+      // 离线 → 在线的边沿:只 flush 未推送的本地改动,不自动 pull。
+      debugPrint('sync: connectivity restored, flushing pending push');
+      unawaited(_runPush());
     }
     _wasOffline = isOffline;
   }
