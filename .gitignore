@@ -89,7 +89,10 @@ frontend/packages/**/example/
 Thumbs.db
 desktop.ini
 ehthumbs.db
-Icon?
+# 注意: 不要添加 macOS 的 "Icon?" 规则。本项目只构建 Windows + Android,
+# 不存在 macOS Finder 的 Icon\r 文件; 而在 core.ignorecase=true 的系统(Windows)上,
+# "Icon?" 的 ? 通配符会大小写不敏感地匹配到 assets/icons/ 目录,
+# 导致整目录 SVG 被静默忽略、CI 打包后图标全部丢失。
 
 # ----- Env / Secrets -----
 .env
