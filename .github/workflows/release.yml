@@ -57,11 +57,33 @@ jobs:
           $zipName  = "Achievements-${{ steps.version.outputs.VERSION }}-windows-portable.zip"
           Compress-Archive -Path "$buildDir\*" -DestinationPath $zipName -Force
 
-      - name: Upload artifact
+      - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-portable
           path: frontend/Achievements-*-windows-portable.zip
+          retention-days: 5
+
+      # ---- Inno Setup 安装包 ----
+      # 复用上面 flutter build windows 的产物(installer/.iss 的 ReleaseDir 指向它)。
+      # choco 安装的是官方完整版 Inno Setup 6，自带 Languages\ChineseSimplified.isl。
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+          & $iscc "installer\achievements.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup 编译失败 (exit $LASTEXITCODE)" }
+          Get-ChildItem "installer\Output\AchievementsSetup-*.exe"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: frontend/installer/Output/AchievementsSetup-*.exe
           retention-days: 5
 
   # ========== Android APK ==========
