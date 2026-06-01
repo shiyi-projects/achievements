@@ -1,5 +1,4 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
-import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/features/task_detail/widgets/date_helpers.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +22,11 @@ class CollapsibleMeta extends StatelessWidget {
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(bottom: Spacing.sm),
         dense: true,
-        leading: AppIcons.svgIcon(AppIcons.info, size: 18),
+        leading: Icon(
+          Icons.info_outline_rounded,
+          size: 18,
+          color: scheme.outline,
+        ),
         title: Text(
           summary,
           style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),

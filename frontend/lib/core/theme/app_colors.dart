@@ -18,6 +18,10 @@ abstract final class AppColors {
   /// ⚪ 低 / Low — 使用 outline 色调
   static const Color low = Color(0xFF79747E);
 
+  /// ⭐ 星标 / Starred — 暖金色,语义固定不随主题切换。
+  /// 背景高亮用本色叠加低 alpha,在 Light/Dark 下均为柔和暖调。
+  static const Color star = Color(0xFFF5A623);
+
   // ── 主题预设种子色 ──
   /// 科技蓝 — 主默认种子色
   static const Color seedTechBlue = Color(0xFF0078D4);

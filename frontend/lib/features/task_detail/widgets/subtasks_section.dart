@@ -1,5 +1,4 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
-import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/state/selected_task.dart';
@@ -8,9 +7,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 任务详情面板内的子任务区。
 class SubtasksSection extends ConsumerStatefulWidget {
-  const SubtasksSection({required this.parent, super.key});
+  const SubtasksSection({
+    required this.parent,
+    this.showHeader = true,
+    super.key,
+  });
 
   final Task parent;
+
+  /// 内嵌于 Tab 时由外层 Tab 标签承担标题,关闭内部标题行。
+  final bool showHeader;
 
   @override
   ConsumerState<SubtasksSection> createState() => _SubtasksSectionState();
@@ -56,54 +62,63 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        subtasksAsync.when(
-          loading: () => Row(
-            children: [
-              AppIcons.svgIcon(AppIcons.subtask, size: 18),
-              const SizedBox(width: Spacing.sm),
-              Text('子任务', style: theme.textTheme.labelLarge),
-            ],
-          ),
-          error: (e, st) => Text('Failed to load: $e'),
-          data: (subs) {
-            final total = subs.length;
-            final done = subs.where((s) => s.completedAt != null).length;
-            return Row(
+        if (widget.showHeader)
+          subtasksAsync.when(
+            loading: () => Row(
               children: [
-                AppIcons.svgIcon(AppIcons.subtask, size: 18),
+                Icon(
+                  Icons.checklist_rounded,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: Spacing.sm),
                 Text('子任务', style: theme.textTheme.labelLarge),
-                if (total > 0) ...[
+              ],
+            ),
+            error: (e, st) => Text('Failed to load: $e'),
+            data: (subs) {
+              final total = subs.length;
+              final done = subs.where((s) => s.completedAt != null).length;
+              return Row(
+                children: [
+                  Icon(
+                    Icons.checklist_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: Spacing.sm),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: Spacing.sm,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: done == total && total > 0
-                          ? scheme.primary.withValues(alpha: 0.15)
-                          : scheme.surfaceContainerHighest.withValues(
-                              alpha: 0.5,
-                            ),
-                      borderRadius: BorderRadius.circular(Radii.circle),
-                    ),
-                    child: Text(
-                      '$done/$total',
-                      style: theme.textTheme.labelSmall?.copyWith(
+                  Text('子任务', style: theme.textTheme.labelLarge),
+                  if (total > 0) ...[
+                    const SizedBox(width: Spacing.sm),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Spacing.sm,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
                         color: done == total && total > 0
-                            ? scheme.primary
-                            : scheme.outline,
-                        fontWeight: FontWeight.w600,
+                            ? scheme.primary.withValues(alpha: 0.15)
+                            : scheme.surfaceContainerHighest.withValues(
+                                alpha: 0.5,
+                              ),
+                        borderRadius: BorderRadius.circular(Radii.circle),
+                      ),
+                      child: Text(
+                        '$done/$total',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: done == total && total > 0
+                              ? scheme.primary
+                              : scheme.outline,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: Spacing.sm),
+              );
+            },
+          ),
+        if (widget.showHeader) const SizedBox(height: Spacing.sm),
         subtasksAsync.when(
           loading: () => const LinearProgressIndicator(minHeight: 2),
           error: (_, __) => const SizedBox.shrink(),
@@ -120,7 +135,7 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
           padding: const EdgeInsets.only(top: Spacing.sm),
           child: Row(
             children: [
-              AppIcons.svgIcon(AppIcons.add, size: 18),
+              Icon(Icons.add_rounded, size: 18, color: scheme.outline),
               const SizedBox(width: Spacing.md),
               Expanded(
                 child: TextField(
@@ -191,7 +206,13 @@ class _SubtaskRow extends ConsumerWidget {
                     width: 1.5,
                   ),
                 ),
-                child: done ? AppIcons.svgIcon(AppIcons.check, size: 14) : null,
+                child: done
+                    ? Icon(
+                        Icons.check_rounded,
+                        size: 14,
+                        color: scheme.onPrimary,
+                      )
+                    : null,
               ),
             ),
             const SizedBox(width: Spacing.md),
