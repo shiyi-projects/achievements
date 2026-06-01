@@ -54,3 +54,14 @@ class TagPayload(_Base):
     name: str | None = None
     color: str | None = None
     deleted_at: datetime | None = None
+
+
+class TaskTagPayload(_Base):
+    """关联表用复合键 (task_id, tag_id) 定位,不走 Mutation.id。
+
+    upsert:建立关联(幂等);delete:置 deleted_at 墓碑。两个键在 upsert/delete
+    时都必填。
+    """
+
+    task_id: UUID
+    tag_id: UUID

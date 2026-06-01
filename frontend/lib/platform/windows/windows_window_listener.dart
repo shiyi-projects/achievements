@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:achievements/core/sync/sync_coordinator.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
 import 'package:achievements/platform/windows/quit_app.dart';
@@ -10,10 +9,11 @@ import 'package:window_manager/window_manager.dart';
 
 /// 监听 Windows 窗口事件。
 ///
-/// 两个职责:
+/// 职责:
 /// - **关闭按钮**:`onWindowClose` 读用户偏好,决定 hide / destroy / ask
-/// - **窗口聚焦**:`onWindowFocus` 节流地触发一次同步(Alt+Tab 回到 app 或
-///   点了一下窗口时,把云端新东西拉下来,无需用户去点"立即同步")
+///
+/// 注:窗口聚焦不再自动触发同步——按「不每次打开都同」的策略,远端变更靠启动
+/// 拉取或用户手动「立即同步」/下拉刷新获取。
 class AppWindowListener extends WindowListener {
   AppWindowListener(this._container);
 
@@ -36,12 +36,6 @@ class AppWindowListener extends WindowListener {
       case CloseAction.ask:
         await _askAndAct();
     }
-  }
-
-  @override
-  void onWindowFocus() {
-    // 节流由 coordinator.triggerIfStale 处理,这里不用 await。
-    unawaited(_container.read(syncCoordinatorProvider).triggerIfStale());
   }
 
   Future<void> _askAndAct() async {

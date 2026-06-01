@@ -325,9 +325,11 @@ POST   /export, POST /import
 ### 7.1 同步引擎(Phase 2 重点)
 
 - 写路径:UI → Repository → Drift 事务(主表 + Outbox)→ 立刻返回 → 后台 worker 出队 → `POST /sync/push` → 成功后删除 outbox 行,失败指数退避(最多 5 次)。
-- 读路径:启动时及定时(30s)`GET /sync/pull?since=cursor`,合并到本地。
+- 读路径:**仅启动拉一次** `GET /sync/pull?since=cursor`,合并到本地;不再周期/聚焦轮询。
 - 冲突:本地 `version != server.version` 时,按 `updated_at` 较大者胜,落败方进入 `activities` 表留痕,以便后续查看。
-- 删除:软删,`deleted_at` 字段同步;客户端 30 天清扫真删。
+- 删除:两态 —— `deleted_at`(回收站,可恢复)与 `purged_at`(永久删除墓碑,客户端 pull 到即物理删,服务端超保留期惰性 GC)。
+
+> 同步引擎与同步 API 的权威细节(触发策略、删除两态、purge 墓碑、task_tag 同步、pull/push 契约)见 [`dev_docs/sync.md`](sync.md)。
 
 ### 7.2 提醒可靠性(Phase 2)
 

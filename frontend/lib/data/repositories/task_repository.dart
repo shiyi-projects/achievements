@@ -323,10 +323,11 @@ class TaskRepository {
     });
   }
 
-  /// 硬删本地行。同步语义降级为 server 软删:enqueue 一条 delete,服务端
-  /// 据此把 deleted_at 写上,其他端 pull 后也变成软删。本地行已经物理消失,
-  /// 后续 pull 回来 server 那行的 deleted_at 时,本地不会再恢复(insertOnConflictUpdate
-  /// 仍会落,但 UI 查询都过滤了 deletedAt 非空,效果等价于不可见)。
+  /// 永久删除(回收站「永久删除」)。本地物理删行,并 enqueue 一条 `purge`:
+  /// 服务端据此写 purged_at 墓碑,其他端 pull 到墓碑后同样物理删本地行;墓碑超过
+  /// 保留期由服务端惰性 GC 物理清除。注意必须用 `purge` 而非 `delete`——`delete`
+  /// 只软删(deleted_at),会被 pull 当成增量重新落库,导致已永久删除的任务又出现
+  /// 在回收站(回收站视图正是 `deletedAt 非空`)。
   Future<void> hardDelete(String id) async {
     await _db.transaction(() async {
       final current =
@@ -339,7 +340,7 @@ class TaskRepository {
       if (current != null) {
         await _outbox.enqueue(
           entity: 'task',
-          op: 'delete',
+          op: 'purge',
           entityId: id,
           baseVersion: current.version,
           payload: const {},
