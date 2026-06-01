@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+<defs>
+  <linearGradient id="purpleGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#7C6CFF"/>
+    <stop offset="1" stop-color="#4F46E5"/>
+  </linearGradient>
+  <linearGradient id="blueGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#60A5FA"/>
+    <stop offset="1" stop-color="#3B82F6"/>
+  </linearGradient>
+  <linearGradient id="greenGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#34D399"/>
+    <stop offset="1" stop-color="#10B981"/>
+  </linearGradient>
+  <linearGradient id="yellowGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FCD34D"/>
+    <stop offset="1" stop-color="#F59E0B"/>
+  </linearGradient>
+  <linearGradient id="redGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FF7A66"/>
+    <stop offset="1" stop-color="#FF4D4F"/>
+  </linearGradient>
+  <linearGradient id="tealGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#2DD4BF"/>
+    <stop offset="1" stop-color="#14B8A6"/>
+  </linearGradient>
+  <linearGradient id="lavenderGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#D8CCFF"/>
+    <stop offset="1" stop-color="#BCAEFF"/>
+  </linearGradient>
+  <linearGradient id="folderGrad" x1="48" y1="56" x2="208" y2="200" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#6EA8FF"/>
+    <stop offset="1" stop-color="#4F46E5"/>
+  </linearGradient>
+</defs>
+
+<rect x="58" y="132" width="28" height="56" rx="14" fill="url(#purpleGrad)" opacity="0.9"/>
+<rect x="108" y="108" width="28" height="80" rx="14" fill="url(#purpleGrad)" opacity="0.9"/>
+<rect x="158" y="84" width="28" height="104" rx="14" fill="url(#purpleGrad)" opacity="0.9"/>
+<circle cx="72" cy="114" r="10" fill="url(#purpleGrad)"/>
+<circle cx="122" cy="88" r="10" fill="url(#purpleGrad)"/>
+<circle cx="172" cy="62" r="10" fill="url(#purpleGrad)"/>
+<path d="M 72 114 L 122 88 L 172 62" stroke="#9C95FF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

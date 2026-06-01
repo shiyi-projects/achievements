@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+<defs>
+  <linearGradient id="purpleGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#7C6CFF"/>
+    <stop offset="1" stop-color="#4F46E5"/>
+  </linearGradient>
+  <linearGradient id="blueGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#60A5FA"/>
+    <stop offset="1" stop-color="#3B82F6"/>
+  </linearGradient>
+  <linearGradient id="greenGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#34D399"/>
+    <stop offset="1" stop-color="#10B981"/>
+  </linearGradient>
+  <linearGradient id="yellowGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FCD34D"/>
+    <stop offset="1" stop-color="#F59E0B"/>
+  </linearGradient>
+  <linearGradient id="redGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FF7A66"/>
+    <stop offset="1" stop-color="#FF4D4F"/>
+  </linearGradient>
+  <linearGradient id="tealGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#2DD4BF"/>
+    <stop offset="1" stop-color="#14B8A6"/>
+  </linearGradient>
+  <linearGradient id="lavenderGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#D8CCFF"/>
+    <stop offset="1" stop-color="#BCAEFF"/>
+  </linearGradient>
+  <linearGradient id="folderGrad" x1="48" y1="56" x2="208" y2="200" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#6EA8FF"/>
+    <stop offset="1" stop-color="#4F46E5"/>
+  </linearGradient>
+</defs>
+
+<rect x="24" y="24" width="208" height="208" rx="48" fill="url(#purpleGrad)"/>
+<rect x="68" y="56" width="108" height="120" rx="22" fill="white" opacity="0.98"/>
+<rect x="98" y="44" width="48" height="20" rx="10" fill="#EDE9FE"/>
+<rect x="92" y="72" width="12" height="12" rx="6" fill="url(#purpleGrad)"/>
+<path d="M 90 78 L 97 85 L 108 70" stroke="url(#purpleGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="116" y="73" width="40" height="8" rx="4" fill="#C4B5FD"/>
+<rect x="92" y="102" width="12" height="12" rx="6" fill="url(#purpleGrad)"/>
+<path d="M 90 108 L 97 115 L 108 100" stroke="url(#purpleGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="116" y="103" width="40" height="8" rx="4" fill="#C4B5FD"/>
+<rect x="92" y="132" width="12" height="12" rx="6" fill="url(#purpleGrad)"/>
+<path d="M 90 138 L 97 145 L 108 130" stroke="url(#purpleGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="116" y="133" width="40" height="8" rx="4" fill="#C4B5FD"/>
+
+    <path d="M 151.36 125.68
+             C 134.00 125.68, 126.56 138.08, 126.56 152.96
+             V 175.28
+             C 126.56 182.72, 121.60 190.16, 116.64 195.12
+             C 116.64 198.84, 119.12 202.56, 124.08 202.56
+             H 178.64
+             C 183.60 202.56, 186.08 198.84, 186.08 195.12
+             C 181.12 190.16, 176.16 182.72, 176.16 175.28
+             V 152.96
+             C 176.16 138.08, 168.72 125.68, 151.36 125.68 Z" fill="url(#yellowGrad)"/>
+    <rect x="146.40" y="118.24" width="9.92" height="11.16" rx="4.96" fill="url(#yellowGrad)"/>
+    <path d="M 141.44 205.04 Q 151.36 214.96 161.28 205.04" stroke="url(#yellowGrad)" stroke-width="6.20" stroke-linecap="round"/>
+    
+</svg>

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+<defs>
+  <linearGradient id="purpleGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#7C6CFF"/>
+    <stop offset="1" stop-color="#4F46E5"/>
+  </linearGradient>
+  <linearGradient id="blueGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#60A5FA"/>
+    <stop offset="1" stop-color="#3B82F6"/>
+  </linearGradient>
+  <linearGradient id="greenGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#34D399"/>
+    <stop offset="1" stop-color="#10B981"/>
+  </linearGradient>
+  <linearGradient id="yellowGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FCD34D"/>
+    <stop offset="1" stop-color="#F59E0B"/>
+  </linearGradient>
+  <linearGradient id="redGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FF7A66"/>
+    <stop offset="1" stop-color="#FF4D4F"/>
+  </linearGradient>
+  <linearGradient id="tealGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#2DD4BF"/>
+    <stop offset="1" stop-color="#14B8A6"/>
+  </linearGradient>
+  <linearGradient id="lavenderGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#D8CCFF"/>
+    <stop offset="1" stop-color="#BCAEFF"/>
+  </linearGradient>
+  <linearGradient id="grayGrad" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#94A3B8"/>
+    <stop offset="1" stop-color="#64748B"/>
+  </linearGradient>
+</defs>
+
+<path d="M 132 44 C 146 72 144 90 130 108 C 160 102 182 124 182 154 C 182 184 158 208 128 208 C 98 208 74 186 74 156 C 74 132 86 118 100 102 C 110 90 120 76 120 54 C 120 46 128 40 132 44 Z" fill="url(#redGrad)"/>
+<path d="M 132 90 C 142 108 140 120 130 132 C 148 130 160 144 160 160 C 160 178 146 192 128 192 C 110 192 96 178 96 160 C 96 146 102 138 110 130 C 116 124 122 114 122 100 C 122 94 128 88 132 90 Z" fill="url(#yellowGrad)"/>
+</svg>
