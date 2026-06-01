@@ -56,7 +56,9 @@ CloseApplications=force
 RestartApplications=no
 
 [Languages]
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; ChineseSimplified 是非官方翻译,Inno Setup 安装包不自带 → 随仓库内置(与 .iss 同目录),
+; 用相对路径引用,避免依赖编译机的 Languages 目录(CI runner 上就缺这个文件)。
+Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 Name: "english";          MessagesFile: "compiler:Default.isl"
 
 [Tasks]
