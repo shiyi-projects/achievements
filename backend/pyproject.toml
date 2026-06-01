@@ -1,6 +1,6 @@
 [project]
 name = "achievements-backend"
-version = "0.0.1"
+version = "0.1.0"
 description = "Achievements Todo backend service"
 readme = "README.md"
 requires-python = ">=3.13"
