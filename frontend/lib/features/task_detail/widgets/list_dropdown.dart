@@ -1,5 +1,4 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
-import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
@@ -90,7 +89,11 @@ class ListDropdown extends ConsumerWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AppIcons.svgIcon(AppIcons.folder, size: 16),
+              Icon(
+                Icons.folder_outlined,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+              ),
               const SizedBox(width: Spacing.sm),
               Flexible(
                 child: Text(
@@ -119,14 +122,15 @@ class ListDropdown extends ConsumerWidget {
         padding: EdgeInsets.only(left: indent ? Spacing.base : 0),
         child: Row(
           children: [
-            AppIcons.svgIcon(
-              l.isSystem ? AppIcons.inbox : AppIcons.list,
+            Icon(
+              l.isSystem ? Icons.inbox_rounded : Icons.list_rounded,
               size: 18,
+              color: scheme.onSurfaceVariant,
             ),
             const SizedBox(width: Spacing.md),
             Flexible(child: Text(l.name, overflow: TextOverflow.ellipsis)),
             if (l.id == currentListId)
-              AppIcons.svgIcon(AppIcons.check, size: 18),
+              Icon(Icons.check_rounded, size: 18, color: scheme.primary),
           ],
         ),
       ),

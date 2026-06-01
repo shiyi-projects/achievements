@@ -1,5 +1,4 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
-import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/tag_repository.dart';
 import 'package:achievements/shared/widgets/name_input_dialog.dart';
@@ -67,7 +66,11 @@ class TagEditor extends ConsumerWidget {
                   ),
                 ),
               ActionChip(
-                avatar: AppIcons.svgIcon(AppIcons.add, size: 16),
+                avatar: Icon(
+                  Icons.add_rounded,
+                  size: 16,
+                  color: scheme.primary,
+                ),
                 label: Text(
                   'New',
                   style: theme.textTheme.labelMedium?.copyWith(

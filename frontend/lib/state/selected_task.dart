@@ -22,29 +22,21 @@ class SelectedTaskId extends _$SelectedTaskId {
   void clear() => state = null;
 }
 
-/// 解析为真实 [Task] 行的流;选中 ID 为 null 时 yield null。
+/// 解析为真实 [Task] 行的响应式流;选中 ID 为 null 时发射 null。
+///
+/// 用 [TaskRepository.watchById] 而非一次性 `getById`,确保任意字段
+/// (星标 / 完成态 / 日期等)在 DB 更新后实时反映到详情面板。
 @riverpod
-Stream<Task?> currentTask(Ref ref) async* {
+Stream<Task?> currentTask(Ref ref) {
   final id = ref.watch(selectedTaskIdProvider);
-  if (id == null) {
-    yield null;
-    return;
-  }
-  final repo = ref.watch(taskRepositoryProvider);
-  yield await repo.getById(id);
+  if (id == null) return Stream.value(null);
+  return ref.watch(taskRepositoryProvider).watchById(id);
 }
 
-/// 当前任务的父任务（面包屑导航用）。
-///
-/// 若当前任务有 [Task.parentId]，从 DB 实时查询父任务行；
-/// 否则 yield null。
+/// 当前任务的父任务（面包屑导航用），同样响应式监听。
 @riverpod
-Stream<Task?> parentTask(Ref ref) async* {
+Stream<Task?> parentTask(Ref ref) {
   final current = ref.watch(currentTaskProvider).valueOrNull;
-  if (current == null || current.parentId == null) {
-    yield null;
-    return;
-  }
-  final repo = ref.watch(taskRepositoryProvider);
-  yield await repo.getById(current.parentId!);
+  if (current == null || current.parentId == null) return Stream.value(null);
+  return ref.watch(taskRepositoryProvider).watchById(current.parentId!);
 }

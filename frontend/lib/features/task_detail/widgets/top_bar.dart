@@ -1,5 +1,5 @@
+import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
-import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
 
@@ -56,7 +56,7 @@ class TaskDetailTopBar extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            icon: AppIcons.svgIcon(AppIcons.close),
+            icon: const Icon(Icons.close_rounded),
             tooltip: '关闭 (Esc)',
             onPressed: onClose,
           ),
@@ -106,7 +106,7 @@ class TaskDetailTopBar extends StatelessWidget {
               iconSize: 20,
               style: IconButton.styleFrom(
                 backgroundColor: starred
-                    ? const Color(0xFFFFF8E1) // warm tint when starred
+                    ? AppColors.star.withValues(alpha: 0.15)
                     : Colors.transparent,
                 shape: const CircleBorder(),
               ),
@@ -124,9 +124,11 @@ class TaskDetailTopBar extends StatelessWidget {
                   );
                 },
                 child: starred
-                    ? SizedBox(
-                        key: const ValueKey(true),
-                        child: AppIcons.svgIcon(AppIcons.important),
+                    ? const Icon(
+                        Icons.star_rounded,
+                        key: ValueKey(true),
+                        size: 20,
+                        color: AppColors.star,
                       )
                     : Icon(
                         Icons.star_border_rounded,
@@ -144,7 +146,7 @@ class TaskDetailTopBar extends StatelessWidget {
             height: 36,
             child: PopupMenuButton<String>(
               padding: EdgeInsets.zero,
-              icon: AppIcons.svgIcon(AppIcons.more),
+              icon: const Icon(Icons.more_horiz_rounded),
               iconSize: 20,
               tooltip: '更多',
               onSelected: (v) {
@@ -261,11 +263,11 @@ class AnimatedCompleteButton extends StatelessWidget {
                   child: child,
                 ),
                 child: completed
-                    ? SizedBox(
+                    ? Icon(
+                        Icons.check_rounded,
                         key: const ValueKey('done'),
-                        width: 14,
-                        height: 14,
-                        child: AppIcons.svgIcon(AppIcons.check, size: 14),
+                        size: 14,
+                        color: scheme.onPrimary,
                       )
                     : const SizedBox.shrink(key: ValueKey('undone')),
               ),

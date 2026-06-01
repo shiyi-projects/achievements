@@ -446,6 +446,14 @@ class TaskRepository {
         .getSingleOrNull();
   }
 
+  /// 监听单个任务行。详情面板订阅此流,任意字段(星标/完成/日期等)更新后
+  /// 实时反映到 UI,无需手动 invalidate。
+  Stream<Task?> watchById(String taskId) {
+    return (_db.select(_db.tasks)
+          ..where((t) => t.id.equals(taskId) & t.userId.equals(_userId)))
+        .watchSingleOrNull();
+  }
+
   /// 累加任务的专注时长（秒）。
   Future<void> addFocusedSeconds(String taskId, int seconds) async {
     final task = await getById(taskId);
