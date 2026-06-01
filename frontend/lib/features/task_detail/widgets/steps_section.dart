@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class StepsSection extends ConsumerStatefulWidget {
-  const StepsSection({required this.taskId, super.key});
+  const StepsSection({required this.taskId, this.showHeader = true, super.key});
 
   final String taskId;
+
+  /// 内嵌于 Tab 时由外层 Tab 标签承担标题,关闭内部标题行。
+  final bool showHeader;
 
   @override
   ConsumerState<StepsSection> createState() => _StepsSectionState();
@@ -70,35 +73,36 @@ class _StepsSectionState extends ConsumerState<StepsSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // ── Header ──
-        Row(
-          children: [
-            Icon(Icons.checklist_rounded, size: 18, color: scheme.outline),
-            const SizedBox(width: Spacing.sm),
-            Text('步骤', style: theme.textTheme.labelLarge),
-            if (total > 0) ...[
+        if (widget.showHeader)
+          Row(
+            children: [
+              Icon(Icons.checklist_rounded, size: 18, color: scheme.outline),
               const SizedBox(width: Spacing.sm),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Spacing.sm,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: done == total
-                      ? scheme.primary.withValues(alpha: 0.15)
-                      : scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(Radii.circle),
-                ),
-                child: Text(
-                  '$done/$total',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: done == total ? scheme.primary : scheme.outline,
-                    fontWeight: FontWeight.w600,
+              Text('步骤', style: theme.textTheme.labelLarge),
+              if (total > 0) ...[
+                const SizedBox(width: Spacing.sm),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Spacing.sm,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: done == total
+                        ? scheme.primary.withValues(alpha: 0.15)
+                        : scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(Radii.circle),
+                  ),
+                  child: Text(
+                    '$done/$total',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: done == total ? scheme.primary : scheme.outline,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
-        ),
+          ),
 
         // ── Progress bar ──
         if (total > 0)

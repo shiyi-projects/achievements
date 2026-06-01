@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:achievements/core/sync/sync_coordinator.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
-import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:achievements/features/auth/auth_session.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
+import 'package:achievements/shared/widgets/surface_card.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -69,7 +69,7 @@ class SettingsPage extends ConsumerWidget {
         actions: [
           if (showCloseButton)
             IconButton(
-              icon: AppIcons.svgIcon(AppIcons.close),
+              icon: const Icon(Icons.close_rounded),
               onPressed: () => Navigator.of(context).pop(),
             ),
         ],
@@ -78,23 +78,34 @@ class SettingsPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败: $e')),
         data: (settings) => ListView(
-          padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+          padding: const EdgeInsets.fromLTRB(
+            Spacing.lg,
+            Spacing.sm,
+            Spacing.lg,
+            Spacing.xl,
+          ),
           children: [
             const _SectionHeader('外观'),
-            _ThemeModeSection(current: settings.themeMode),
-            const SizedBox(height: Spacing.sm),
-            _ColorSection(current: settings.seedColor),
+            SurfaceCard(
+              children: [
+                _ThemeModeSection(current: settings.themeMode),
+                const SizedBox(height: Spacing.base),
+                _ColorSection(current: settings.seedColor),
+              ],
+            ),
             if (defaultTargetPlatform == TargetPlatform.windows) ...[
-              const Divider(height: Spacing.xl),
               const _SectionHeader('桌面'),
-              _CloseActionSection(current: settings.closeAction),
+              SurfaceCard(
+                children: [_CloseActionSection(current: settings.closeAction)],
+              ),
             ],
-            const Divider(height: Spacing.xl),
             const _SectionHeader('同步'),
-            const _SyncSection(),
-            const Divider(height: Spacing.xl),
+            const SurfaceCard(children: [_SyncSection()]),
             const _SectionHeader('关于'),
-            const _AboutSection(),
+            const SurfaceCard(
+              padding: EdgeInsets.symmetric(vertical: Spacing.xs),
+              children: [_AboutSection()],
+            ),
           ],
         ),
       ),
@@ -116,10 +127,10 @@ class _SectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        Spacing.lg,
-        Spacing.base,
+        Spacing.xs,
         Spacing.lg,
         Spacing.xs,
+        Spacing.sm,
       ),
       child: Text(
         title,
@@ -147,38 +158,35 @@ class _ThemeModeSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final notifier = ref.read(settingsNotifierProvider.notifier);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: Spacing.sm),
-            child: Text('主题模式', style: theme.textTheme.titleSmall),
-          ),
-          SegmentedButton<ThemeMode>(
-            segments: const [
-              ButtonSegment(
-                value: ThemeMode.system,
-                label: Text('跟随系统'),
-                icon: Icon(Icons.brightness_auto_rounded),
-              ),
-              ButtonSegment(
-                value: ThemeMode.light,
-                label: Text('浅色'),
-                icon: Icon(Icons.light_mode_rounded),
-              ),
-              ButtonSegment(
-                value: ThemeMode.dark,
-                label: Text('深色'),
-                icon: Icon(Icons.dark_mode_rounded),
-              ),
-            ],
-            selected: {current},
-            onSelectionChanged: (sel) => notifier.setThemeMode(sel.first),
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: Spacing.sm),
+          child: Text('主题模式', style: theme.textTheme.titleSmall),
+        ),
+        SegmentedButton<ThemeMode>(
+          segments: const [
+            ButtonSegment(
+              value: ThemeMode.system,
+              label: Text('跟随系统'),
+              icon: Icon(Icons.brightness_auto_rounded),
+            ),
+            ButtonSegment(
+              value: ThemeMode.light,
+              label: Text('浅色'),
+              icon: Icon(Icons.light_mode_rounded),
+            ),
+            ButtonSegment(
+              value: ThemeMode.dark,
+              label: Text('深色'),
+              icon: Icon(Icons.dark_mode_rounded),
+            ),
+          ],
+          selected: {current},
+          onSelectionChanged: (sel) => notifier.setThemeMode(sel.first),
+        ),
+      ],
     );
   }
 }
@@ -197,57 +205,64 @@ class _ColorSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final notifier = ref.read(settingsNotifierProvider.notifier);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: Spacing.sm),
-            child: Text('主题色', style: theme.textTheme.titleSmall),
-          ),
-          Wrap(
-            spacing: Spacing.md,
-            runSpacing: Spacing.md,
-            children: kPresetColors.map((preset) {
-              final isSelected = current.toARGB32() == preset.color.toARGB32();
-              return Tooltip(
-                message: preset.name,
-                child: GestureDetector(
-                  onTap: () => notifier.setSeedColor(preset.color),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: preset.color,
-                      shape: BoxShape.circle,
-                      border: isSelected
-                          ? Border.all(
-                              color: theme.colorScheme.onSurface,
-                              width: 2.5,
-                            )
-                          : null,
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: preset.color.withValues(alpha: 0.4),
-                                blurRadius: 8,
-                                spreadRadius: 1,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: isSelected
-                        ? AppIcons.svgIcon(AppIcons.check, size: 20)
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: Spacing.sm),
+          child: Text('主题色', style: theme.textTheme.titleSmall),
+        ),
+        Wrap(
+          spacing: Spacing.md,
+          runSpacing: Spacing.md,
+          children: kPresetColors.map((preset) {
+            final isSelected = current.toARGB32() == preset.color.toARGB32();
+            return Tooltip(
+              message: preset.name,
+              child: GestureDetector(
+                onTap: () => notifier.setSeedColor(preset.color),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: preset.color,
+                    shape: BoxShape.circle,
+                    border: isSelected
+                        ? Border.all(
+                            color: theme.colorScheme.onSurface,
+                            width: 2.5,
+                          )
+                        : null,
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: preset.color.withValues(alpha: 0.4),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ]
                         : null,
                   ),
+                  child: isSelected
+                      ? Icon(
+                          Icons.check_rounded,
+                          size: 20,
+                          color:
+                              ThemeData.estimateBrightnessForColor(
+                                    preset.color,
+                                  ) ==
+                                  Brightness.dark
+                              ? Colors.white
+                              : Colors.black,
+                        )
+                      : null,
                 ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }
@@ -266,47 +281,44 @@ class _CloseActionSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final notifier = ref.read(settingsNotifierProvider.notifier);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: Spacing.xs),
-            child: Text('关闭按钮行为', style: theme.textTheme.titleSmall),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: Spacing.sm),
-            child: Text(
-              '点击窗口右上角 X 时的默认动作',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: Spacing.xs),
+          child: Text('关闭按钮行为', style: theme.textTheme.titleSmall),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: Spacing.sm),
+          child: Text(
+            '点击窗口右上角 X 时的默认动作',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          SegmentedButton<CloseAction>(
-            segments: const [
-              ButtonSegment(
-                value: CloseAction.minimizeToTray,
-                label: Text('托盘'),
-                icon: Icon(Icons.minimize_rounded),
-              ),
-              ButtonSegment(
-                value: CloseAction.exitApp,
-                label: Text('退出'),
-                icon: Icon(Icons.power_settings_new_rounded),
-              ),
-              ButtonSegment(
-                value: CloseAction.ask,
-                label: Text('询问'),
-                icon: Icon(Icons.help_outline_rounded),
-              ),
-            ],
-            selected: {current},
-            onSelectionChanged: (sel) => notifier.setCloseAction(sel.first),
-          ),
-        ],
-      ),
+        ),
+        SegmentedButton<CloseAction>(
+          segments: const [
+            ButtonSegment(
+              value: CloseAction.minimizeToTray,
+              label: Text('托盘'),
+              icon: Icon(Icons.minimize_rounded),
+            ),
+            ButtonSegment(
+              value: CloseAction.exitApp,
+              label: Text('退出'),
+              icon: Icon(Icons.power_settings_new_rounded),
+            ),
+            ButtonSegment(
+              value: CloseAction.ask,
+              label: Text('询问'),
+              icon: Icon(Icons.help_outline_rounded),
+            ),
+          ],
+          selected: {current},
+          onSelectionChanged: (sel) => notifier.setCloseAction(sel.first),
+        ),
+      ],
     );
   }
 }
@@ -334,58 +346,53 @@ class _SyncSection extends ConsumerWidget {
       SyncStatus.offline => (Icons.cloud_off_rounded, scheme.outline, '离线'),
     };
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── 状态 + 上次同步 ──
-          Row(
-            children: [
-              Icon(statusIcon, color: statusColor, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text(
-                statusText,
-                style: theme.textTheme.titleSmall?.copyWith(color: statusColor),
-              ),
-              const Spacer(),
-              Text(
-                _formatLastSync(lastSyncAt),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-
-          // ── 手动同步 ──
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonalIcon(
-              onPressed: isSyncing
-                  ? null
-                  : () => unawaited(
-                      ref.read(syncCoordinatorProvider).runFullSync(),
-                    ),
-              icon: isSyncing
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.sync_rounded, size: 18),
-              label: Text(isSyncing ? '同步中…' : '立即同步'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── 状态 + 上次同步 ──
+        Row(
+          children: [
+            Icon(statusIcon, color: statusColor, size: 20),
+            const SizedBox(width: Spacing.sm),
+            Text(
+              statusText,
+              style: theme.textTheme.titleSmall?.copyWith(color: statusColor),
             ),
+            const Spacer(),
+            Text(
+              _formatLastSync(lastSyncAt),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Spacing.md),
+
+        // ── 手动同步 ──
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            onPressed: isSyncing
+                ? null
+                : () => unawaited(
+                    ref.read(syncCoordinatorProvider).runFullSync(),
+                  ),
+            icon: isSyncing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_rounded, size: 18),
+            label: Text(isSyncing ? '同步中…' : '立即同步'),
           ),
+        ),
 
-          const SizedBox(height: Spacing.md),
-          const Divider(height: 1),
-          const SizedBox(height: Spacing.sm),
+        const SizedBox(height: Spacing.base),
 
-          const _AccountSection(),
-        ],
-      ),
+        const _AccountSection(),
+      ],
     );
   }
 
@@ -509,7 +516,7 @@ class _AboutSection extends StatelessWidget {
     return Column(
       children: [
         ListTile(
-          leading: AppIcons.svgIcon(AppIcons.info),
+          leading: const Icon(Icons.info_outline_rounded),
           title: const Text('版本'),
           trailing: Text(
             '0.0.1',

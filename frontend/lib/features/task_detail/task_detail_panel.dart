@@ -2,21 +2,18 @@ import 'dart:async';
 
 import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
-import 'package:achievements/core/theme/app_icons.dart';
-import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/focus/providers/focus_plan_service.dart';
 import 'package:achievements/features/task_detail/widgets/collapsible_meta.dart';
-import 'package:achievements/features/task_detail/widgets/date_chip.dart';
-import 'package:achievements/features/task_detail/widgets/detail_card.dart';
+import 'package:achievements/features/task_detail/widgets/due_reminder_field.dart';
 import 'package:achievements/features/task_detail/widgets/focus_progress_row.dart';
 import 'package:achievements/features/task_detail/widgets/list_dropdown.dart';
 import 'package:achievements/features/task_detail/widgets/priority_chips.dart';
-import 'package:achievements/features/task_detail/widgets/steps_section.dart';
-import 'package:achievements/features/task_detail/widgets/subtasks_section.dart';
+import 'package:achievements/features/task_detail/widgets/steps_subtasks_tabs.dart';
 import 'package:achievements/features/task_detail/widgets/tag_editor.dart';
 import 'package:achievements/features/task_detail/widgets/top_bar.dart';
+import 'package:achievements/shared/widgets/surface_card.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -184,111 +181,6 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
     if (parentId != null) {
       ref.read(selectedTaskIdProvider.notifier).select(parentId);
     }
-  }
-
-  CalendarDatePicker2WithActionButtonsConfig _calendarConfig() {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return CalendarDatePicker2WithActionButtonsConfig(
-      calendarType: CalendarDatePicker2Type.single,
-      firstDayOfWeek: 1,
-      centerAlignModePicker: true,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
-      selectedDayHighlightColor: scheme.primary,
-      weekdayLabels: const ['日', '一', '二', '三', '四', '五', '六'],
-      weekdayLabelTextStyle: textTheme.labelSmall?.copyWith(
-        color: scheme.onSurfaceVariant,
-        fontWeight: FontWeight.w600,
-      ),
-      controlsTextStyle: textTheme.titleSmall?.copyWith(
-        color: scheme.onSurface,
-        fontWeight: FontWeight.w600,
-      ),
-      dayTextStyle: textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
-      selectedDayTextStyle: textTheme.bodyMedium?.copyWith(
-        color: scheme.onPrimary,
-        fontWeight: FontWeight.w600,
-      ),
-      todayTextStyle: textTheme.bodyMedium?.copyWith(
-        color: scheme.primary,
-        fontWeight: FontWeight.w600,
-      ),
-      disabledDayTextStyle: textTheme.bodyMedium?.copyWith(
-        color: scheme.onSurface.withValues(alpha: 0.38),
-      ),
-      dayBorderRadius: BorderRadius.circular(Radii.chip),
-      // 只传 Text，不能传带 onPressed 的 Button：
-      // 包的 InkWell 负责处理 tap(→ Navigator.pop)，若 child 也有 GestureDetector
-      // 则内层优先消耗 tap，外层 Navigator.pop 永远不触发。
-      okButton: Text(
-        '确定',
-        style: textTheme.labelLarge?.copyWith(color: scheme.primary),
-      ),
-      cancelButton: Text(
-        '取消',
-        style: textTheme.labelLarge?.copyWith(color: scheme.outline),
-      ),
-    );
-  }
-
-  Future<void> _pickDueDate() async {
-    FocusScope.of(context).unfocus();
-    final initial = widget.task.dueAt ?? DateTime.now();
-    final results = await showCalendarDatePicker2Dialog(
-      context: context,
-      config: _calendarConfig(),
-      dialogSize: const Size(340, 400),
-      borderRadius: BorderRadius.circular(Radii.sheet),
-      value: [initial],
-    );
-    if (results == null ||
-        results.isEmpty ||
-        results.first == null ||
-        !mounted) {
-      return;
-    }
-    final picked = results.first!;
-    await _repo.update(
-      widget.task.id,
-      knownVersion: widget.task.version,
-      dueAt: Value(DateTime(picked.year, picked.month, picked.day, 23, 59)),
-    );
-  }
-
-  Future<void> _pickRemind() async {
-    FocusScope.of(context).unfocus();
-    final initial =
-        widget.task.remindAt ?? DateTime.now().add(const Duration(hours: 1));
-    final results = await showCalendarDatePicker2Dialog(
-      context: context,
-      config: _calendarConfig(),
-      dialogSize: const Size(340, 400),
-      borderRadius: BorderRadius.circular(Radii.sheet),
-      value: [initial],
-    );
-    if (results == null ||
-        results.isEmpty ||
-        results.first == null ||
-        !mounted) {
-      return;
-    }
-    final date = results.first!;
-    // 等待日历退场动画结束后再显示时间选择器，避免两个 dialog 动画同时播放
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    if (!mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-    );
-    if (time == null || !mounted) return;
-    await _repo.update(
-      widget.task.id,
-      knownVersion: widget.task.version,
-      remindAt: Value(
-        DateTime(date.year, date.month, date.day, time.hour, time.minute),
-      ),
-    );
   }
 
   Future<void> _softDelete() async {
@@ -462,7 +354,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                       // ═════════════════════════════════════════
                       // 属性卡片
                       // ═════════════════════════════════════════
-                      DetailCard(
+                      SurfaceCard(
                         icon: Icon(
                           Icons.tune_rounded,
                           size: 18,
@@ -490,12 +382,12 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                           TagEditor(taskId: task.id),
                         ],
                       ),
-                      const SizedBox(height: Spacing.sm),
+                      const SizedBox(height: Spacing.md),
 
                       // ═════════════════════════════════════════
                       // 时间 & 专注卡片
                       // ═════════════════════════════════════════
-                      DetailCard(
+                      SurfaceCard(
                         icon: Icon(
                           Icons.schedule_rounded,
                           size: 18,
@@ -503,44 +395,15 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                         ),
                         title: '时间 & 专注',
                         children: [
-                          // ── 截止日期 / 提醒 / 预估时长 — 同一 Wrap 行 ──
+                          // ── 时间(截止+提醒合并) / 预估时长 — 同一 Wrap 行 ──
                           Wrap(
                             spacing: Spacing.sm,
                             runSpacing: Spacing.sm,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              DateChip(
-                                date: task.dueAt,
-                                icon: AppIcons.svgIcon(
-                                  AppIcons.planned,
-                                  size: 16,
-                                ),
-                                emptyLabel: '截止日期',
-                                onTap: _pickDueDate,
-                                onClear: task.dueAt != null
-                                    ? () => _repo.update(
-                                        task.id,
-                                        knownVersion: task.version,
-                                        dueAt: const Value(null),
-                                      )
-                                    : null,
-                              ),
-                              DateChip(
-                                date: task.remindAt,
-                                icon: AppIcons.svgIcon(
-                                  AppIcons.reminder,
-                                  size: 16,
-                                ),
-                                emptyLabel: '提醒',
-                                showTime: true,
-                                onTap: _pickRemind,
-                                onClear: task.remindAt != null
-                                    ? () => _repo.update(
-                                        task.id,
-                                        knownVersion: task.version,
-                                        remindAt: const Value(null),
-                                      )
-                                    : null,
+                              DueReminderField(
+                                dueAt: task.dueAt,
+                                remindAt: task.remindAt,
                               ),
                               _EstimatedDurationRow(
                                 estimatedMinutes: task.estimatedMinutes,
@@ -570,35 +433,21 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                             ),
                         ],
                       ),
-                      const SizedBox(height: Spacing.sm),
+                      const SizedBox(height: Spacing.md),
 
                       // ═════════════════════════════════════════
-                      // 步骤卡片
+                      // 步骤 / 子任务（Tab 切换）
                       // ═════════════════════════════════════════
-                      DetailCard(
+                      SurfaceCard(
                         padding: const EdgeInsets.fromLTRB(
                           Spacing.base,
-                          Spacing.base,
+                          Spacing.sm,
                           Spacing.base,
                           Spacing.sm,
                         ),
-                        children: [StepsSection(taskId: task.id)],
+                        children: [StepsSubtasksTabs(task: task)],
                       ),
-                      const SizedBox(height: Spacing.sm),
-
-                      // ═════════════════════════════════════════
-                      // 子任务卡片
-                      // ═════════════════════════════════════════
-                      DetailCard(
-                        padding: const EdgeInsets.fromLTRB(
-                          Spacing.base,
-                          Spacing.base,
-                          Spacing.base,
-                          Spacing.sm,
-                        ),
-                        children: [SubtasksSection(parent: task)],
-                      ),
-                      const SizedBox(height: Spacing.sm),
+                      const SizedBox(height: Spacing.md),
 
                       // ── 元信息 (折叠) ──
                       CollapsibleMeta(task: task),

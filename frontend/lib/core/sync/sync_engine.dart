@@ -176,6 +176,16 @@ class SyncEngine {
       await _outbox.deleteById(row.id);
       return;
     }
+    // 永久删除是终态,不参与 LWW:若服务端已是墓碑则完成,否则跟随服务端 version
+    // 重试,直到 base_version 对上后 apply,保证 purge 最终生效。
+    if (row.op == 'purge') {
+      if (serverValue['purged_at'] != null) {
+        await _outbox.deleteById(row.id);
+      } else {
+        await _outbox.updateBaseVersion(row.id, serverVersion);
+      }
+      return;
+    }
     final serverUpdatedAt = _dt(serverValue['updated_at']);
     final localTs = row.createdAt;
     final localWins =
@@ -227,6 +237,11 @@ class SyncEngine {
     String entity,
     Map<String, dynamic> value,
   ) async {
+    // 永久删除墓碑:物理删本地行,不再落库(否则会复活到回收站)。
+    if (value['purged_at'] != null) {
+      await _deleteLocalById(entity, value['id'] as String);
+      return;
+    }
     switch (entity) {
       case 'folder':
         await _db
@@ -245,31 +260,81 @@ class SyncEngine {
     }
   }
 
+  /// 物理删除本地实体行(永久删除墓碑落地)。
+  Future<void> _deleteLocalById(String entity, String id) async {
+    switch (entity) {
+      case 'folder':
+        await (_db.delete(
+          _db.folders,
+        )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
+      case 'list':
+        await (_db.delete(
+          _db.taskLists,
+        )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
+      case 'task':
+        await (_db.delete(
+          _db.tasks,
+        )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
+      case 'tag':
+        await (_db.delete(
+          _db.tags,
+        )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
+    }
+  }
+
   /// 把服务端 SyncPullResponse 落入本地 Drift。
   ///
-  /// 简化策略:对每行做 insertOnConflictUpdate,服务端是 source of truth;
-  /// 软删行(deleted_at 非空)同样落,本地查询会自然过滤掉。
+  /// 策略:服务端是 source of truth。普通行 insertOnConflictUpdate;**永久删除墓碑**
+  /// (purged_at 非空)物理删本地行——绝不能 insert,否则已永久删除的任务会随
+  /// deleted_at 复活到回收站。软删行(deleted_at 非空、purged_at 为空)正常落,
+  /// UI 查询据 deletedAt 过滤,显示在回收站。
   Future<void> _applyPullResponse(Map<String, dynamic> data) async {
     await _db.transaction(() async {
       for (final raw in _list(data['folders'])) {
-        await _db
-            .into(_db.folders)
-            .insertOnConflictUpdate(_foldersCompanion(raw));
+        if (raw['purged_at'] != null) {
+          await _deleteLocalById('folder', raw['id'] as String);
+        } else {
+          await _db
+              .into(_db.folders)
+              .insertOnConflictUpdate(_foldersCompanion(raw));
+        }
       }
       for (final raw in _list(data['lists'])) {
-        await _db
-            .into(_db.taskLists)
-            .insertOnConflictUpdate(_taskListsCompanion(raw));
+        if (raw['purged_at'] != null) {
+          await _deleteLocalById('list', raw['id'] as String);
+        } else {
+          await _db
+              .into(_db.taskLists)
+              .insertOnConflictUpdate(_taskListsCompanion(raw));
+        }
       }
       for (final raw in _list(data['tasks'])) {
-        await _db.into(_db.tasks).insertOnConflictUpdate(_tasksCompanion(raw));
+        if (raw['purged_at'] != null) {
+          await _deleteLocalById('task', raw['id'] as String);
+        } else {
+          await _db
+              .into(_db.tasks)
+              .insertOnConflictUpdate(_tasksCompanion(raw));
+        }
       }
       for (final raw in _list(data['tags'])) {
-        await _db.into(_db.tags).insertOnConflictUpdate(_tagsCompanion(raw));
+        if (raw['purged_at'] != null) {
+          await _deleteLocalById('tag', raw['id'] as String);
+        } else {
+          await _db.into(_db.tags).insertOnConflictUpdate(_tagsCompanion(raw));
+        }
       }
       for (final raw in _list(data['task_tags'])) {
         final taskId = raw['task_id'] as String;
         final tagId = raw['tag_id'] as String;
+        // 删除墓碑:物理删本地关联行(取消打标签的跨端传播)。
+        if (raw['deleted_at'] != null) {
+          await (_db.delete(_db.taskTags)..where(
+                (tt) => tt.taskId.equals(taskId) & tt.tagId.equals(tagId),
+              ))
+              .go();
+          continue;
+        }
         if (!await _ownsTaskAndTag(taskId, tagId)) continue;
         await _db
             .into(_db.taskTags)

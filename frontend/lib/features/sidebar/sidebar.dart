@@ -19,7 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// 段落:
 ///   1. 品牌 Header
-///   2. System 清单(7 个内置)
+///   2. 顶部导航(7 个系统清单 + 3 个视图入口合并,按使用频次从高到低排列)
 ///   3. Folders + 各文件夹下的清单(可折叠;长按文件夹改 / 删)
 ///   4. 根目录用户清单(folder_id IS NULL)
 ///   5. 末尾 "+ New list" 与 "+ New folder" 入口
@@ -47,8 +47,9 @@ class Sidebar extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) => SidebarError(message: e.toString()),
         data: (lists) {
-          final systemLists = lists.where((l) => l.isSystem).toList()
-            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+          final systemByKind = <String, TaskList>{
+            for (final l in lists.where((l) => l.isSystem)) l.systemKind!: l,
+          };
           final folders = allFolders.maybeWhen(
             data: (data) => data,
             orElse: () => const <Folder>[],
@@ -69,6 +70,51 @@ class Sidebar extends ConsumerWidget {
           }
           rootLists.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
+          // ── 顶部导航:系统清单 + 视图入口合并,按使用频次从高到低排列 ──
+          // 系统清单相对顺序: 今天 > 收件箱 > 计划 > 重要 > 全部 > 已完成 > 回收站
+          // 视图入口插入位置: 日历(随计划)、专注(居中)、成就(靠归档)
+          SidebarTile? systemTile(SystemListKind kind) {
+            final list = systemByKind[kind.value];
+            if (list == null) return null;
+            return SidebarTile(
+              list: list,
+              icon: _systemIcon(kind),
+              displayName: displayNameOfList(
+                systemKind: list.systemKind,
+                fallback: list.name,
+              ),
+              selected: list.id == currentId,
+            );
+          }
+
+          final topNav = <Widget?>[
+            systemTile(SystemListKind.today),
+            systemTile(SystemListKind.inbox),
+            systemTile(SystemListKind.planned),
+            ViewNavTile(
+              icon: AppIcons.svgIcon(AppIcons.calendar),
+              label: '日历',
+              selected: currentView == AppView.calendar,
+              onTap: viewNotifier.showCalendar,
+            ),
+            systemTile(SystemListKind.important),
+            ViewNavTile(
+              icon: AppIcons.svgIcon(AppIcons.focusTimer),
+              label: '专注',
+              selected: currentView == AppView.focus,
+              onTap: viewNotifier.showFocus,
+            ),
+            systemTile(SystemListKind.all),
+            ViewNavTile(
+              icon: AppIcons.svgIcon(AppIcons.achievement),
+              label: '成就',
+              selected: currentView == AppView.insights,
+              onTap: viewNotifier.showInsights,
+            ),
+            systemTile(SystemListKind.completed),
+            systemTile(SystemListKind.trash),
+          ].whereType<Widget>().toList();
+
           return Column(
             children: [
               // ── Brand Header ──
@@ -82,39 +128,8 @@ class Sidebar extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
                   children: [
-                    // ── System lists ──
-                    for (final list in systemLists)
-                      SidebarTile(
-                        list: list,
-                        icon: _systemIcon(
-                          SystemListKind.fromValue(list.systemKind),
-                        ),
-                        displayName: displayNameOfList(
-                          systemKind: list.systemKind,
-                          fallback: list.name,
-                        ),
-                        selected: list.id == currentId,
-                      ),
-
-                    // ── Top-level view nav entries ──
-                    ViewNavTile(
-                      icon: AppIcons.svgIcon(AppIcons.calendar),
-                      label: '日历',
-                      selected: currentView == AppView.calendar,
-                      onTap: viewNotifier.showCalendar,
-                    ),
-                    ViewNavTile(
-                      icon: AppIcons.svgIcon(AppIcons.focusTimer),
-                      label: '专注',
-                      selected: currentView == AppView.focus,
-                      onTap: viewNotifier.showFocus,
-                    ),
-                    ViewNavTile(
-                      icon: AppIcons.svgIcon(AppIcons.achievement),
-                      label: '成就',
-                      selected: currentView == AppView.insights,
-                      onTap: viewNotifier.showInsights,
-                    ),
+                    // ── 顶部导航(系统清单 + 视图入口,按使用频次排序) ──
+                    ...topNav,
 
                     // ── Separator ──
                     Padding(
