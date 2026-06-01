@@ -1,0 +1,77 @@
+name: Sync split branches
+
+# main 是单仓真源；frontend / backend 是「只保留各自子目录」的发布分支。
+# 每次 main 更新后，自动把 main 的内容同步到这两个分支，并各自移除对方目录：
+#   frontend  = main 去掉 backend/
+#   backend   = main 去掉 frontend/
+# 同步用合并(保留历史)，冲突只会是「对方目录的 modify/delete」，统一按删除解决；
+# 若出现真正的内容冲突(同一文件双方都改)，任务会失败并报出文件名，绝不静默提交。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 串行执行，避免两次 main 推送并发同步导致非快进 push 失败。
+concurrency:
+  group: sync-split-branches
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync main into split branches
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main frontend backend
+
+          sync() {
+            target="$1"   # 要更新的分支
+            drop="$2"     # 在该分支上需要移除的顶层目录
+            echo "::group::sync main -> $target (drop $drop/)"
+
+            git checkout -B "$target" "origin/$target"
+
+            # 合并 main：对 $drop 目录会产生 modify/delete 冲突(预期内)，先不让它中断脚本。
+            git merge --no-edit -m "chore(sync): merge main into $target (drop $drop/)" origin/main || true
+
+            # 统一解决：该分支不保留 $drop 目录(含被 main 新增的文件，故用 -f 语义的 --ignore-unmatch)。
+            git rm -rf --ignore-unmatch "$drop" >/dev/null 2>&1 || true
+            rm -rf "$drop"
+
+            # 若还剩未解决项，说明是真正的内容冲突——报错退出，避免污染发布分支。
+            remaining="$(git diff --name-only --diff-filter=U || true)"
+            if [ -n "$remaining" ]; then
+              echo "::error::Unresolved content conflicts on $target:"
+              echo "$remaining"
+              exit 1
+            fi
+
+            git add -A
+            if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+              git commit -m "chore(sync): merge main into $target (drop $drop/)"
+            elif ! git diff --cached --quiet; then
+              git commit -m "chore(sync): sync main into $target (drop $drop/)"
+            else
+              echo "nothing new for $target"
+            fi
+
+            git push origin "HEAD:$target"
+            echo "::endgroup::"
+          }
+
+          sync frontend backend
+          sync backend frontend
