@@ -54,6 +54,9 @@ frontend/packages/**/example/
 **/android/key.properties
 **/*.jks
 **/*.keystore
+# base64 编码后的 keystore(配 GitHub Secrets 用,临时产物,绝不入库)
+**/keystore.base64.txt
+**/*.base64.txt
 
 # Windows (Flutter desktop)
 **/windows/flutter/generated_plugin_registrant.cc
