@@ -69,6 +69,7 @@ flutter {
 }
 
 // Built-in Kotlin DSL:取代旧的 android.kotlinOptions { jvmTarget = ... }。
+// `kotlin {}` 访问器需要较新的 Flutter Gradle Plugin 注册(本地/CI 均用 Flutter 3.44.0)。
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
