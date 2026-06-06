@@ -7,6 +7,7 @@ import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:achievements/features/auth/auth_session.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
+import 'package:achievements/platform/android/keepalive_service.dart';
 import 'package:achievements/shared/widgets/surface_card.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -98,6 +99,10 @@ class SettingsPage extends ConsumerWidget {
               SurfaceCard(
                 children: [_CloseActionSection(current: settings.closeAction)],
               ),
+            ],
+            if (defaultTargetPlatform == TargetPlatform.android) ...[
+              const _SectionHeader('提醒与后台'),
+              const SurfaceCard(children: [_KeepAliveSection()]),
             ],
             const _SectionHeader('同步'),
             const SurfaceCard(children: [_SyncSection()]),
@@ -317,6 +322,117 @@ class _CloseActionSection extends ConsumerWidget {
           ],
           selected: {current},
           onSelectionChanged: (sel) => notifier.setCloseAction(sel.first),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 提醒与后台保活(Android)
+// ─────────────────────────────────────────────────────────────────────
+
+class _KeepAliveSection extends ConsumerStatefulWidget {
+  const _KeepAliveSection();
+
+  @override
+  ConsumerState<_KeepAliveSection> createState() => _KeepAliveSectionState();
+}
+
+class _KeepAliveSectionState extends ConsumerState<_KeepAliveSection>
+    with WidgetsBindingObserver {
+  bool? _ignoring; // null = 检测中
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 从系统设置页返回时重新检测豁免状态。
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final v = await ref
+        .read(keepAliveServiceProvider)
+        .isIgnoringBatteryOptimizations();
+    if (mounted) setState(() => _ignoring = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final service = ref.read(keepAliveServiceProvider);
+    final detecting = _ignoring == null;
+    final exempt = _ignoring ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '为保证提醒准时触发,建议关闭对本应用的电池优化,并在系统里允许自启动。'
+          '提醒本身由系统闹钟驱动,App 被后台清理也能到点提醒。',
+          style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),
+        ),
+        const SizedBox(height: Spacing.base),
+
+        // ── 电池优化豁免 ──
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            exempt
+                ? Icons.battery_charging_full_rounded
+                : Icons.battery_alert_rounded,
+            color: exempt ? scheme.primary : scheme.error,
+          ),
+          title: const Text('电池优化豁免'),
+          subtitle: Text(
+            detecting
+                ? '检测中…'
+                : exempt
+                ? '已豁免,提醒不会被省电策略掐断'
+                : '未豁免,后台可能延迟或拦截提醒',
+          ),
+          trailing: exempt
+              ? Icon(Icons.check_circle_rounded, color: scheme.primary)
+              : FilledButton.tonal(
+                  onPressed: () async {
+                    await service.requestIgnoreBatteryOptimizations();
+                    // 返回后由 didChangeAppLifecycleState 刷新状态。
+                  },
+                  child: const Text('允许后台运行'),
+                ),
+        ),
+        const Divider(height: Spacing.base),
+
+        // ── 厂商自启动 ──
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.restart_alt_rounded, color: scheme.onSurface),
+          title: const Text('自启动管理'),
+          subtitle: const Text('在系统里允许本应用自启动(部分品牌需手动开启)'),
+          trailing: OutlinedButton(
+            onPressed: () async {
+              final ok = await service.openAutoStartSettings();
+              if (!ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('未能打开系统设置,请手动前往「设置」开启自启动')),
+                );
+              }
+            },
+            child: const Text('前往设置'),
+          ),
         ),
       ],
     );
