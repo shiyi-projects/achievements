@@ -113,6 +113,18 @@ class TaskRepository {
     );
   }
 
+  /// 监听所有与重复相关的行:模板(repeat_rule 非空)+ override(recurrence_parent_id
+  /// 非空)。**含软删 override**(EXDATE 跳过标记)。日历 / 提醒据此一次性展开,避免
+  /// 为每个模板各开一条流。模板的软删需调用方自行过滤。
+  Stream<List<Task>> watchRecurring() {
+    return (_db.select(_db.tasks)..where(
+          (t) =>
+              t.userId.equals(_userId) &
+              (t.repeatRule.isNotNull() | t.recurrenceParentId.isNotNull()),
+        ))
+        .watch();
+  }
+
   /// 监听某模板的全部 override(**含软删** —— 软删 override 即 EXDATE 跳过标记)。
   Stream<List<Task>> watchOverridesForTemplate(String templateId) {
     return (_db.select(_db.tasks)..where(
