@@ -91,8 +91,160 @@ class TaskRepository {
         payload: {'completed_at': completedAt?.toUtc().toIso8601String()},
       );
 
-      // 注:重复系列「完成某次→实体化 override + 系列继续」的逻辑由 P1 的
-      // RecurrenceService 负责(见 dev_docs/recurring-tasks.md §3),不在此处理。
+      // 注:重复系列某次的「完成 / 删除」走 setOccurrenceCompleted /
+      // deleteOccurrence(实体化 override),不经此普通完成路径。
+    });
+  }
+
+  // ----------------------------------------------------------------------
+  // 重复系列(模板 + 虚拟展开)。展开计算在 RecurrenceService;这里只管 DB 实体化。
+  // 见 dev_docs/recurring-tasks.md §3。
+  // ----------------------------------------------------------------------
+
+  /// 监听所有重复「模板」:repeat_rule 非空、非 override、未软删。
+  /// 日历 / 提醒据此虚拟展开。
+  Stream<List<Task>> watchTemplates() {
+    return _watchWith(
+      (t) =>
+          t.userId.equals(_userId) &
+          t.deletedAt.isNull() &
+          t.recurrenceParentId.isNull() &
+          t.repeatRule.isNotNull(),
+    );
+  }
+
+  /// 监听某模板的全部 override(**含软删** —— 软删 override 即 EXDATE 跳过标记)。
+  Stream<List<Task>> watchOverridesForTemplate(String templateId) {
+    return (_db.select(_db.tasks)..where(
+          (t) =>
+              t.userId.equals(_userId) &
+              t.recurrenceParentId.equals(templateId),
+        ))
+        .watch();
+  }
+
+  /// 取某模板的全部 override(含软删),供一次性合并展开。
+  Future<List<Task>> getOverridesForTemplate(String templateId) {
+    return (_db.select(_db.tasks)..where(
+          (t) =>
+              t.userId.equals(_userId) &
+              t.recurrenceParentId.equals(templateId),
+        ))
+        .get();
+  }
+
+  /// 完成 / 取消完成重复系列的某一次:把该发生点实体化为 override。
+  ///
+  /// override 主键用确定性 [occurrenceId],多端对同一次操作天然合并。提醒时间按
+  /// 模板的 remind-due 偏移继承到该次。
+  Future<void> setOccurrenceCompleted({
+    required Task template,
+    required DateTime occurrence,
+    required bool completed,
+  }) async {
+    await _upsertOverride(
+      template: template,
+      occurrence: occurrence,
+      completedAt: completed ? DateTime.now() : null,
+    );
+  }
+
+  /// 删除重复系列的某一次(EXDATE):实体化一条软删 override,展开时跳过该发生点。
+  Future<void> deleteOccurrence({
+    required Task template,
+    required DateTime occurrence,
+  }) async {
+    await _upsertOverride(
+      template: template,
+      occurrence: occurrence,
+      deletedAt: DateTime.now(),
+    );
+  }
+
+  /// 删除整个重复系列:软删模板及其全部 override。
+  Future<void> deleteSeries(String templateId) async {
+    await _db.transaction(() async {
+      final rows =
+          await (_db.select(_db.tasks)..where(
+                (t) =>
+                    t.userId.equals(_userId) &
+                    (t.id.equals(templateId) |
+                        t.recurrenceParentId.equals(templateId)),
+              ))
+              .get();
+      final now = DateTime.now();
+      for (final row in rows) {
+        if (row.deletedAt != null) continue;
+        await (_db.update(_db.tasks)..where((t) => t.id.equals(row.id))).write(
+          TasksCompanion(deletedAt: Value(now)),
+        );
+        await _outbox.enqueue(
+          entity: 'task',
+          op: 'delete',
+          entityId: row.id,
+          baseVersion: row.version,
+          payload: const {},
+        );
+      }
+    });
+  }
+
+  /// 实体化(或更新)某发生点的 override 行 + 入 outbox。completedAt / deletedAt
+  /// 任意组合:完成→completedAt 非空;取消完成→都为空;删某次→deletedAt 非空。
+  Future<void> _upsertOverride({
+    required Task template,
+    required DateTime occurrence,
+    DateTime? completedAt,
+    DateTime? deletedAt,
+  }) async {
+    final id = occurrenceId(template.id, occurrence);
+    DateTime? remindAt;
+    if (template.remindAt != null && template.dueAt != null) {
+      remindAt = occurrence.add(template.remindAt!.difference(template.dueAt!));
+    }
+    await _db.transaction(() async {
+      final existing = await getById(id);
+      final now = DateTime.now();
+      await _db
+          .into(_db.tasks)
+          .insertOnConflictUpdate(
+            TasksCompanion.insert(
+              id: id,
+              userId: _userId,
+              listId: template.listId,
+              title: template.title,
+              notes: Value(template.notes),
+              priority: Value(template.priority),
+              dueAt: Value(occurrence),
+              remindAt: Value(remindAt),
+              starred: Value(template.starred),
+              recurrenceParentId: Value(template.id),
+              occurrenceDate: Value(occurrence),
+              completedAt: Value(completedAt),
+              deletedAt: Value(deletedAt),
+              updatedAt: Value(now),
+            ),
+          );
+      await _outbox.enqueue(
+        entity: 'task',
+        op: deletedAt != null ? 'delete' : 'upsert',
+        entityId: id,
+        baseVersion: existing?.version ?? 0,
+        payload: deletedAt != null
+            ? const {}
+            : {
+                'list_id': template.listId,
+                'title': template.title,
+                'notes': template.notes,
+                'priority': template.priority,
+                'due_at': occurrence.toUtc().toIso8601String(),
+                'remind_at': remindAt?.toUtc().toIso8601String(),
+                'starred': template.starred,
+                'recurrence_parent_id': template.id,
+                'occurrence_date': occurrence.toUtc().toIso8601String(),
+                'completed_at': completedAt?.toUtc().toIso8601String(),
+              },
+      );
     });
   }
 
@@ -111,6 +263,7 @@ class TaskRepository {
     Value<int> priority = const Value.absent(),
     Value<String> listId = const Value.absent(),
     Value<int?> estimatedMinutes = const Value.absent(),
+    Value<String?> repeatRule = const Value.absent(),
   }) async {
     await _db.transaction(() async {
       final version =
@@ -131,6 +284,7 @@ class TaskRepository {
           priority: priority,
           listId: listId,
           estimatedMinutes: estimatedMinutes,
+          repeatRule: repeatRule,
         ),
       );
       final payload = <String, dynamic>{
@@ -144,6 +298,7 @@ class TaskRepository {
         if (listId.present) 'list_id': listId.value,
         if (estimatedMinutes.present)
           'estimated_minutes': estimatedMinutes.value,
+        if (repeatRule.present) 'repeat_rule': repeatRule.value,
       };
       if (payload.isEmpty) return;
       await _outbox.enqueue(

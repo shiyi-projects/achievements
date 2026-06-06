@@ -44,6 +44,9 @@ dependencies:
   timezone: ^0.10.0
   flutter_timezone: ^4.1.1
 
+  # ---- 重复任务规则(RFC5545 RRULE 展开)----
+  rrule: ^0.2.16
+
   # ---- 图表 / 动效 ----
   fl_chart: ^0.69.0
   flutter_animate: ^4.5.2
