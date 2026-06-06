@@ -21,9 +21,46 @@ import 'package:intl/intl.dart';
 /// - Trailing: 优先级 Chip / 提醒图标 / 星标
 /// - Dismissible 滑动操作 (右滑完成, 左滑删除)
 class CalendarTaskTile extends ConsumerWidget {
-  const CalendarTaskTile({required this.task, super.key});
+  const CalendarTaskTile({
+    required this.task,
+    this.recurrenceTemplate,
+    this.occurrence,
+    super.key,
+  });
 
   final Task task;
+
+  /// 非空表示这是重复系列的**虚拟发生点**:完成 / 删除路由到「实体化某次」而非
+  /// 直接改 [task](合成行在 DB 中并不存在)。
+  final Task? recurrenceTemplate;
+  final DateTime? occurrence;
+
+  bool get _isVirtual => recurrenceTemplate != null;
+
+  Future<void> _toggleComplete(WidgetRef ref, {required bool done}) async {
+    final repo = ref.read(taskRepositoryProvider);
+    if (_isVirtual) {
+      await repo.setOccurrenceCompleted(
+        template: recurrenceTemplate!,
+        occurrence: occurrence!,
+        completed: !done,
+      );
+    } else {
+      await repo.setCompleted(task.id, completed: !done);
+    }
+  }
+
+  Future<void> _delete(WidgetRef ref) async {
+    final repo = ref.read(taskRepositoryProvider);
+    if (_isVirtual) {
+      await repo.deleteOccurrence(
+        template: recurrenceTemplate!,
+        occurrence: occurrence!,
+      );
+    } else {
+      await repo.softDelete(task.id);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -66,11 +103,9 @@ class CalendarTaskTile extends ConsumerWidget {
         ),
         confirmDismiss: (direction) async {
           if (direction == DismissDirection.startToEnd) {
-            await ref
-                .read(taskRepositoryProvider)
-                .setCompleted(task.id, completed: !done);
+            await _toggleComplete(ref, done: done);
           } else {
-            await ref.read(taskRepositoryProvider).softDelete(task.id);
+            await _delete(ref);
           }
           return false; // Don't remove widget, let provider rebuild
         },
@@ -80,8 +115,9 @@ class CalendarTaskTile extends ConsumerWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             borderRadius: BorderRadius.circular(Radii.input),
-            onTap: () =>
-                ref.read(selectedTaskIdProvider.notifier).select(task.id),
+            onTap: () => ref
+                .read(selectedTaskIdProvider.notifier)
+                .select(_isVirtual ? recurrenceTemplate!.id : task.id),
             child: Container(
               decoration: priority != TaskPriority.none
                   ? BoxDecoration(
@@ -106,9 +142,7 @@ class CalendarTaskTile extends ConsumerWidget {
                         _BouncyCheckbox(
                           checked: done,
                           color: done ? scheme.primary : scheme.outline,
-                          onTap: () => ref
-                              .read(taskRepositoryProvider)
-                              .setCompleted(task.id, completed: !done),
+                          onTap: () => _toggleComplete(ref, done: done),
                         ),
                         const SizedBox(width: Spacing.md),
 

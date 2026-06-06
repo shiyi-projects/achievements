@@ -20,7 +20,7 @@ class DayTaskList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(selectedDayProvider);
-    final tasks = ref.watch(selectedDayTasksProvider);
+    final tasks = ref.watch(selectedDayEntriesProvider);
 
     if (selected == null) {
       return EmptyState(
@@ -35,8 +35,12 @@ class DayTaskList extends ConsumerWidget {
     final weekDay = _weekDayNames[selected.weekday];
     final label = '${selected.month} 月 ${selected.day} 日  $weekDay';
 
-    final pending = tasks.where((t) => t.completedAt == null).toList();
-    final completed = tasks.where((t) => t.completedAt != null).toList();
+    final pending = tasks
+        .where((e) => e.displayTask.completedAt == null)
+        .toList();
+    final completed = tasks
+        .where((e) => e.displayTask.completedAt != null)
+        .toList();
 
     return AnimatedSwitcher(
       duration: MotionDurations.normal,
@@ -128,9 +132,14 @@ class DayTaskList extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   // Pending tasks
                   if (index < pending.length) {
+                    final e = pending[index];
                     return _AnimatedTaskEntry(
                       index: index,
-                      child: CalendarTaskTile(task: pending[index]),
+                      child: CalendarTaskTile(
+                        task: e.displayTask,
+                        recurrenceTemplate: e.template,
+                        occurrence: e.occurrence,
+                      ),
                     );
                   }
                   // Completed header
@@ -140,9 +149,14 @@ class DayTaskList extends ConsumerWidget {
                   }
                   // Completed tasks
                   final cTaskIndex = cIndex - 1;
+                  final e = completed[cTaskIndex];
                   return _AnimatedTaskEntry(
                     index: pending.length + cTaskIndex,
-                    child: CalendarTaskTile(task: completed[cTaskIndex]),
+                    child: CalendarTaskTile(
+                      task: e.displayTask,
+                      recurrenceTemplate: e.template,
+                      occurrence: e.occurrence,
+                    ),
                   );
                 },
               ),
