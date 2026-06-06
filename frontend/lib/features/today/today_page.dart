@@ -40,7 +40,7 @@ class TodayPage extends ConsumerWidget {
           ),
         ),
         QuickCreateInput(
-          hint: '添加今日任务…(试试「每天9点 吃药」)',
+          hint: '添加今日任务…(试试「每天9点 读书」)',
           onSubmit: (title) => _createForToday(ref, title),
           onSubmitCapture: (r) => _createForToday(
             ref,
