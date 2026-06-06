@@ -245,11 +245,14 @@ class AppShell extends ConsumerWidget {
       useSafeArea: true,
       showDragHandle: true,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
+        initialChildSize: 0.92,
+        minChildSize: 0.5,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) => const TaskDetailPanel(),
+        // 把 sheet 的 scrollController 接进面板内部列表,拖拽与内容滚动统一,
+        // 不再各管各地打架。
+        builder: (context, scrollController) =>
+            TaskDetailPanel(scrollController: scrollController),
       ),
     );
     ref.read(selectedTaskIdProvider.notifier).clear();
