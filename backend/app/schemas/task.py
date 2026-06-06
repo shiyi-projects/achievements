@@ -16,6 +16,9 @@ class TaskCreate(BaseModel):
     priority: int = Field(default=0, ge=0, le=3)
     due_at: datetime | None = None
     remind_at: datetime | None = None
+    repeat_rule: str | None = Field(default=None, max_length=255)
+    recurrence_parent_id: UUID | None = None
+    occurrence_date: datetime | None = None
     color: str | None = None
     starred: bool = False
 
@@ -28,6 +31,9 @@ class TaskUpdate(BaseModel):
     priority: int | None = Field(default=None, ge=0, le=3)
     due_at: datetime | None = None
     remind_at: datetime | None = None
+    repeat_rule: str | None = Field(default=None, max_length=255)
+    recurrence_parent_id: UUID | None = None
+    occurrence_date: datetime | None = None
     color: str | None = None
     starred: bool | None = None
 
@@ -47,6 +53,9 @@ class TaskRead(BaseModel):
     priority: int
     due_at: datetime | None
     remind_at: datetime | None
+    repeat_rule: str | None
+    recurrence_parent_id: UUID | None
+    occurrence_date: datetime | None
     color: str | None
     sort_order: int
     completed_at: datetime | None

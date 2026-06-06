@@ -7,6 +7,7 @@
   - frontend/pubspec.yaml            version: X.Y.Z+BUILD   (Dart：含构建号)
   - backend/pyproject.toml           version = "X.Y.Z"
   - frontend/installer/achievements.iss   #define MyAppVersion "X.Y.Z"
+  - frontend/lib/core/app_info.dart  const String kAppVersion = 'X.Y.Z'
 
 用法：
   python scripts/bump_version.py --bump patch        # 0.0.2 -> 0.0.3
@@ -32,6 +33,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PUBSPEC = REPO_ROOT / "frontend" / "pubspec.yaml"
 PYPROJECT = REPO_ROOT / "backend" / "pyproject.toml"
 ISS = REPO_ROOT / "frontend" / "installer" / "achievements.iss"
+APP_INFO = REPO_ROOT / "frontend" / "lib" / "core" / "app_info.dart"
 
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
@@ -88,6 +90,12 @@ def build_edits(new_version: str, build: int) -> list[Edit]:
             re.compile(r'^#define\s+MyAppVersion\s+"\d+\.\d+\.\d+"\s*$', re.MULTILINE),
             lambda v: f'#define MyAppVersion         "{v}"',
             f"achievements.iss  MyAppVersion → {new_version}",
+        ),
+        Edit(
+            APP_INFO,
+            re.compile(r"^const String kAppVersion = '\d+\.\d+\.\d+';\s*$", re.MULTILINE),
+            lambda v: f"const String kAppVersion = '{v}';",
+            f"app_info.dart  kAppVersion → {new_version}",
         ),
     ]
 
