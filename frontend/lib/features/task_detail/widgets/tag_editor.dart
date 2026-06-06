@@ -12,7 +12,7 @@ enum _TagAction { rename, delete }
 /// - 显示所有 active 标签为 FilterChip,已关联标记 selected
 /// - tap chip 切换 add/remove
 /// - 长按 / 右键 chip 弹菜单:重命名 / 删除标签
-/// - 末尾 ActionChip "New" 弹 dialog 创建新标签并自动关联
+/// - 末尾 ActionChip「新建」弹 dialog 创建新标签并自动关联
 class TagEditor extends ConsumerWidget {
   const TagEditor({required this.taskId, super.key});
 
@@ -30,7 +30,7 @@ class TagEditor extends ConsumerWidget {
         padding: EdgeInsets.symmetric(vertical: Spacing.sm),
         child: LinearProgressIndicator(minHeight: 2),
       ),
-      error: (e, st) => Text('Failed to load tags: $e'),
+      error: (e, st) => Text('标签加载失败: $e'),
       data: (allTags) {
         final mine = mineAsync.maybeWhen(
           data: (list) => list.map((t) => t.id).toSet(),
@@ -72,7 +72,7 @@ class TagEditor extends ConsumerWidget {
                   color: scheme.primary,
                 ),
                 label: Text(
-                  'New',
+                  '新建',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: scheme.primary,
                   ),
@@ -92,9 +92,9 @@ class TagEditor extends ConsumerWidget {
   Future<void> _showCreate(BuildContext context, WidgetRef ref) async {
     final created = await showNameInputDialog(
       context,
-      title: 'New tag',
-      hint: 'Tag name',
-      confirm: 'Create',
+      title: '新建标签',
+      hint: '标签名',
+      confirm: '创建',
     );
     if (created == null) return;
     final repo = ref.read(tagRepositoryProvider);
