@@ -29,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration {
@@ -88,6 +88,17 @@ class AppDatabase extends _$AppDatabase {
         }
         // v9 → v10:系统清单 ID 改为按用户生成。旧主库迁移在 legacy import 中处理;
         // 这里不再依赖全局固定 UUID。
+        // v10 → v11:重复任务「模板 + 虚拟展开」模型的两个新列。
+        // recurrence_parent_id:override 指回模板;occurrence_date:对应发生点。
+        // datetime 默认存为 unix 秒(INTEGER)。详见 dev_docs/recurring-tasks.md。
+        if (from < 11) {
+          await customStatement(
+            'ALTER TABLE tasks ADD COLUMN recurrence_parent_id TEXT',
+          );
+          await customStatement(
+            'ALTER TABLE tasks ADD COLUMN occurrence_date INTEGER',
+          );
+        }
       },
     );
   }

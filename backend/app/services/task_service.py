@@ -72,6 +72,9 @@ async def create_task(
         priority=payload.priority,
         due_at=payload.due_at,
         remind_at=payload.remind_at,
+        repeat_rule=payload.repeat_rule,
+        recurrence_parent_id=payload.recurrence_parent_id,
+        occurrence_date=payload.occurrence_date,
         color=payload.color,
         starred=payload.starred,
     )

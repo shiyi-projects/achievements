@@ -1422,6 +1422,29 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _recurrenceParentIdMeta =
+      const VerificationMeta('recurrenceParentId');
+  @override
+  late final GeneratedColumn<String> recurrenceParentId =
+      GeneratedColumn<String>(
+        'recurrence_parent_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _occurrenceDateMeta = const VerificationMeta(
+    'occurrenceDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> occurrenceDate =
+      GeneratedColumn<DateTime>(
+        'occurrence_date',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _colorMeta = const VerificationMeta('color');
   @override
   late final GeneratedColumn<String> color = GeneratedColumn<String>(
@@ -1519,6 +1542,8 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     dueAt,
     remindAt,
     repeatRule,
+    recurrenceParentId,
+    occurrenceDate,
     color,
     sortOrder,
     completedAt,
@@ -1626,6 +1651,24 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
       context.handle(
         _repeatRuleMeta,
         repeatRule.isAcceptableOrUnknown(data['repeat_rule']!, _repeatRuleMeta),
+      );
+    }
+    if (data.containsKey('recurrence_parent_id')) {
+      context.handle(
+        _recurrenceParentIdMeta,
+        recurrenceParentId.isAcceptableOrUnknown(
+          data['recurrence_parent_id']!,
+          _recurrenceParentIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('occurrence_date')) {
+      context.handle(
+        _occurrenceDateMeta,
+        occurrenceDate.isAcceptableOrUnknown(
+          data['occurrence_date']!,
+          _occurrenceDateMeta,
+        ),
       );
     }
     if (data.containsKey('color')) {
@@ -1744,6 +1787,14 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         DriftSqlType.string,
         data['${effectivePrefix}repeat_rule'],
       ),
+      recurrenceParentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence_parent_id'],
+      ),
+      occurrenceDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}occurrence_date'],
+      ),
       color: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}color'],
@@ -1806,7 +1857,17 @@ class Task extends DataClass implements Insertable<Task> {
   final int priority;
   final DateTime? dueAt;
   final DateTime? remindAt;
+
+  /// RFC5545 RRULE 主体(不含 DTSTART),例:`FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE,FR`。
+  /// 非空表示这是重复系列的「模板」,DTSTART 由 [dueAt] 提供。详见
+  /// [`dev_docs/recurring-tasks.md`](../../../../dev_docs/recurring-tasks.md)。
   final String? repeatRule;
+
+  /// override 实体指回其重复模板的 id;模板自身与普通任务为 null。
+  final String? recurrenceParentId;
+
+  /// override 对应系列里的哪个发生点(去重锚点)。配合 [recurrenceParentId] 使用。
+  final DateTime? occurrenceDate;
   final String? color;
   final int sortOrder;
   final DateTime? completedAt;
@@ -1833,6 +1894,8 @@ class Task extends DataClass implements Insertable<Task> {
     this.dueAt,
     this.remindAt,
     this.repeatRule,
+    this.recurrenceParentId,
+    this.occurrenceDate,
     this.color,
     required this.sortOrder,
     this.completedAt,
@@ -1869,6 +1932,12 @@ class Task extends DataClass implements Insertable<Task> {
     }
     if (!nullToAbsent || repeatRule != null) {
       map['repeat_rule'] = Variable<String>(repeatRule);
+    }
+    if (!nullToAbsent || recurrenceParentId != null) {
+      map['recurrence_parent_id'] = Variable<String>(recurrenceParentId);
+    }
+    if (!nullToAbsent || occurrenceDate != null) {
+      map['occurrence_date'] = Variable<DateTime>(occurrenceDate);
     }
     if (!nullToAbsent || color != null) {
       map['color'] = Variable<String>(color);
@@ -1916,6 +1985,12 @@ class Task extends DataClass implements Insertable<Task> {
       repeatRule: repeatRule == null && nullToAbsent
           ? const Value.absent()
           : Value(repeatRule),
+      recurrenceParentId: recurrenceParentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceParentId),
+      occurrenceDate: occurrenceDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(occurrenceDate),
       color: color == null && nullToAbsent
           ? const Value.absent()
           : Value(color),
@@ -1954,6 +2029,10 @@ class Task extends DataClass implements Insertable<Task> {
       dueAt: serializer.fromJson<DateTime?>(json['dueAt']),
       remindAt: serializer.fromJson<DateTime?>(json['remindAt']),
       repeatRule: serializer.fromJson<String?>(json['repeatRule']),
+      recurrenceParentId: serializer.fromJson<String?>(
+        json['recurrenceParentId'],
+      ),
+      occurrenceDate: serializer.fromJson<DateTime?>(json['occurrenceDate']),
       color: serializer.fromJson<String?>(json['color']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
@@ -1981,6 +2060,8 @@ class Task extends DataClass implements Insertable<Task> {
       'dueAt': serializer.toJson<DateTime?>(dueAt),
       'remindAt': serializer.toJson<DateTime?>(remindAt),
       'repeatRule': serializer.toJson<String?>(repeatRule),
+      'recurrenceParentId': serializer.toJson<String?>(recurrenceParentId),
+      'occurrenceDate': serializer.toJson<DateTime?>(occurrenceDate),
       'color': serializer.toJson<String?>(color),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'completedAt': serializer.toJson<DateTime?>(completedAt),
@@ -2006,6 +2087,8 @@ class Task extends DataClass implements Insertable<Task> {
     Value<DateTime?> dueAt = const Value.absent(),
     Value<DateTime?> remindAt = const Value.absent(),
     Value<String?> repeatRule = const Value.absent(),
+    Value<String?> recurrenceParentId = const Value.absent(),
+    Value<DateTime?> occurrenceDate = const Value.absent(),
     Value<String?> color = const Value.absent(),
     int? sortOrder,
     Value<DateTime?> completedAt = const Value.absent(),
@@ -2028,6 +2111,12 @@ class Task extends DataClass implements Insertable<Task> {
     dueAt: dueAt.present ? dueAt.value : this.dueAt,
     remindAt: remindAt.present ? remindAt.value : this.remindAt,
     repeatRule: repeatRule.present ? repeatRule.value : this.repeatRule,
+    recurrenceParentId: recurrenceParentId.present
+        ? recurrenceParentId.value
+        : this.recurrenceParentId,
+    occurrenceDate: occurrenceDate.present
+        ? occurrenceDate.value
+        : this.occurrenceDate,
     color: color.present ? color.value : this.color,
     sortOrder: sortOrder ?? this.sortOrder,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
@@ -2056,6 +2145,12 @@ class Task extends DataClass implements Insertable<Task> {
       repeatRule: data.repeatRule.present
           ? data.repeatRule.value
           : this.repeatRule,
+      recurrenceParentId: data.recurrenceParentId.present
+          ? data.recurrenceParentId.value
+          : this.recurrenceParentId,
+      occurrenceDate: data.occurrenceDate.present
+          ? data.occurrenceDate.value
+          : this.occurrenceDate,
       color: data.color.present ? data.color.value : this.color,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       completedAt: data.completedAt.present
@@ -2091,6 +2186,8 @@ class Task extends DataClass implements Insertable<Task> {
           ..write('dueAt: $dueAt, ')
           ..write('remindAt: $remindAt, ')
           ..write('repeatRule: $repeatRule, ')
+          ..write('recurrenceParentId: $recurrenceParentId, ')
+          ..write('occurrenceDate: $occurrenceDate, ')
           ..write('color: $color, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('completedAt: $completedAt, ')
@@ -2118,6 +2215,8 @@ class Task extends DataClass implements Insertable<Task> {
     dueAt,
     remindAt,
     repeatRule,
+    recurrenceParentId,
+    occurrenceDate,
     color,
     sortOrder,
     completedAt,
@@ -2144,6 +2243,8 @@ class Task extends DataClass implements Insertable<Task> {
           other.dueAt == this.dueAt &&
           other.remindAt == this.remindAt &&
           other.repeatRule == this.repeatRule &&
+          other.recurrenceParentId == this.recurrenceParentId &&
+          other.occurrenceDate == this.occurrenceDate &&
           other.color == this.color &&
           other.sortOrder == this.sortOrder &&
           other.completedAt == this.completedAt &&
@@ -2168,6 +2269,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
   final Value<DateTime?> dueAt;
   final Value<DateTime?> remindAt;
   final Value<String?> repeatRule;
+  final Value<String?> recurrenceParentId;
+  final Value<DateTime?> occurrenceDate;
   final Value<String?> color;
   final Value<int> sortOrder;
   final Value<DateTime?> completedAt;
@@ -2191,6 +2294,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.dueAt = const Value.absent(),
     this.remindAt = const Value.absent(),
     this.repeatRule = const Value.absent(),
+    this.recurrenceParentId = const Value.absent(),
+    this.occurrenceDate = const Value.absent(),
     this.color = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.completedAt = const Value.absent(),
@@ -2215,6 +2320,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.dueAt = const Value.absent(),
     this.remindAt = const Value.absent(),
     this.repeatRule = const Value.absent(),
+    this.recurrenceParentId = const Value.absent(),
+    this.occurrenceDate = const Value.absent(),
     this.color = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.completedAt = const Value.absent(),
@@ -2242,6 +2349,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Expression<DateTime>? dueAt,
     Expression<DateTime>? remindAt,
     Expression<String>? repeatRule,
+    Expression<String>? recurrenceParentId,
+    Expression<DateTime>? occurrenceDate,
     Expression<String>? color,
     Expression<int>? sortOrder,
     Expression<DateTime>? completedAt,
@@ -2266,6 +2375,9 @@ class TasksCompanion extends UpdateCompanion<Task> {
       if (dueAt != null) 'due_at': dueAt,
       if (remindAt != null) 'remind_at': remindAt,
       if (repeatRule != null) 'repeat_rule': repeatRule,
+      if (recurrenceParentId != null)
+        'recurrence_parent_id': recurrenceParentId,
+      if (occurrenceDate != null) 'occurrence_date': occurrenceDate,
       if (color != null) 'color': color,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (completedAt != null) 'completed_at': completedAt,
@@ -2292,6 +2404,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Value<DateTime?>? dueAt,
     Value<DateTime?>? remindAt,
     Value<String?>? repeatRule,
+    Value<String?>? recurrenceParentId,
+    Value<DateTime?>? occurrenceDate,
     Value<String?>? color,
     Value<int>? sortOrder,
     Value<DateTime?>? completedAt,
@@ -2316,6 +2430,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
       dueAt: dueAt ?? this.dueAt,
       remindAt: remindAt ?? this.remindAt,
       repeatRule: repeatRule ?? this.repeatRule,
+      recurrenceParentId: recurrenceParentId ?? this.recurrenceParentId,
+      occurrenceDate: occurrenceDate ?? this.occurrenceDate,
       color: color ?? this.color,
       sortOrder: sortOrder ?? this.sortOrder,
       completedAt: completedAt ?? this.completedAt,
@@ -2372,6 +2488,12 @@ class TasksCompanion extends UpdateCompanion<Task> {
     if (repeatRule.present) {
       map['repeat_rule'] = Variable<String>(repeatRule.value);
     }
+    if (recurrenceParentId.present) {
+      map['recurrence_parent_id'] = Variable<String>(recurrenceParentId.value);
+    }
+    if (occurrenceDate.present) {
+      map['occurrence_date'] = Variable<DateTime>(occurrenceDate.value);
+    }
     if (color.present) {
       map['color'] = Variable<String>(color.value);
     }
@@ -2416,6 +2538,8 @@ class TasksCompanion extends UpdateCompanion<Task> {
           ..write('dueAt: $dueAt, ')
           ..write('remindAt: $remindAt, ')
           ..write('repeatRule: $repeatRule, ')
+          ..write('recurrenceParentId: $recurrenceParentId, ')
+          ..write('occurrenceDate: $occurrenceDate, ')
           ..write('color: $color, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('completedAt: $completedAt, ')
@@ -6224,6 +6348,8 @@ typedef $$TasksTableCreateCompanionBuilder =
       Value<DateTime?> dueAt,
       Value<DateTime?> remindAt,
       Value<String?> repeatRule,
+      Value<String?> recurrenceParentId,
+      Value<DateTime?> occurrenceDate,
       Value<String?> color,
       Value<int> sortOrder,
       Value<DateTime?> completedAt,
@@ -6249,6 +6375,8 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<DateTime?> dueAt,
       Value<DateTime?> remindAt,
       Value<String?> repeatRule,
+      Value<String?> recurrenceParentId,
+      Value<DateTime?> occurrenceDate,
       Value<String?> color,
       Value<int> sortOrder,
       Value<DateTime?> completedAt,
@@ -6334,6 +6462,16 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<String> get repeatRule => $composableBuilder(
     column: $table.repeatRule,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recurrenceParentId => $composableBuilder(
+    column: $table.recurrenceParentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get occurrenceDate => $composableBuilder(
+    column: $table.occurrenceDate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6452,6 +6590,16 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get recurrenceParentId => $composableBuilder(
+    column: $table.recurrenceParentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get occurrenceDate => $composableBuilder(
+    column: $table.occurrenceDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get color => $composableBuilder(
     column: $table.color,
     builder: (column) => ColumnOrderings(column),
@@ -6541,6 +6689,16 @@ class $$TasksTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get recurrenceParentId => $composableBuilder(
+    column: $table.recurrenceParentId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get occurrenceDate => $composableBuilder(
+    column: $table.occurrenceDate,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get color =>
       $composableBuilder(column: $table.color, builder: (column) => column);
 
@@ -6613,6 +6771,8 @@ class $$TasksTableTableManager
                 Value<DateTime?> dueAt = const Value.absent(),
                 Value<DateTime?> remindAt = const Value.absent(),
                 Value<String?> repeatRule = const Value.absent(),
+                Value<String?> recurrenceParentId = const Value.absent(),
+                Value<DateTime?> occurrenceDate = const Value.absent(),
                 Value<String?> color = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
@@ -6636,6 +6796,8 @@ class $$TasksTableTableManager
                 dueAt: dueAt,
                 remindAt: remindAt,
                 repeatRule: repeatRule,
+                recurrenceParentId: recurrenceParentId,
+                occurrenceDate: occurrenceDate,
                 color: color,
                 sortOrder: sortOrder,
                 completedAt: completedAt,
@@ -6661,6 +6823,8 @@ class $$TasksTableTableManager
                 Value<DateTime?> dueAt = const Value.absent(),
                 Value<DateTime?> remindAt = const Value.absent(),
                 Value<String?> repeatRule = const Value.absent(),
+                Value<String?> recurrenceParentId = const Value.absent(),
+                Value<DateTime?> occurrenceDate = const Value.absent(),
                 Value<String?> color = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
@@ -6684,6 +6848,8 @@ class $$TasksTableTableManager
                 dueAt: dueAt,
                 remindAt: remindAt,
                 repeatRule: repeatRule,
+                recurrenceParentId: recurrenceParentId,
+                occurrenceDate: occurrenceDate,
                 color: color,
                 sortOrder: sortOrder,
                 completedAt: completedAt,

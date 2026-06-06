@@ -198,6 +198,55 @@ async def test_push_delete_soft_deletes(client: AsyncClient) -> None:
     assert fetched.json()["deleted_at"] is not None
 
 
+@pytest.mark.asyncio
+async def test_push_recurrence_fields_round_trip(client: AsyncClient) -> None:
+    """重复模板与 override 字段经 sync push → pull 往返保真。"""
+    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    template_id = str(uuid4())
+    override_id = str(uuid4())
+
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task",
+                    "op": "upsert",
+                    "id": template_id,
+                    "base_version": 0,
+                    "payload": {
+                        "list_id": list_id,
+                        "title": "Standup",
+                        "repeat_rule": "FREQ=WEEKLY;BYDAY=MO",
+                        "due_at": "2026-06-08T01:00:00Z",
+                    },
+                },
+                {
+                    "entity": "task",
+                    "op": "upsert",
+                    "id": override_id,
+                    "base_version": 0,
+                    "payload": {
+                        "list_id": list_id,
+                        "title": "Standup",
+                        "recurrence_parent_id": template_id,
+                        "occurrence_date": "2026-06-15T01:00:00Z",
+                    },
+                },
+            ]
+        },
+    )
+    assert [r["status"] for r in push.json()["results"]] == ["applied", "applied"]
+
+    pull = (await client.get("/api/v1/sync/pull")).json()
+    template = next(t for t in pull["tasks"] if t["id"] == template_id)
+    override = next(t for t in pull["tasks"] if t["id"] == override_id)
+    assert template["repeat_rule"] == "FREQ=WEEKLY;BYDAY=MO"
+    assert template["recurrence_parent_id"] is None
+    assert override["recurrence_parent_id"] == template_id
+    assert override["occurrence_date"] is not None
+
+
 # ---- purge (永久删除墓碑) --------------------------------------------------
 
 
@@ -283,9 +332,9 @@ async def _create_tag(client: AsyncClient, name: str = "urgent") -> str:
 @pytest.mark.asyncio
 async def test_task_tag_upsert_then_delete_sync(client: AsyncClient) -> None:
     list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
-    task_id = (
-        await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "t"})
-    ).json()["id"]
+    task_id = (await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "t"})).json()[
+        "id"
+    ]
     tag_id = await _create_tag(client)
 
     payload = {"task_id": task_id, "tag_id": tag_id}
@@ -308,11 +357,7 @@ async def test_task_tag_upsert_then_delete_sync(client: AsyncClient) -> None:
     assert up.json()["results"][0]["status"] == "applied"
 
     pull = (await client.get("/api/v1/sync/pull")).json()
-    tt = next(
-        x
-        for x in pull["task_tags"]
-        if x["task_id"] == task_id and x["tag_id"] == tag_id
-    )
+    tt = next(x for x in pull["task_tags"] if x["task_id"] == task_id and x["tag_id"] == tag_id)
     assert tt["deleted_at"] is None
 
     # delete 置墓碑
@@ -333,11 +378,7 @@ async def test_task_tag_upsert_then_delete_sync(client: AsyncClient) -> None:
     assert rm.json()["results"][0]["status"] == "applied"
 
     pull2 = (await client.get("/api/v1/sync/pull")).json()
-    tt2 = next(
-        x
-        for x in pull2["task_tags"]
-        if x["task_id"] == task_id and x["tag_id"] == tag_id
-    )
+    tt2 = next(x for x in pull2["task_tags"] if x["task_id"] == task_id and x["tag_id"] == tag_id)
     assert tt2["deleted_at"] is not None
 
 

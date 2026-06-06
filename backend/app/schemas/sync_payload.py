@@ -42,6 +42,8 @@ class TaskPayload(_Base):
     due_at: datetime | None = None
     remind_at: datetime | None = None
     repeat_rule: str | None = None
+    recurrence_parent_id: UUID | None = None
+    occurrence_date: datetime | None = None
     color: str | None = None
     sort_order: int | None = None
     completed_at: datetime | None = None
