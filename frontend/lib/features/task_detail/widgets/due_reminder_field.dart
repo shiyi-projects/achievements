@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:achievements/core/recurrence/recurrence_rule_draft.dart';
 import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
@@ -231,20 +233,6 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
     }
   }
 
-  void _setRecurrence(Task task, RecurrenceRuleDraft? draft) {
-    final body = draft?.toRuleBody();
-    // 重复需要 DTSTART 锚点(dueAt);若未设,落今天终点。
-    final due = (body != null && task.dueAt == null)
-        ? Value(_endOfToday())
-        : const Value<DateTime?>.absent();
-    _repo.update(
-      task.id,
-      knownVersion: task.version,
-      repeatRule: Value(body),
-      dueAt: due,
-    );
-  }
-
   CalendarDatePicker2Config _calendarConfig(ColorScheme scheme) {
     return CalendarDatePicker2Config(
       calendarType: CalendarDatePicker2Type.single,
@@ -266,9 +254,6 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
     final currentOffset = (due != null && task.remindAt != null)
         ? due.difference(task.remindAt!)
         : null;
-    final draft = task.repeatRule == null
-        ? null
-        : RecurrenceRuleDraft.fromRuleBody(task.repeatRule!);
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -391,22 +376,86 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
               color: scheme.outlineVariant.withValues(alpha: 0.4),
             ),
 
-            // ── 重复(就地内嵌)──
-            Row(
-              children: [
-                Icon(Icons.repeat_rounded, size: 20, color: scheme.outline),
-                const SizedBox(width: Spacing.md),
-                Text('重复', style: theme.textTheme.bodyLarge),
-              ],
-            ),
-            const SizedBox(height: Spacing.sm),
-            RecurrenceEditor(
-              draft: draft,
-              onChanged: (d) => _setRecurrence(task, d),
-            ),
+            // ── 重复(独立有状态区块:本地草稿 + debounce 写库,连点间隔不重建日历)──
+            _RecurrenceSection(taskId: task.id, initialRule: task.repeatRule),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 独立的「重复」编辑区块。
+///
+/// 自管本地草稿 + debounce 写库:间隔/次数连点只触发**自身** setState,不会重建
+/// 父面板里那个开销大的内嵌日历,从根上消除「调间隔很卡」。
+class _RecurrenceSection extends ConsumerStatefulWidget {
+  const _RecurrenceSection({required this.taskId, required this.initialRule});
+
+  final String taskId;
+  final String? initialRule;
+
+  @override
+  ConsumerState<_RecurrenceSection> createState() => _RecurrenceSectionState();
+}
+
+class _RecurrenceSectionState extends ConsumerState<_RecurrenceSection> {
+  late RecurrenceRuleDraft? _draft = widget.initialRule == null
+      ? null
+      : RecurrenceRuleDraft.fromRuleBody(widget.initialRule!);
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _flush();
+    super.dispose();
+  }
+
+  void _onChanged(RecurrenceRuleDraft? d) {
+    setState(() => _draft = d);
+    _timer?.cancel();
+    _timer = Timer(const Duration(milliseconds: 450), _flush);
+  }
+
+  void _flush() {
+    _timer?.cancel();
+    final task = ref.read(currentTaskProvider).valueOrNull;
+    if (task == null || task.id != widget.taskId) return;
+    final body = _draft?.toRuleBody();
+    if (body == task.repeatRule) return; // 无变化
+    // 重复需要 DTSTART 锚点(dueAt);若未设,落今天终点。
+    final now = DateTime.now();
+    final due = (body != null && task.dueAt == null)
+        ? Value(DateTime(now.year, now.month, now.day, 23, 59))
+        : const Value<DateTime?>.absent();
+    ref
+        .read(taskRepositoryProvider)
+        .update(
+          task.id,
+          knownVersion: task.version,
+          repeatRule: Value(body),
+          dueAt: due,
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.repeat_rounded, size: 20, color: scheme.outline),
+            const SizedBox(width: Spacing.md),
+            Text('重复', style: theme.textTheme.bodyLarge),
+          ],
+        ),
+        const SizedBox(height: Spacing.sm),
+        RecurrenceEditor(draft: _draft, onChanged: _onChanged),
+      ],
     );
   }
 }
