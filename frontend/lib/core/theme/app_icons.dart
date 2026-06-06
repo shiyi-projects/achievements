@@ -70,12 +70,29 @@ abstract final class AppIcons {
   static const cloudOff = '$_base/41_cloud_off.svg';
   static const cloudError = '$_base/42_cloud_error.svg';
 
+  // 品牌外链(来自全局复用库 dev-assets,见 dev_docs/refs/dev-assets.md)
+  static const _logos = 'assets/logos';
+
+  /// GitHub 标志(纯黑单色,渲染时建议传 [color] 跟随主题)。
+  static const github = '$_logos/github.svg';
+
+  /// 哔哩哔哩标志(品牌蓝,默认保留原色)。
+  static const bilibili = '$_logos/bilibili.svg';
+
   // ── 工厂方法 ──────────────────────────────────────────────────────
 
-  /// 返回一个保持多色原貌的 SVG Widget。
+  /// 返回一个 SVG Widget。
   ///
   /// [size] 同时约束 width/height,默认 20。
-  static Widget svgIcon(String assetPath, {double size = 20}) {
-    return SvgPicture.asset(assetPath, width: size, height: size);
+  /// [color] 不为空时整体着色(用于单色图标跟随主题);为空则保持多色原貌。
+  static Widget svgIcon(String assetPath, {double size = 20, Color? color}) {
+    return SvgPicture.asset(
+      assetPath,
+      width: size,
+      height: size,
+      colorFilter: color == null
+          ? null
+          : ColorFilter.mode(color, BlendMode.srcIn),
+    );
   }
 }
