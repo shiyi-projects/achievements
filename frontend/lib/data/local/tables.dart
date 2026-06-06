@@ -60,7 +60,18 @@ class Tasks extends Table with SyncableMixin {
 
   DateTimeColumn get dueAt => dateTime().nullable()();
   DateTimeColumn get remindAt => dateTime().nullable()();
+
+  /// RFC5545 RRULE 主体(不含 DTSTART),例:`FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE,FR`。
+  /// 非空表示这是重复系列的「模板」,DTSTART 由 [dueAt] 提供。详见
+  /// [`dev_docs/recurring-tasks.md`](../../../../dev_docs/recurring-tasks.md)。
   TextColumn get repeatRule => text().nullable()();
+
+  /// override 实体指回其重复模板的 id;模板自身与普通任务为 null。
+  TextColumn get recurrenceParentId => text().nullable()();
+
+  /// override 对应系列里的哪个发生点(去重锚点)。配合 [recurrenceParentId] 使用。
+  DateTimeColumn get occurrenceDate => dateTime().nullable()();
+
   TextColumn get color => text().nullable()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   DateTimeColumn get completedAt => dateTime().nullable()();

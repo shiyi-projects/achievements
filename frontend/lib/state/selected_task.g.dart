@@ -6,9 +6,12 @@ part of 'selected_task.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$currentTaskHash() => r'451d7a2025835d9b712ca09ceb18a5e6b230b70a';
+String _$currentTaskHash() => r'e89c01c4c204cd1a98cf51846dd893a036618485';
 
-/// 解析为真实 [Task] 行的流;选中 ID 为 null 时 yield null。
+/// 解析为真实 [Task] 行的响应式流;选中 ID 为 null 时发射 null。
+///
+/// 用 [TaskRepository.watchById] 而非一次性 `getById`,确保任意字段
+/// (星标 / 完成态 / 日期等)在 DB 更新后实时反映到详情面板。
 ///
 /// Copied from [currentTask].
 @ProviderFor(currentTask)
@@ -25,12 +28,9 @@ final currentTaskProvider = AutoDisposeStreamProvider<Task?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentTaskRef = AutoDisposeStreamProviderRef<Task?>;
-String _$parentTaskHash() => r'084061965e8e3a4d8cd567caf443219a0a86baff';
+String _$parentTaskHash() => r'5de94310c4e5185c7ac254e1e8225cedd493ec2c';
 
-/// 当前任务的父任务（面包屑导航用）。
-///
-/// 若当前任务有 [Task.parentId]，从 DB 实时查询父任务行；
-/// 否则 yield null。
+/// 当前任务的父任务（面包屑导航用），同样响应式监听。
 ///
 /// Copied from [parentTask].
 @ProviderFor(parentTask)

@@ -23,7 +23,7 @@ final authApiClientProvider = Provider<Dio>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AuthApiClientRef = ProviderRef<Dio>;
-String _$apiClientHash() => r'f2dda40d1e32d85a33ea7c49b0ad00ed4ab68e67';
+String _$apiClientHash() => r'6551ed71a41e13951560658ee6d6c1078edf2df5';
 
 /// 全局认证后 Dio 客户端。
 ///

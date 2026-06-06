@@ -107,6 +107,56 @@ async def test_hard_delete(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_recurrence_fields_round_trip(client: AsyncClient) -> None:
+    """重复模板与 override 字段经 REST create/read/update 往返(修复历史断点)。"""
+    list_id = await _create_list(client)
+
+    # 创建一条重复「模板」:带 RRULE,recurrence_parent_id 为空
+    template = (
+        await client.post(
+            "/api/v1/tasks",
+            json={
+                "list_id": str(list_id),
+                "title": "Weekly standup",
+                "repeat_rule": "FREQ=WEEKLY;BYDAY=MO",
+                "due_at": "2026-06-08T01:00:00Z",
+            },
+        )
+    ).json()
+    assert template["repeat_rule"] == "FREQ=WEEKLY;BYDAY=MO"
+    assert template["recurrence_parent_id"] is None
+    assert template["occurrence_date"] is None
+
+    # 读回保留 RRULE
+    fetched = (await client.get(f"/api/v1/tasks/{template['id']}")).json()
+    assert fetched["repeat_rule"] == "FREQ=WEEKLY;BYDAY=MO"
+
+    # 创建一条 override 实体:指回模板 + 标记发生点
+    override = (
+        await client.post(
+            "/api/v1/tasks",
+            json={
+                "list_id": str(list_id),
+                "title": "Weekly standup",
+                "recurrence_parent_id": template["id"],
+                "occurrence_date": "2026-06-15T01:00:00Z",
+            },
+        )
+    ).json()
+    assert override["recurrence_parent_id"] == template["id"]
+    assert override["occurrence_date"] is not None
+
+    # update 也能改 repeat_rule(截断系列等场景)
+    patched = (
+        await client.patch(
+            f"/api/v1/tasks/{template['id']}",
+            json={"repeat_rule": "FREQ=WEEKLY;BYDAY=MO;UNTIL=20260701T000000Z"},
+        )
+    ).json()
+    assert patched["repeat_rule"].endswith("UNTIL=20260701T000000Z")
+
+
+@pytest.mark.asyncio
 async def test_filter_by_list(client: AsyncClient) -> None:
     a = await _create_list(client, "A")
     b = await _create_list(client, "B")

@@ -91,85 +91,9 @@ class TaskRepository {
         payload: {'completed_at': completedAt?.toUtc().toIso8601String()},
       );
 
-      // 完成重复任务时生成下一实例
-      if (completed) await _maybeCreateNextRepeat(current);
+      // 注:重复系列「完成某次→实体化 override + 系列继续」的逻辑由 P1 的
+      // RecurrenceService 负责(见 dev_docs/recurring-tasks.md §3),不在此处理。
     });
-  }
-
-  Future<void> _maybeCreateNextRepeat(Task current) async {
-    final rule = current.repeatRule;
-    if (rule == null || rule.isEmpty) return;
-    final nextDue = _nextOccurrence(rule, current.dueAt);
-    if (nextDue == null) return;
-
-    DateTime? nextRemind;
-    if (current.remindAt != null && current.dueAt != null) {
-      final offset = current.remindAt!.difference(current.dueAt!);
-      nextRemind = nextDue.add(offset);
-    }
-
-    final nextId = newId();
-    await _db
-        .into(_db.tasks)
-        .insert(
-          TasksCompanion.insert(
-            id: nextId,
-            userId: _userId,
-            listId: current.listId,
-            title: current.title,
-            notes: Value(current.notes),
-            priority: Value(current.priority),
-            dueAt: Value(nextDue),
-            remindAt: Value(nextRemind),
-            repeatRule: Value(rule),
-            starred: Value(current.starred),
-          ),
-        );
-    await _outbox.enqueue(
-      entity: 'task',
-      op: 'upsert',
-      entityId: nextId,
-      baseVersion: 0,
-      payload: {
-        'list_id': current.listId,
-        'title': current.title,
-        'notes': current.notes,
-        'priority': current.priority,
-        'due_at': nextDue.toUtc().toIso8601String(),
-        'remind_at': nextRemind?.toUtc().toIso8601String(),
-        'repeat_rule': rule,
-        'starred': current.starred,
-      },
-    );
-  }
-
-  /// 支持的重复规则:DAILY / WEEKLY / MONTHLY / YEARLY。
-  static DateTime? _nextOccurrence(String rule, DateTime? from) {
-    final base = from ?? DateTime.now();
-    switch (rule.toUpperCase()) {
-      case 'DAILY':
-        return base.add(const Duration(days: 1));
-      case 'WEEKLY':
-        return base.add(const Duration(days: 7));
-      case 'MONTHLY':
-        return DateTime(
-          base.year,
-          base.month + 1,
-          base.day,
-          base.hour,
-          base.minute,
-        );
-      case 'YEARLY':
-        return DateTime(
-          base.year + 1,
-          base.month,
-          base.day,
-          base.hour,
-          base.minute,
-        );
-      default:
-        return null;
-    }
   }
 
   /// 局部更新任务字段。传入 `Value.absent()` 的字段保持不变。
