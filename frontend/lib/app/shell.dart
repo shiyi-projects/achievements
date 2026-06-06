@@ -5,6 +5,7 @@ import 'package:achievements/core/notifications/reminder_checker.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
+import 'package:achievements/core/update/update_checker.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/features/insights/insights_page.dart';
 import 'package:achievements/features/calendar/calendar_page.dart';
@@ -75,6 +76,19 @@ class AppShell extends ConsumerWidget {
         }
       });
     }
+
+    // 启动自动检查更新:有新版本时弹一次轻量提示,引导去「设置 → 检查更新」。
+    ref.listen(updateCheckProvider, (_, next) {
+      final info = next.valueOrNull;
+      if (info == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('发现新版本 v${info.version},可在「设置 → 检查更新」获取'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    });
 
     // Windows 端托盘/窗口监听器把 UI 意图丢到 shellCommandProvider,这里统一兑现。
     ref.listen<ShellCommand?>(shellCommandProvider, (_, cmd) {
@@ -245,11 +259,14 @@ class AppShell extends ConsumerWidget {
       useSafeArea: true,
       showDragHandle: true,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
+        initialChildSize: 0.92,
+        minChildSize: 0.5,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) => const TaskDetailPanel(),
+        // 把 sheet 的 scrollController 接进面板内部列表,拖拽与内容滚动统一,
+        // 不再各管各地打架。
+        builder: (context, scrollController) =>
+            TaskDetailPanel(scrollController: scrollController),
       ),
     );
     ref.read(selectedTaskIdProvider.notifier).clear();

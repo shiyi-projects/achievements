@@ -23,7 +23,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 const Duration _kDebounce = Duration(milliseconds: 600);
 
 class TaskDetailPanel extends ConsumerWidget {
-  const TaskDetailPanel({super.key});
+  const TaskDetailPanel({this.scrollController, super.key});
+
+  /// 窄屏 bottom sheet 传入 DraggableScrollableSheet 的控制器,使拖拽与内容滚动
+  /// 统一;桌面停靠时为 null,列表用自身控制器。
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,7 +37,7 @@ class TaskDetailPanel extends ConsumerWidget {
       error: (e, st) => Center(child: Text('加载失败: $e')),
       data: (task) {
         if (task == null) return const _EmptySelection();
-        return _TaskDetailForm(task: task);
+        return _TaskDetailForm(task: task, scrollController: scrollController);
       },
     );
   }
@@ -75,8 +79,9 @@ class _EmptySelection extends StatelessWidget {
 }
 
 class _TaskDetailForm extends ConsumerStatefulWidget {
-  const _TaskDetailForm({required this.task});
+  const _TaskDetailForm({required this.task, this.scrollController});
   final Task task;
+  final ScrollController? scrollController;
   @override
   ConsumerState<_TaskDetailForm> createState() => _TaskDetailFormState();
 }
@@ -274,6 +279,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                 // ── Content ──
                 Expanded(
                   child: ListView(
+                    controller: widget.scrollController,
                     padding: const EdgeInsets.fromLTRB(
                       Spacing.xl,
                       Spacing.base,
@@ -355,6 +361,8 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                       // 属性卡片
                       // ═════════════════════════════════════════
                       SurfaceCard(
+                        key: const PageStorageKey('detail-card-attrs'),
+                        collapsible: true,
                         icon: Icon(
                           Icons.tune_rounded,
                           size: 18,
@@ -388,6 +396,8 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                       // 时间 & 专注卡片
                       // ═════════════════════════════════════════
                       SurfaceCard(
+                        key: const PageStorageKey('detail-card-time'),
+                        collapsible: true,
                         icon: Icon(
                           Icons.schedule_rounded,
                           size: 18,
@@ -404,6 +414,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                               DueReminderField(
                                 dueAt: task.dueAt,
                                 remindAt: task.remindAt,
+                                repeatRule: task.repeatRule,
                               ),
                               _EstimatedDurationRow(
                                 estimatedMinutes: task.estimatedMinutes,

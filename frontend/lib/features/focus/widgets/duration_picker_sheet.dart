@@ -65,7 +65,7 @@ class _DurationPickerSheetState extends ConsumerState<DurationPickerSheet> {
           _PresetRow(
             presets: _workPresets,
             selected: _workMinutes,
-            unit: 'min',
+            unit: '分钟',
             onSelect: (v) => setState(() => _workMinutes = v),
           ),
           const SizedBox(height: Spacing.sm),
@@ -90,7 +90,7 @@ class _DurationPickerSheetState extends ConsumerState<DurationPickerSheet> {
           _PresetRow(
             presets: _breakPresets,
             selected: _breakMinutes,
-            unit: 'min',
+            unit: '分钟',
             onSelect: (v) => setState(() => _breakMinutes = v),
           ),
           const SizedBox(height: Spacing.sm),

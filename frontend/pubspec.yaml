@@ -1,7 +1,7 @@
 name: achievements
 description: Achievements - cross-platform Todo app (Windows + Android)
 publish_to: none
-version: 0.1.1+4
+version: 0.3.0+6
 environment:
   sdk: ^3.8.1
 
@@ -44,6 +44,9 @@ dependencies:
   timezone: ^0.10.0
   flutter_timezone: ^4.1.1
 
+  # ---- 重复任务规则(RFC5545 RRULE 展开)----
+  rrule: ^0.2.16
+
   # ---- 图表 / 动效 ----
   fl_chart: ^0.69.0
   flutter_animate: ^4.5.2
@@ -60,6 +63,9 @@ dependencies:
   intl: 0.20.2
   connectivity_plus: ^7.1.1
   calendar_date_picker2: ^3.0.0
+
+  # ---- 外部链接(浏览器跳转)----
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
@@ -91,6 +97,7 @@ flutter:
     - assets/app_icon.png
     - assets/icons/
     - assets/achievements_svg/
+    - assets/logos/
 
 flutter_launcher_icons:
   android: true

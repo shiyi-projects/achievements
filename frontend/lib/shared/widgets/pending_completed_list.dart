@@ -1,9 +1,6 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
-import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
-import 'package:achievements/data/repositories/task_repository.dart';
-import 'package:achievements/platform/android/haptic.dart';
-import 'package:achievements/shared/widgets/task_tile.dart';
+import 'package:achievements/shared/widgets/swipeable_task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,7 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// - 仅 completed -> 折叠区一开始展开
 /// - 两者都有 -> 上半 pending,下半 ExpansionTile("已完成 (N)")
 ///
-/// 在移动端:向右滑动 = 完成/恢复,向左滑动 = 删除(带触觉反馈)。
+/// 滑动手势由共享的 [SwipeableTaskTile] 提供(右滑完成/恢复,左滑删除)。
 class PendingCompletedList extends ConsumerWidget {
   const PendingCompletedList({
     required this.tasks,
@@ -68,7 +65,7 @@ class PendingCompletedList extends ConsumerWidget {
             ),
           ),
 
-        for (final t in pending) _SwipeableTaskTile(task: t, isPending: true),
+        for (final t in pending) SwipeableTaskTile(task: t, isPending: true),
 
         // ── Completed section ──
         if (completed.isNotEmpty)
@@ -96,123 +93,12 @@ class PendingCompletedList extends ConsumerWidget {
                 childrenPadding: EdgeInsets.zero,
                 children: [
                   for (final t in completed)
-                    _SwipeableTaskTile(task: t, isPending: false),
+                    SwipeableTaskTile(task: t, isPending: false),
                 ],
               ),
             ),
           ),
       ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Swipeable wrapper — 增强的滑动动画
-// ─────────────────────────────────────────────────────────────────────
-
-class _SwipeableTaskTile extends ConsumerWidget {
-  const _SwipeableTaskTile({required this.task, required this.isPending});
-
-  final Task task;
-  final bool isPending;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    final repo = ref.read(taskRepositoryProvider);
-
-    return Dismissible(
-      key: ValueKey(task.id),
-      // Right swipe: complete (pending) or restore (completed)
-      background: _SwipeBackground(
-        color: scheme.primaryContainer,
-        icon: isPending
-            ? AppIcons.svgIcon(AppIcons.completedStatus, size: 24)
-            : AppIcons.svgIcon(AppIcons.undo, size: 24),
-        label: isPending ? '完成' : '恢复',
-        alignment: Alignment.centerLeft,
-      ),
-      // Left swipe: delete
-      secondaryBackground: _SwipeBackground(
-        color: scheme.errorContainer,
-        icon: AppIcons.svgIcon(AppIcons.delete, size: 24),
-        label: '删除',
-        alignment: Alignment.centerRight,
-      ),
-      confirmDismiss: (direction) async {
-        if (direction == DismissDirection.startToEnd) {
-          // complete / restore
-          await Haptic.medium();
-          await repo.setCompleted(task.id, completed: isPending);
-          return false; // the list refreshes reactively; don't remove widget
-        } else {
-          // delete
-          await Haptic.heavy();
-          await repo.softDelete(task.id);
-          return false;
-        }
-      },
-      child: TaskTile(task: task),
-    );
-  }
-}
-
-class _SwipeBackground extends StatelessWidget {
-  const _SwipeBackground({
-    required this.color,
-    required this.icon,
-    required this.label,
-    required this.alignment,
-  });
-
-  final Color color;
-  final Widget icon;
-  final String label;
-  final Alignment alignment;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final isLeft = alignment == Alignment.centerLeft;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: Spacing.base,
-        vertical: Spacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(Radii.card),
-      ),
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!isLeft) ...[
-            Text(
-              label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: scheme.onErrorContainer,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(width: Spacing.sm),
-          ],
-          icon,
-          if (isLeft) ...[
-            const SizedBox(width: Spacing.sm),
-            Text(
-              label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: scheme.onPrimaryContainer,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

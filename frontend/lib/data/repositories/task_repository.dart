@@ -27,6 +27,8 @@ class TaskRepository {
     required String title,
     String? parentId,
     DateTime? dueAt,
+    DateTime? remindAt,
+    String? repeatRule,
     bool starred = false,
     int? estimatedMinutes,
   }) async {
@@ -42,6 +44,8 @@ class TaskRepository {
               title: title,
               parentId: Value(parentId),
               dueAt: Value(dueAt),
+              remindAt: Value(remindAt),
+              repeatRule: Value(repeatRule),
               starred: Value(starred),
               estimatedMinutes: Value(estimatedMinutes),
             ),
@@ -56,6 +60,8 @@ class TaskRepository {
           'title': title,
           'parent_id': parentId,
           'due_at': dueAt?.toUtc().toIso8601String(),
+          'remind_at': remindAt?.toUtc().toIso8601String(),
+          'repeat_rule': repeatRule,
           'starred': starred,
           'estimated_minutes': estimatedMinutes,
         },
@@ -91,85 +97,173 @@ class TaskRepository {
         payload: {'completed_at': completedAt?.toUtc().toIso8601String()},
       );
 
-      // 完成重复任务时生成下一实例
-      if (completed) await _maybeCreateNextRepeat(current);
+      // 注:重复系列某次的「完成 / 删除」走 setOccurrenceCompleted /
+      // deleteOccurrence(实体化 override),不经此普通完成路径。
     });
   }
 
-  Future<void> _maybeCreateNextRepeat(Task current) async {
-    final rule = current.repeatRule;
-    if (rule == null || rule.isEmpty) return;
-    final nextDue = _nextOccurrence(rule, current.dueAt);
-    if (nextDue == null) return;
+  // ----------------------------------------------------------------------
+  // 重复系列(模板 + 虚拟展开)。展开计算在 RecurrenceService;这里只管 DB 实体化。
+  // 见 dev_docs/recurring-tasks.md §3。
+  // ----------------------------------------------------------------------
 
-    DateTime? nextRemind;
-    if (current.remindAt != null && current.dueAt != null) {
-      final offset = current.remindAt!.difference(current.dueAt!);
-      nextRemind = nextDue.add(offset);
-    }
-
-    final nextId = newId();
-    await _db
-        .into(_db.tasks)
-        .insert(
-          TasksCompanion.insert(
-            id: nextId,
-            userId: _userId,
-            listId: current.listId,
-            title: current.title,
-            notes: Value(current.notes),
-            priority: Value(current.priority),
-            dueAt: Value(nextDue),
-            remindAt: Value(nextRemind),
-            repeatRule: Value(rule),
-            starred: Value(current.starred),
-          ),
-        );
-    await _outbox.enqueue(
-      entity: 'task',
-      op: 'upsert',
-      entityId: nextId,
-      baseVersion: 0,
-      payload: {
-        'list_id': current.listId,
-        'title': current.title,
-        'notes': current.notes,
-        'priority': current.priority,
-        'due_at': nextDue.toUtc().toIso8601String(),
-        'remind_at': nextRemind?.toUtc().toIso8601String(),
-        'repeat_rule': rule,
-        'starred': current.starred,
-      },
+  /// 监听所有重复「模板」:repeat_rule 非空、非 override、未软删。
+  /// 日历 / 提醒据此虚拟展开。
+  Stream<List<Task>> watchTemplates() {
+    return _watchWith(
+      (t) =>
+          t.userId.equals(_userId) &
+          t.deletedAt.isNull() &
+          t.recurrenceParentId.isNull() &
+          t.repeatRule.isNotNull(),
     );
   }
 
-  /// 支持的重复规则:DAILY / WEEKLY / MONTHLY / YEARLY。
-  static DateTime? _nextOccurrence(String rule, DateTime? from) {
-    final base = from ?? DateTime.now();
-    switch (rule.toUpperCase()) {
-      case 'DAILY':
-        return base.add(const Duration(days: 1));
-      case 'WEEKLY':
-        return base.add(const Duration(days: 7));
-      case 'MONTHLY':
-        return DateTime(
-          base.year,
-          base.month + 1,
-          base.day,
-          base.hour,
-          base.minute,
+  /// 监听所有与重复相关的行:模板(repeat_rule 非空)+ override(recurrence_parent_id
+  /// 非空)。**含软删 override**(EXDATE 跳过标记)。日历 / 提醒据此一次性展开,避免
+  /// 为每个模板各开一条流。模板的软删需调用方自行过滤。
+  Stream<List<Task>> watchRecurring() {
+    return (_db.select(_db.tasks)..where(
+          (t) =>
+              t.userId.equals(_userId) &
+              (t.repeatRule.isNotNull() | t.recurrenceParentId.isNotNull()),
+        ))
+        .watch();
+  }
+
+  /// 监听某模板的全部 override(**含软删** —— 软删 override 即 EXDATE 跳过标记)。
+  Stream<List<Task>> watchOverridesForTemplate(String templateId) {
+    return (_db.select(_db.tasks)..where(
+          (t) =>
+              t.userId.equals(_userId) &
+              t.recurrenceParentId.equals(templateId),
+        ))
+        .watch();
+  }
+
+  /// 取某模板的全部 override(含软删),供一次性合并展开。
+  Future<List<Task>> getOverridesForTemplate(String templateId) {
+    return (_db.select(_db.tasks)..where(
+          (t) =>
+              t.userId.equals(_userId) &
+              t.recurrenceParentId.equals(templateId),
+        ))
+        .get();
+  }
+
+  /// 完成 / 取消完成重复系列的某一次:把该发生点实体化为 override。
+  ///
+  /// override 主键用确定性 [occurrenceId],多端对同一次操作天然合并。提醒时间按
+  /// 模板的 remind-due 偏移继承到该次。
+  Future<void> setOccurrenceCompleted({
+    required Task template,
+    required DateTime occurrence,
+    required bool completed,
+  }) async {
+    await _upsertOverride(
+      template: template,
+      occurrence: occurrence,
+      completedAt: completed ? DateTime.now() : null,
+    );
+  }
+
+  /// 删除重复系列的某一次(EXDATE):实体化一条软删 override,展开时跳过该发生点。
+  Future<void> deleteOccurrence({
+    required Task template,
+    required DateTime occurrence,
+  }) async {
+    await _upsertOverride(
+      template: template,
+      occurrence: occurrence,
+      deletedAt: DateTime.now(),
+    );
+  }
+
+  /// 删除整个重复系列:软删模板及其全部 override。
+  Future<void> deleteSeries(String templateId) async {
+    await _db.transaction(() async {
+      final rows =
+          await (_db.select(_db.tasks)..where(
+                (t) =>
+                    t.userId.equals(_userId) &
+                    (t.id.equals(templateId) |
+                        t.recurrenceParentId.equals(templateId)),
+              ))
+              .get();
+      final now = DateTime.now();
+      for (final row in rows) {
+        if (row.deletedAt != null) continue;
+        await (_db.update(_db.tasks)..where((t) => t.id.equals(row.id))).write(
+          TasksCompanion(deletedAt: Value(now)),
         );
-      case 'YEARLY':
-        return DateTime(
-          base.year + 1,
-          base.month,
-          base.day,
-          base.hour,
-          base.minute,
+        await _outbox.enqueue(
+          entity: 'task',
+          op: 'delete',
+          entityId: row.id,
+          baseVersion: row.version,
+          payload: const {},
         );
-      default:
-        return null;
+      }
+    });
+  }
+
+  /// 实体化(或更新)某发生点的 override 行 + 入 outbox。completedAt / deletedAt
+  /// 任意组合:完成→completedAt 非空;取消完成→都为空;删某次→deletedAt 非空。
+  Future<void> _upsertOverride({
+    required Task template,
+    required DateTime occurrence,
+    DateTime? completedAt,
+    DateTime? deletedAt,
+  }) async {
+    final id = occurrenceId(template.id, occurrence);
+    DateTime? remindAt;
+    if (template.remindAt != null && template.dueAt != null) {
+      remindAt = occurrence.add(template.remindAt!.difference(template.dueAt!));
     }
+    await _db.transaction(() async {
+      final existing = await getById(id);
+      final now = DateTime.now();
+      await _db
+          .into(_db.tasks)
+          .insertOnConflictUpdate(
+            TasksCompanion.insert(
+              id: id,
+              userId: _userId,
+              listId: template.listId,
+              title: template.title,
+              notes: Value(template.notes),
+              priority: Value(template.priority),
+              dueAt: Value(occurrence),
+              remindAt: Value(remindAt),
+              starred: Value(template.starred),
+              recurrenceParentId: Value(template.id),
+              occurrenceDate: Value(occurrence),
+              completedAt: Value(completedAt),
+              deletedAt: Value(deletedAt),
+              updatedAt: Value(now),
+            ),
+          );
+      await _outbox.enqueue(
+        entity: 'task',
+        op: deletedAt != null ? 'delete' : 'upsert',
+        entityId: id,
+        baseVersion: existing?.version ?? 0,
+        payload: deletedAt != null
+            ? const {}
+            : {
+                'list_id': template.listId,
+                'title': template.title,
+                'notes': template.notes,
+                'priority': template.priority,
+                'due_at': occurrence.toUtc().toIso8601String(),
+                'remind_at': remindAt?.toUtc().toIso8601String(),
+                'starred': template.starred,
+                'recurrence_parent_id': template.id,
+                'occurrence_date': occurrence.toUtc().toIso8601String(),
+                'completed_at': completedAt?.toUtc().toIso8601String(),
+              },
+      );
+    });
   }
 
   /// 局部更新任务字段。传入 `Value.absent()` 的字段保持不变。
@@ -187,6 +281,7 @@ class TaskRepository {
     Value<int> priority = const Value.absent(),
     Value<String> listId = const Value.absent(),
     Value<int?> estimatedMinutes = const Value.absent(),
+    Value<String?> repeatRule = const Value.absent(),
   }) async {
     await _db.transaction(() async {
       final version =
@@ -207,6 +302,7 @@ class TaskRepository {
           priority: priority,
           listId: listId,
           estimatedMinutes: estimatedMinutes,
+          repeatRule: repeatRule,
         ),
       );
       final payload = <String, dynamic>{
@@ -220,6 +316,7 @@ class TaskRepository {
         if (listId.present) 'list_id': listId.value,
         if (estimatedMinutes.present)
           'estimated_minutes': estimatedMinutes.value,
+        if (repeatRule.present) 'repeat_rule': repeatRule.value,
       };
       if (payload.isEmpty) return;
       await _outbox.enqueue(

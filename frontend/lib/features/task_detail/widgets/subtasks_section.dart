@@ -75,7 +75,7 @@ class _SubtasksSectionState extends ConsumerState<SubtasksSection> {
                 Text('子任务', style: theme.textTheme.labelLarge),
               ],
             ),
-            error: (e, st) => Text('Failed to load: $e'),
+            error: (e, st) => Text('加载失败: $e'),
             data: (subs) {
               final total = subs.length;
               final done = subs.where((s) => s.completedAt != null).length;

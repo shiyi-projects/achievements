@@ -1,17 +1,22 @@
 import 'dart:async';
 
+import 'package:achievements/core/app_info.dart';
 import 'package:achievements/core/sync/sync_coordinator.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
+import 'package:achievements/core/update/update_checker.dart';
 import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:achievements/features/auth/auth_session.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
 import 'package:achievements/features/settings/providers/settings_providers.dart';
-import 'package:achievements/shared/widgets/surface_card.dart';
+import 'package:achievements/features/settings/widgets/settings_group.dart';
+import 'package:achievements/platform/android/keepalive_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// 显示设置页弹窗(桌面用 dialog,移动用 bottom sheet)。
 void showSettingsDialog(BuildContext context) {
@@ -48,7 +53,7 @@ class _SettingsDialog extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Main Settings Page
+// Main Settings Page — iOS 风格分组列表
 // ─────────────────────────────────────────────────────────────────────
 
 class SettingsPage extends ConsumerWidget {
@@ -80,31 +85,55 @@ class SettingsPage extends ConsumerWidget {
         data: (settings) => ListView(
           padding: const EdgeInsets.fromLTRB(
             Spacing.lg,
-            Spacing.sm,
+            0,
             Spacing.lg,
             Spacing.xl,
           ),
           children: [
-            const _SectionHeader('外观'),
-            SurfaceCard(
+            SettingsGroup(
+              title: '外观',
               children: [
                 _ThemeModeSection(current: settings.themeMode),
-                const SizedBox(height: Spacing.base),
                 _ColorSection(current: settings.seedColor),
               ],
             ),
-            if (defaultTargetPlatform == TargetPlatform.windows) ...[
-              const _SectionHeader('桌面'),
-              SurfaceCard(
+            if (defaultTargetPlatform == TargetPlatform.windows)
+              SettingsGroup(
+                title: '桌面',
                 children: [_CloseActionSection(current: settings.closeAction)],
               ),
-            ],
-            const _SectionHeader('同步'),
-            const SurfaceCard(children: [_SyncSection()]),
-            const _SectionHeader('关于'),
-            const SurfaceCard(
-              padding: EdgeInsets.symmetric(vertical: Spacing.xs),
-              children: [_AboutSection()],
+            if (defaultTargetPlatform == TargetPlatform.android)
+              const SettingsGroup(
+                title: '提醒与后台',
+                footer: '提醒由系统闹钟驱动,App 被后台清理也能到点提醒;为保证准时,建议关闭电池优化并允许自启动。',
+                children: [_KeepAliveSection()],
+              ),
+            const SettingsGroup(
+              title: '同步',
+              children: [
+                _SyncStatusTile(),
+                _SyncActionTile(),
+                _AccountSection(),
+              ],
+            ),
+            const SettingsGroup(
+              title: '关于',
+              children: [
+                _VersionTile(),
+                _CheckUpdateTile(),
+                _LinkTile(
+                  asset: AppIcons.github,
+                  tinted: true,
+                  label: 'GitHub',
+                  url: kGithubUrl,
+                ),
+                _LinkTile(
+                  asset: AppIcons.bilibili,
+                  label: '哔哩哔哩',
+                  url: kBilibiliUrl,
+                ),
+                _LicenseTile(),
+              ],
             ),
           ],
         ),
@@ -114,38 +143,7 @@ class SettingsPage extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Section header
-// ─────────────────────────────────────────────────────────────────────
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.xs,
-        Spacing.lg,
-        Spacing.xs,
-        Spacing.sm,
-      ),
-      child: Text(
-        title,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.primary,
-          letterSpacing: 1.1,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Theme mode
+// 外观:主题模式
 // ─────────────────────────────────────────────────────────────────────
 
 class _ThemeModeSection extends ConsumerWidget {
@@ -155,17 +153,12 @@ class _ThemeModeSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final notifier = ref.read(settingsNotifierProvider.notifier);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: Spacing.sm),
-          child: Text('主题模式', style: theme.textTheme.titleSmall),
-        ),
-        SegmentedButton<ThemeMode>(
+    return SettingsBlock(
+      label: '主题模式',
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<ThemeMode>(
           segments: const [
             ButtonSegment(
               value: ThemeMode.system,
@@ -186,13 +179,13 @@ class _ThemeModeSection extends ConsumerWidget {
           selected: {current},
           onSelectionChanged: (sel) => notifier.setThemeMode(sel.first),
         ),
-      ],
+      ),
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Seed color picker
+// 外观:主题色
 // ─────────────────────────────────────────────────────────────────────
 
 class _ColorSection extends ConsumerWidget {
@@ -205,64 +198,58 @@ class _ColorSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final notifier = ref.read(settingsNotifierProvider.notifier);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: Spacing.sm),
-          child: Text('主题色', style: theme.textTheme.titleSmall),
-        ),
-        Wrap(
-          spacing: Spacing.md,
-          runSpacing: Spacing.md,
-          children: kPresetColors.map((preset) {
-            final isSelected = current.toARGB32() == preset.color.toARGB32();
-            return Tooltip(
-              message: preset.name,
-              child: GestureDetector(
-                onTap: () => notifier.setSeedColor(preset.color),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: preset.color,
-                    shape: BoxShape.circle,
-                    border: isSelected
-                        ? Border.all(
-                            color: theme.colorScheme.onSurface,
-                            width: 2.5,
-                          )
-                        : null,
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: preset.color.withValues(alpha: 0.4),
-                              blurRadius: 8,
-                              spreadRadius: 1,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: isSelected
-                      ? Icon(
-                          Icons.check_rounded,
-                          size: 20,
-                          color:
-                              ThemeData.estimateBrightnessForColor(
-                                    preset.color,
-                                  ) ==
-                                  Brightness.dark
-                              ? Colors.white
-                              : Colors.black,
+    return SettingsBlock(
+      label: '主题色',
+      child: Wrap(
+        spacing: Spacing.md,
+        runSpacing: Spacing.md,
+        children: kPresetColors.map((preset) {
+          final isSelected = current.toARGB32() == preset.color.toARGB32();
+          return Tooltip(
+            message: preset.name,
+            child: GestureDetector(
+              onTap: () => notifier.setSeedColor(preset.color),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: preset.color,
+                  shape: BoxShape.circle,
+                  border: isSelected
+                      ? Border.all(
+                          color: theme.colorScheme.onSurface,
+                          width: 2.5,
                         )
                       : null,
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: preset.color.withValues(alpha: 0.4),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
                 ),
+                child: isSelected
+                    ? Icon(
+                        Icons.check_rounded,
+                        size: 20,
+                        color:
+                            ThemeData.estimateBrightnessForColor(
+                                  preset.color,
+                                ) ==
+                                Brightness.dark
+                            ? Colors.white
+                            : Colors.black,
+                      )
+                    : null,
               ),
-            );
-          }).toList(),
-        ),
-      ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }
@@ -278,26 +265,13 @@ class _CloseActionSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final notifier = ref.read(settingsNotifierProvider.notifier);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: Spacing.xs),
-          child: Text('关闭按钮行为', style: theme.textTheme.titleSmall),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: Spacing.sm),
-          child: Text(
-            '点击窗口右上角 X 时的默认动作',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        SegmentedButton<CloseAction>(
+    return SettingsBlock(
+      label: '关闭按钮行为',
+      description: '点击窗口右上角 X 时的默认动作',
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<CloseAction>(
           segments: const [
             ButtonSegment(
               value: CloseAction.minimizeToTray,
@@ -318,94 +292,173 @@ class _CloseActionSection extends ConsumerWidget {
           selected: {current},
           onSelectionChanged: (sel) => notifier.setCloseAction(sel.first),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 提醒与后台保活(Android)
+// ─────────────────────────────────────────────────────────────────────
+
+class _KeepAliveSection extends ConsumerStatefulWidget {
+  const _KeepAliveSection();
+
+  @override
+  ConsumerState<_KeepAliveSection> createState() => _KeepAliveSectionState();
+}
+
+class _KeepAliveSectionState extends ConsumerState<_KeepAliveSection>
+    with WidgetsBindingObserver {
+  bool? _ignoring; // null = 检测中
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 从系统设置页返回时重新检测豁免状态。
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final v = await ref
+        .read(keepAliveServiceProvider)
+        .isIgnoringBatteryOptimizations();
+    if (mounted) setState(() => _ignoring = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final service = ref.read(keepAliveServiceProvider);
+    final detecting = _ignoring == null;
+    final exempt = _ignoring ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── 电池优化豁免 ──
+        SettingsTile(
+          leading: exempt
+              ? Icons.battery_charging_full_rounded
+              : Icons.battery_alert_rounded,
+          leadingColor: exempt ? scheme.primary : scheme.error,
+          title: '电池优化豁免',
+          subtitle: detecting
+              ? '检测中…'
+              : exempt
+              ? '已豁免,提醒不会被省电策略掐断'
+              : '未豁免,后台可能延迟或拦截提醒',
+          trailing: exempt
+              ? Icon(Icons.check_circle_rounded, color: scheme.primary)
+              : FilledButton.tonal(
+                  onPressed: () async {
+                    await service.requestIgnoreBatteryOptimizations();
+                    // 返回后由 didChangeAppLifecycleState 刷新状态。
+                  },
+                  child: const Text('允许'),
+                ),
+        ),
+        const Divider(height: 1, indent: Spacing.base, endIndent: Spacing.base),
+        // ── 厂商自启动 ──
+        SettingsTile(
+          leading: Icons.restart_alt_rounded,
+          title: '自启动管理',
+          subtitle: '在系统里允许本应用自启动(部分品牌需手动开启)',
+          trailing: OutlinedButton(
+            onPressed: () async {
+              final ok = await service.openAutoStartSettings();
+              if (!ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('未能打开系统设置,请手动前往「设置」开启自启动')),
+                );
+              }
+            },
+            child: const Text('前往'),
+          ),
+        ),
       ],
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Sync (状态 + 上次同步 + 手动触发 + user_id)
+// 同步:状态 / 立即同步 / 账户
 // ─────────────────────────────────────────────────────────────────────
 
-class _SyncSection extends ConsumerWidget {
-  const _SyncSection();
+class _SyncStatusTile extends ConsumerWidget {
+  const _SyncStatusTile();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     final status = ref.watch(syncStatusControllerProvider);
-    final lastSyncAtAsync = ref.watch(lastSyncAtProvider);
-    final lastSyncAt = lastSyncAtAsync.valueOrNull;
-    final isSyncing = status == SyncStatus.syncing;
+    final lastSyncAt = ref.watch(lastSyncAtProvider).valueOrNull;
 
-    final (statusIcon, statusColor, statusText) = switch (status) {
+    final (icon, color, text) = switch (status) {
       SyncStatus.idle => (Icons.cloud_done_rounded, scheme.primary, '已同步'),
       SyncStatus.syncing => (Icons.cloud_sync_rounded, scheme.primary, '同步中…'),
       SyncStatus.error => (Icons.error_outline_rounded, scheme.error, '同步失败'),
       SyncStatus.offline => (Icons.cloud_off_rounded, scheme.outline, '离线'),
     };
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── 状态 + 上次同步 ──
-        Row(
-          children: [
-            Icon(statusIcon, color: statusColor, size: 20),
-            const SizedBox(width: Spacing.sm),
-            Text(
-              statusText,
-              style: theme.textTheme.titleSmall?.copyWith(color: statusColor),
-            ),
-            const Spacer(),
-            Text(
-              _formatLastSync(lastSyncAt),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: Spacing.md),
-
-        // ── 手动同步 ──
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.tonalIcon(
-            onPressed: isSyncing
-                ? null
-                : () => unawaited(
-                    ref.read(syncCoordinatorProvider).runFullSync(),
-                  ),
-            icon: isSyncing
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync_rounded, size: 18),
-            label: Text(isSyncing ? '同步中…' : '立即同步'),
-          ),
-        ),
-
-        const SizedBox(height: Spacing.base),
-
-        const _AccountSection(),
-      ],
+    return SettingsTile(
+      leading: icon,
+      leadingColor: color,
+      title: text,
+      titleColor: color,
+      value: _formatLastSync(lastSyncAt),
     );
   }
 
-  /// 把 ISO 时间格式化为"X 分钟前"。
+  /// 把时间格式化为"X 分钟前"。
   String _formatLastSync(DateTime? at) {
     if (at == null) return '从未同步';
     final diff = DateTime.now().difference(at);
-    if (diff.isNegative) return '刚刚';
-    if (diff.inSeconds < 60) return '刚刚';
+    if (diff.isNegative || diff.inSeconds < 60) return '刚刚';
     if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
     if (diff.inHours < 24) return '${diff.inHours} 小时前';
     if (diff.inDays < 7) return '${diff.inDays} 天前';
     return '${at.year}-${at.month.toString().padLeft(2, '0')}-${at.day.toString().padLeft(2, '0')}';
+  }
+}
+
+class _SyncActionTile extends ConsumerWidget {
+  const _SyncActionTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final isSyncing =
+        ref.watch(syncStatusControllerProvider) == SyncStatus.syncing;
+
+    return SettingsTile(
+      leading: isSyncing ? null : Icons.sync_rounded,
+      leadingColor: scheme.primary,
+      title: isSyncing ? '同步中…' : '立即同步',
+      titleColor: scheme.primary,
+      trailing: isSyncing
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : null,
+      onTap: isSyncing
+          ? null
+          : () => unawaited(ref.read(syncCoordinatorProvider).runFullSync()),
+    );
   }
 }
 
@@ -419,84 +472,84 @@ class _AccountSection extends ConsumerWidget {
       AuthAuthenticated(:final session) => session,
       _ => null,
     };
+    if (session == null) {
+      return const SettingsTile(
+        leading: Icons.person_off_rounded,
+        title: '未登录',
+      );
+    }
+
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    if (session == null) {
-      return Text('未登录', style: TextStyle(color: scheme.onSurfaceVariant));
-    }
     final nickname = session.profile.nickname?.trim();
     final avatarUrl = session.profile.avatarUrl?.trim();
     final avatarUri = avatarUrl == null ? null : Uri.tryParse(avatarUrl);
     final hasRemoteAvatar =
         avatarUri != null && avatarUri.hasScheme && avatarUri.hasAuthority;
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            CircleAvatar(
-              backgroundImage: hasRemoteAvatar
-                  ? NetworkImage(avatarUrl!)
-                  : null,
-              child: hasRemoteAvatar ? null : const Icon(Icons.person_rounded),
-            ),
-            const SizedBox(width: Spacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    nickname == null || nickname.isEmpty ? '微信用户' : nickname,
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  Text(
-                    'OLib #${session.olibUserId} · ${session.profile.role}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
+        // ── 账户头像 + 昵称 + 退出 ──
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.base,
+            vertical: Spacing.sm,
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundImage: hasRemoteAvatar
+                    ? NetworkImage(avatarUrl!)
+                    : null,
+                child: hasRemoteAvatar
+                    ? null
+                    : const Icon(Icons.person_rounded),
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nickname == null || nickname.isEmpty ? '微信用户' : nickname,
+                      style: theme.textTheme.bodyLarge,
                     ),
-                  ),
-                ],
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () async {
-                await ref.read(authControllerProvider.notifier).logout();
-                if (context.mounted) Navigator.of(context).maybePop();
-              },
-              icon: const Icon(Icons.logout_rounded, size: 18),
-              label: const Text('退出'),
-            ),
-          ],
-        ),
-        const SizedBox(height: Spacing.sm),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                session.appUserId,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontFamily: 'monospace',
-                  color: scheme.onSurfaceVariant,
+                    Text(
+                      'OLib #${session.olibUserId} · ${session.profile.role}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.copy_rounded, size: 20),
-              tooltip: '复制 Achievements 用户 ID',
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: session.appUserId));
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('已复制到剪贴板'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-          ],
+              TextButton.icon(
+                onPressed: () async {
+                  await ref.read(authControllerProvider.notifier).logout();
+                  if (context.mounted) Navigator.of(context).maybePop();
+                },
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text('退出'),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, indent: Spacing.base, endIndent: Spacing.base),
+        // ── 用户 ID(可复制) ──
+        SettingsTile(
+          title: session.appUserId,
+          trailing: const Icon(Icons.copy_rounded, size: 20),
+          onTap: () async {
+            await Clipboard.setData(ClipboardData(text: session.appUserId));
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('已复制到剪贴板'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -504,34 +557,160 @@ class _AccountSection extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// About
+// 关于
 // ─────────────────────────────────────────────────────────────────────
 
-class _AboutSection extends StatelessWidget {
-  const _AboutSection();
+class _VersionTile extends StatelessWidget {
+  const _VersionTile();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.info_outline_rounded),
-          title: const Text('版本'),
-          trailing: Text(
-            '0.0.1',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+    return SettingsTile(
+      leading: Icons.info_outline_rounded,
+      title: '版本',
+      subtitle: 'by $kAuthor',
+      value: 'v$kAppVersion',
+    );
+  }
+}
+
+class _CheckUpdateTile extends ConsumerStatefulWidget {
+  const _CheckUpdateTile();
+
+  @override
+  ConsumerState<_CheckUpdateTile> createState() => _CheckUpdateTileState();
+}
+
+class _CheckUpdateTileState extends ConsumerState<_CheckUpdateTile> {
+  bool _checking = false;
+
+  Future<void> _checkUpdate() async {
+    setState(() => _checking = true);
+    final info = await ref.read(updateCheckerProvider).check();
+    if (!mounted) return;
+    setState(() => _checking = false);
+    if (info == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已是最新版本(或暂时无法连接 GitHub)')));
+    } else {
+      await _showUpdateDialog(info);
+    }
+  }
+
+  Future<void> _showUpdateDialog(UpdateInfo info) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.system_update_rounded),
+        title: Text('发现新版本 v${info.version}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('前往下载页面获取最新版:'),
+            const SizedBox(height: Spacing.sm),
+            SelectableText(info.url, style: Theme.of(ctx).textTheme.bodySmall),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('稍后'),
           ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.description_outlined),
-          title: const Text('开源许可'),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => showLicensePage(context: context),
-        ),
-      ],
+          FilledButton.tonal(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: info.url));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('下载链接已复制')));
+            },
+            child: const Text('复制链接'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsTile(
+      leading: _checking ? null : Icons.system_update_rounded,
+      title: '检查更新',
+      trailing: _checking
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : null,
+      showChevron: !_checking,
+      onTap: _checking ? null : _checkUpdate,
+    );
+  }
+}
+
+/// 一行外链(点击调系统默认浏览器打开)。打开失败时回退到复制链接并提示。
+///
+/// [tinted] 为 true 时把单色 SVG 着成主题色(GitHub 纯黑标志在深色模式需跟随主题);
+/// 否则保留品牌原色(如哔哩哔哩品牌蓝)。
+class _LinkTile extends StatelessWidget {
+  const _LinkTile({
+    required this.asset,
+    required this.label,
+    required this.url,
+    this.tinted = false,
+  });
+
+  final String asset;
+  final String label;
+  final String url;
+  final bool tinted;
+
+  Future<void> _open(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    var opened = false;
+    try {
+      opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      opened = false;
+    }
+    if (opened) return;
+    // 回退:打不开浏览器就复制链接,并明确告知用户(不静默失败)。
+    await Clipboard.setData(ClipboardData(text: url));
+    messenger.showSnackBar(SnackBar(content: Text('未能打开浏览器,$label 链接已复制')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsTile(
+      leadingWidget: AppIcons.svgIcon(
+        asset,
+        size: 20,
+        color: tinted ? Theme.of(context).colorScheme.onSurfaceVariant : null,
+      ),
+      title: label,
+      subtitle: url,
+      trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+      onTap: () => _open(context),
+    );
+  }
+}
+
+class _LicenseTile extends StatelessWidget {
+  const _LicenseTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsTile(
+      leading: Icons.description_outlined,
+      title: '开源许可',
+      showChevron: true,
+      onTap: () => showLicensePage(context: context),
     );
   }
 }

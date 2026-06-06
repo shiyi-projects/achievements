@@ -71,8 +71,12 @@ class Sidebar extends ConsumerWidget {
           rootLists.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
           // ── 顶部导航:系统清单 + 视图入口合并,按使用频次从高到低排列 ──
-          // 系统清单相对顺序: 今天 > 收件箱 > 计划 > 重要 > 全部 > 已完成 > 回收站
-          // 视图入口插入位置: 日历(随计划)、专注(居中)、成就(靠归档)
+          // 导航收敛(见 dev_docs/recurring-tasks.md §8.1):
+          // - 「计划」并入日历——日历虚拟展开重复任务,已完整覆盖「未来有排期」语义,
+          //   故从侧边栏隐藏 planned(DB/同步不动)。
+          // - 「重要」改为列表内 ⭐ 筛选开关(P5),亦从侧边栏隐藏。
+          // 系统清单相对顺序: 今天 > 收件箱 > 全部 > 已完成 > 回收站
+          // 视图入口插入位置: 日历(替代计划位置)、专注(居中)、成就(靠归档)
           SidebarTile? systemTile(SystemListKind kind) {
             final list = systemByKind[kind.value];
             if (list == null) return null;
@@ -90,14 +94,12 @@ class Sidebar extends ConsumerWidget {
           final topNav = <Widget?>[
             systemTile(SystemListKind.today),
             systemTile(SystemListKind.inbox),
-            systemTile(SystemListKind.planned),
             ViewNavTile(
               icon: AppIcons.svgIcon(AppIcons.calendar),
               label: '日历',
               selected: currentView == AppView.calendar,
               onTap: viewNotifier.showCalendar,
             ),
-            systemTile(SystemListKind.important),
             ViewNavTile(
               icon: AppIcons.svgIcon(AppIcons.focusTimer),
               label: '专注',
