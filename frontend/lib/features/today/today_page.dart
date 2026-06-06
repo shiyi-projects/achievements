@@ -7,7 +7,7 @@ import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:achievements/shared/widgets/empty_state.dart';
 import 'package:achievements/shared/widgets/quick_create_input.dart';
-import 'package:achievements/shared/widgets/task_tile.dart';
+import 'package:achievements/shared/widgets/swipeable_task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -40,21 +40,41 @@ class TodayPage extends ConsumerWidget {
           ),
         ),
         QuickCreateInput(
-          hint: '添加今日任务…',
+          hint: '添加今日任务…(试试「每天9点 吃药」)',
           onSubmit: (title) => _createForToday(ref, title),
+          onSubmitCapture: (r) => _createForToday(
+            ref,
+            r.title,
+            dueAt: r.dueAt,
+            remindAt: r.remindAt,
+            repeatRule: r.repeatRuleBody,
+          ),
         ),
       ],
     );
   }
 
-  Future<void> _createForToday(WidgetRef ref, String title) async {
+  Future<void> _createForToday(
+    WidgetRef ref,
+    String title, {
+    DateTime? dueAt,
+    DateTime? remindAt,
+    String? repeatRule,
+  }) async {
     final inbox = await ref.read(inboxListProvider.future);
     if (inbox == null) return;
     final now = DateTime.now();
-    final due = DateTime(now.year, now.month, now.day, 23, 59);
+    // 今日页默认落今天;自然语言解析出日期则用解析值。
+    final due = dueAt ?? DateTime(now.year, now.month, now.day, 23, 59);
     await ref
         .read(taskRepositoryProvider)
-        .createTask(listId: inbox.id, title: title, dueAt: due);
+        .createTask(
+          listId: inbox.id,
+          title: title,
+          dueAt: due,
+          remindAt: remindAt,
+          repeatRule: repeatRule,
+        );
   }
 }
 
@@ -101,7 +121,8 @@ class _TodayBody extends StatelessWidget {
             ),
             SliverList.builder(
               itemCount: pending.length,
-              itemBuilder: (_, i) => TaskTile(task: pending[i]),
+              itemBuilder: (_, i) =>
+                  SwipeableTaskTile(task: pending[i], isPending: true),
             ),
           ],
           if (completed.isNotEmpty)
@@ -143,7 +164,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// Completed 折叠区。children 是普通 TaskTile(非 ListView),
+/// Completed 折叠区。children 是 SwipeableTaskTile(非 ListView),
 /// 可安全放在 SliverToBoxAdapter 里。
 class _CompletedSection extends StatelessWidget {
   const _CompletedSection({
@@ -179,7 +200,9 @@ class _CompletedSection extends StatelessWidget {
             ),
           ),
           childrenPadding: EdgeInsets.zero,
-          children: [for (final t in tasks) TaskTile(task: t)],
+          children: [
+            for (final t in tasks) SwipeableTaskTile(task: t, isPending: false),
+          ],
         ),
       ),
     );
