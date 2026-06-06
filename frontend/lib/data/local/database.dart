@@ -69,20 +69,26 @@ class AppDatabase extends _$AppDatabase {
         }
         // v7 -> v8：Tasks 增加预估时长列 + 新增专注计划表。
         if (from < 8) {
-          await customStatement(
+          await _addColumnIfAbsent(
+            'tasks',
+            'estimated_minutes',
             'ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER',
           );
           await m.createTable(focusPlans);
         }
         // v8 → v9：FocusPlans 秒级精度 + Tasks 累计专注时长。
         if (from < 9) {
-          await customStatement(
-            'ALTER TABLE focus_plans RENAME COLUMN actual_minutes TO actual_seconds',
-          );
-          await customStatement(
-            'UPDATE focus_plans SET actual_seconds = actual_seconds * 60',
-          );
-          await customStatement(
+          if (await _columnExists('focus_plans', 'actual_minutes')) {
+            await customStatement(
+              'ALTER TABLE focus_plans RENAME COLUMN actual_minutes TO actual_seconds',
+            );
+            await customStatement(
+              'UPDATE focus_plans SET actual_seconds = actual_seconds * 60',
+            );
+          }
+          await _addColumnIfAbsent(
+            'tasks',
+            'focused_seconds',
             'ALTER TABLE tasks ADD COLUMN focused_seconds INTEGER NOT NULL DEFAULT 0',
           );
         }
@@ -92,15 +98,35 @@ class AppDatabase extends _$AppDatabase {
         // recurrence_parent_id:override 指回模板;occurrence_date:对应发生点。
         // datetime 默认存为 unix 秒(INTEGER)。详见 dev_docs/recurring-tasks.md。
         if (from < 11) {
-          await customStatement(
+          await _addColumnIfAbsent(
+            'tasks',
+            'recurrence_parent_id',
             'ALTER TABLE tasks ADD COLUMN recurrence_parent_id TEXT',
           );
-          await customStatement(
+          await _addColumnIfAbsent(
+            'tasks',
+            'occurrence_date',
             'ALTER TABLE tasks ADD COLUMN occurrence_date INTEGER',
           );
         }
       },
     );
+  }
+
+  /// 查询某表是否已存在某列(走 PRAGMA table_info)。
+  Future<bool> _columnExists(String table, String column) async {
+    final rows = await customSelect('PRAGMA table_info($table)').get();
+    return rows.any((r) => r.data['name'] == column);
+  }
+
+  /// 幂等加列:列已存在则跳过。避免迁移因中途回滚 / 重跑触发「duplicate column」。
+  Future<void> _addColumnIfAbsent(
+    String table,
+    String column,
+    String ddl,
+  ) async {
+    if (await _columnExists(table, column)) return;
+    await customStatement(ddl);
   }
 
   Future<void> _createSystemKindUniqueIndex() async {
