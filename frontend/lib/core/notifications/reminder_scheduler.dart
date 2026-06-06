@@ -5,12 +5,14 @@ import 'package:achievements/core/notifications/notification_service.dart';
 import 'package:achievements/core/recurrence/recurrence_service.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'reminder_scheduler.g.dart';
 
 /// 一条期望排程的提醒(纯数据,供 reconcile 计算与单测)。
+@immutable
 class ScheduledReminder {
   const ScheduledReminder({
     required this.id,
@@ -25,6 +27,18 @@ class ScheduledReminder {
   final String title;
   final String? body;
   final String payload;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ScheduledReminder &&
+      other.id == id &&
+      other.when == when &&
+      other.title == title &&
+      other.body == body &&
+      other.payload == payload;
+
+  @override
+  int get hashCode => Object.hash(id, when, title, body, payload);
 }
 
 /// 监听任务流,reconcile 本地通知排程。两条数据源:
@@ -55,27 +69,35 @@ class ReminderScheduler {
   /// 每个模板最多排程的发生点数(防御 Android pending 通知上限)。
   static const int _maxPerTemplate = 40;
 
+  /// 流连续触发(增删改一次任务常同时触动两条流)时合并 reconcile 的去抖时长。
+  static const Duration _debounceDelay = Duration(milliseconds: 250);
+
   StreamSubscription<List<Task>>? _reminderSub;
   StreamSubscription<List<Task>>? _recurringSub;
+  Timer? _debounce;
 
   List<Task> _activeReminders = const [];
   List<Task> _recurringRows = const [];
-  Set<int> _scheduledIds = const <int>{};
+
+  /// 当前已排程的通知:id → 内容。用于增量 reconcile(只动新增/变化/消失的)。
+  Map<int, ScheduledReminder> _scheduled = const {};
 
   void start() {
     _reminderSub?.cancel();
     _recurringSub?.cancel();
     _reminderSub = _tasks.watchTasksWithActiveReminders().listen((rows) {
       _activeReminders = rows;
-      unawaited(_reconcile());
+      _scheduleReconcile();
     });
     _recurringSub = _tasks.watchRecurring().listen((rows) {
       _recurringRows = rows;
-      unawaited(_reconcile());
+      _scheduleReconcile();
     });
   }
 
   Future<void> stop() async {
+    _debounce?.cancel();
+    _debounce = null;
     await _reminderSub?.cancel();
     await _recurringSub?.cancel();
     _reminderSub = null;
@@ -83,9 +105,16 @@ class ReminderScheduler {
     await _notifications.cancelAll();
     _activeReminders = const [];
     _recurringRows = const [];
-    _scheduledIds = const <int>{};
+    _scheduled = const {};
   }
 
+  void _scheduleReconcile() {
+    _debounce?.cancel();
+    _debounce = Timer(_debounceDelay, () => unawaited(_reconcile()));
+  }
+
+  /// 增量 reconcile:只对**新增 / 内容变化**的发生点重排,对**消失**的取消,其余跳过。
+  /// 避免任一任务增删改时全量重排(几十~上百次跨 channel 调用)造成卡顿。
   Future<void> _reconcile() async {
     final desired = computeSchedule(
       activeReminders: _activeReminders,
@@ -93,22 +122,25 @@ class ReminderScheduler {
       now: DateTime.now(),
       recurrence: _recurrence,
     );
-    final next = <int>{};
+    final next = {for (final r in desired) r.id: r};
+
+    // 新增或内容变化 → schedule(覆盖)
     for (final r in desired) {
-      next.add(r.id);
-      await _notifications.schedule(
-        id: r.id,
-        when: r.when,
-        title: r.title,
-        body: r.body,
-        payload: r.payload,
-      );
+      if (_scheduled[r.id] != r) {
+        await _notifications.schedule(
+          id: r.id,
+          when: r.when,
+          title: r.title,
+          body: r.body,
+          payload: r.payload,
+        );
+      }
     }
-    // 上轮排过但本轮不再需要的 → cancel
-    for (final stale in _scheduledIds.difference(next)) {
-      await _notifications.cancel(stale);
+    // 本轮不再需要的 → cancel
+    for (final id in _scheduled.keys) {
+      if (!next.containsKey(id)) await _notifications.cancel(id);
     }
-    _scheduledIds = next;
+    _scheduled = next;
   }
 
   /// 纯计算:根据普通提醒任务与重复行,算出期望排程的提醒列表。无副作用,可单测。
