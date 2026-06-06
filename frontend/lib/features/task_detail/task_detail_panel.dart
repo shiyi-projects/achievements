@@ -404,6 +404,7 @@ class _TaskDetailFormState extends ConsumerState<_TaskDetailForm> {
                               DueReminderField(
                                 dueAt: task.dueAt,
                                 remindAt: task.remindAt,
+                                repeatRule: task.repeatRule,
                               ),
                               _EstimatedDurationRow(
                                 estimatedMinutes: task.estimatedMinutes,

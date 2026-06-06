@@ -1,13 +1,19 @@
+import 'package:achievements/core/recurrence/recurrence_rule_draft.dart';
 import 'package:achievements/core/theme/app_colors.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/features/task_detail/widgets/date_helpers.dart';
+import 'package:achievements/features/task_detail/widgets/recurrence_picker_sheet.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// 把 RRULE 主体串转成简短中文摘要;无法解析的复杂规则回退为「重复」。
+String recurrenceSummary(String body) =>
+    RecurrenceRuleDraft.fromRuleBody(body)?.describe() ?? '重复';
 
 /// 「截止日期 + 提醒」合并入口。
 ///
@@ -17,11 +23,13 @@ class DueReminderField extends StatelessWidget {
   const DueReminderField({
     required this.dueAt,
     required this.remindAt,
+    this.repeatRule,
     super.key,
   });
 
   final DateTime? dueAt;
   final DateTime? remindAt;
+  final String? repeatRule;
 
   void _openSheet(BuildContext context) {
     showModalBottomSheet<void>(
@@ -112,6 +120,15 @@ class DueReminderField extends StatelessWidget {
                 Icon(Icons.notifications_rounded, size: 16, color: fg),
                 const SizedBox(width: Spacing.xs),
                 Text(formatDateTimeCn(remindAt!), style: labelStyle),
+              ],
+              if (repeatRule != null && repeatRule!.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                  child: Text('·', style: labelStyle),
+                ),
+                Icon(Icons.repeat_rounded, size: 16, color: fg),
+                const SizedBox(width: Spacing.xs),
+                Text(recurrenceSummary(repeatRule!), style: labelStyle),
               ],
             ],
           ),
@@ -235,6 +252,37 @@ class _DueReminderSheetState extends ConsumerState<_DueReminderSheet> {
     }
   }
 
+  Future<void> _editRecurrence(Task task) async {
+    final body = await showRecurrencePicker(
+      context,
+      initialBody: task.repeatRule,
+    );
+    if (body == null || !mounted) return; // 取消
+    if (body.isEmpty) {
+      await _repo.update(
+        task.id,
+        knownVersion: task.version,
+        repeatRule: const Value(null),
+      );
+      return;
+    }
+    // 重复需要 DTSTART 锚点(dueAt)。若未设,落到今天终点作为系列起点。
+    final dueAt = task.dueAt == null
+        ? Value(_endOfToday())
+        : const Value<DateTime?>.absent();
+    await _repo.update(
+      task.id,
+      knownVersion: task.version,
+      repeatRule: Value(body),
+      dueAt: dueAt,
+    );
+  }
+
+  static DateTime _endOfToday() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, 23, 59);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -337,6 +385,29 @@ class _DueReminderSheetState extends ConsumerState<_DueReminderSheet> {
                       ),
                     )
                   : const SizedBox.shrink(),
+            ),
+
+            Divider(
+              height: Spacing.lg,
+              color: scheme.outlineVariant.withValues(alpha: 0.4),
+            ),
+
+            // ── 重复 ──
+            _SettingRow(
+              icon: Icons.repeat_rounded,
+              label: '重复',
+              valueLabel:
+                  (task.repeatRule != null && task.repeatRule!.isNotEmpty)
+                  ? recurrenceSummary(task.repeatRule!)
+                  : null,
+              onTap: () => _editRecurrence(task),
+              onClear: (task.repeatRule != null && task.repeatRule!.isNotEmpty)
+                  ? () => _repo.update(
+                      task.id,
+                      knownVersion: task.version,
+                      repeatRule: const Value(null),
+                    )
+                  : null,
             ),
           ],
         ),

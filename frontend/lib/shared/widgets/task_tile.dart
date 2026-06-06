@@ -302,6 +302,15 @@ class _TaskTileState extends ConsumerState<TaskTile>
         ),
       );
     }
+    final repeatRule = widget.task.repeatRule;
+    if (repeatRule != null && repeatRule.isNotEmpty) {
+      items.add(
+        Padding(
+          padding: const EdgeInsets.only(left: Spacing.sm),
+          child: Icon(Icons.repeat_rounded, size: 16, color: scheme.outline),
+        ),
+      );
+    }
     if (widget.task.starred) {
       items.add(
         Padding(

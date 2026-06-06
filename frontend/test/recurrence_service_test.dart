@@ -1,4 +1,5 @@
 import 'package:achievements/core/id.dart';
+import 'package:achievements/core/recurrence/recurrence_rule_draft.dart';
 import 'package:achievements/core/recurrence/recurrence_service.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -122,6 +123,26 @@ void main() {
         to: DateTime(2026, 6, 5),
       );
       expect(dates, isEmpty);
+    });
+  });
+
+  group('draft 与 expand 跨模块一致性', () {
+    test('draft 的 UNTIL 喂给 expand 不偏移一天(墙钟时间系一致)', () {
+      final draft = RecurrenceRuleDraft(
+        freq: RecurrenceFreq.daily,
+        endMode: RecurrenceEndMode.until,
+        until: DateTime(2026, 7, 1),
+      );
+      final dates = svc.expand(
+        rule: draft.toRuleBody(),
+        dtStart: DateTime(2026, 6, 28, 9),
+        from: DateTime(2026, 6, 28),
+        to: DateTime(2026, 7, 10),
+      );
+      // 应含 7/1,不含 7/2(UNTIL 当日终点截断),且不被时区偏移成 6/30。
+      expect(dates.last, DateTime(2026, 7, 1, 9));
+      expect(dates.map((d) => d.day), contains(1));
+      expect(dates.every((d) => !d.isAfter(DateTime(2026, 7, 1, 9))), isTrue);
     });
   });
 
