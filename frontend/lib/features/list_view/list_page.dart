@@ -12,8 +12,13 @@ import 'package:achievements/state/selected_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// 通用清单视图(System.{inbox/important/planned/all/completed/trash} 与
-/// 用户自定义清单共用)。
+/// 当前清单是否只看星标(⭐ 筛选开关)。
+///
+/// 「重要」系统清单从侧边栏收敛后(见 dev_docs/recurring-tasks.md §8.1),改由此
+/// 开关在**任意清单内**就地筛选星标任务,语义更通用。
+final listStarFilterProvider = StateProvider<bool>((ref) => false);
+
+/// 通用清单视图(System.{inbox/planned/all/completed/trash} 与用户自定义清单共用)。
 ///
 /// 搜索由全局 Ctrl+K 命令面板承担,本页不再嵌入 inline 搜索栏。
 class ListPage extends ConsumerWidget {
@@ -27,6 +32,7 @@ class ListPage extends ConsumerWidget {
       data: (list) => list,
       orElse: () => null,
     );
+    final starOnly = ref.watch(listStarFilterProvider);
 
     final canQuickCreate =
         current != null &&
@@ -41,6 +47,7 @@ class ListPage extends ConsumerWidget {
 
     return Column(
       children: [
+        if (!isTrash) const _StarFilterBar(),
         Expanded(
           child: RefreshIndicator(
             onRefresh: () => ref.read(syncCoordinatorProvider).runFullSync(),
@@ -52,16 +59,22 @@ class ListPage extends ConsumerWidget {
                   child: Text('加载失败: $e'),
                 ),
               ),
-              data: (tasks) => isTrash
-                  ? _TrashList(tasks: tasks)
-                  : PendingCompletedList(
-                      tasks: tasks,
-                      emptyState: EmptyState(
-                        icon: AppIcons.svgIcon(AppIcons.inbox, size: 36),
-                        title: '还没有任务',
-                        subtitle: '从下方输入框创建，或从其他清单移入。',
-                      ),
-                    ),
+              data: (tasks) {
+                if (isTrash) return _TrashList(tasks: tasks);
+                final shown = starOnly
+                    ? tasks.where((t) => t.starred).toList()
+                    : tasks;
+                return PendingCompletedList(
+                  tasks: shown,
+                  emptyState: EmptyState(
+                    icon: AppIcons.svgIcon(AppIcons.inbox, size: 36),
+                    title: starOnly ? '没有星标任务' : '还没有任务',
+                    subtitle: starOnly
+                        ? '点亮任务的 ⭐ 即可在这里聚焦。'
+                        : '从下方输入框创建，或从其他清单移入。',
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -73,8 +86,55 @@ class ListPage extends ConsumerWidget {
             onSubmit: (title) => ref
                 .read(taskRepositoryProvider)
                 .createTask(listId: current.id, title: title),
+            onSubmitCapture: (r) => ref
+                .read(taskRepositoryProvider)
+                .createTask(
+                  listId: current.id,
+                  title: r.title,
+                  dueAt: r.dueAt,
+                  remindAt: r.remindAt,
+                  repeatRule: r.repeatRuleBody,
+                ),
           ),
       ],
+    );
+  }
+}
+
+/// 列表顶部的 ⭐ 仅星标筛选条。
+class _StarFilterBar extends ConsumerWidget {
+  const _StarFilterBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final starOnly = ref.watch(listStarFilterProvider);
+    final theme = Theme.of(context);
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          Spacing.base,
+          Spacing.xs,
+          Spacing.base,
+          0,
+        ),
+        child: FilterChip(
+          visualDensity: VisualDensity.compact,
+          avatar: Icon(
+            starOnly ? Icons.star_rounded : Icons.star_outline_rounded,
+            size: 16,
+            color: starOnly
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline,
+          ),
+          label: const Text('仅星标'),
+          labelStyle: theme.textTheme.labelMedium,
+          selected: starOnly,
+          showCheckmark: false,
+          onSelected: (v) =>
+              ref.read(listStarFilterProvider.notifier).state = v,
+        ),
+      ),
     );
   }
 }

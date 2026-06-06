@@ -142,3 +142,18 @@ P0→P4 是重复功能主链；P5 是独立体验项。每阶段遵循 `dart fo
 - **列表分段重复代码**：Today/List/Trash 三处重复的「待完成+已完成」分段抽成统一组件。
 - **自然语言捕获**：`RuleCaptureParser`（本地规则）解析「每周一9点交周报」→ `due_at`+`remind_at`+
   RRULE；`CaptureParser` 接口 + provider 留 AI 升级接缝；预览 chip 可撤销。
+
+## 9. 实施落地记录
+
+- **P0–P4**：核心重复功能全链路打通,前后端测试齐备。
+- **P5**:
+  - 「重要」从侧边栏收敛为**任意清单内的 ⭐ 仅星标筛选开关**(`listStarFilterProvider`)。
+  - 自然语言捕获落地:`lib/core/capture/`,集成进底部 `QuickCreateInput`(预览 chip),
+    覆盖 中文「每天/每周X/工作日/每N单位/相对日期/时间」。
+  - 列表分段重构:抽出共享 `SwipeableTaskTile`,顺带**修复今天页此前用裸 TaskTile
+    无滑动手势**的历史不一致(与清单页语义对齐:右滑完成、左滑删除)。
+- **已知后续(留接缝,未做)**:
+  - 操作语义「本次及以后修改/停止」(§3,UNTIL 截断 + 另起模板)。
+  - 选择器尚不能编辑 BYMONTHDAY / 带序号 BYDAY(如「每月最后一天」「每月第二个周二」);
+    存储/展开层已支持,`RecurrenceRuleDraft.fromRuleBody` 对这类规则回退为只读不丢数据。
+  - 后端 RRULE 合法性校验(当前仅存字符串,展开/校验在客户端)。

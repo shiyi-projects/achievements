@@ -1,37 +1,40 @@
+import 'package:achievements/core/capture/capture_parser.dart';
+import 'package:achievements/core/recurrence/recurrence_rule_draft.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
+import 'package:achievements/features/task_detail/widgets/date_helpers.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 底部快速创建任务输入框。
 ///
-/// 仅负责呈现 + 收集输入,创建任务的副作用由调用方在 [onSubmit] 里完成
-/// (拿到去空后的 title 字符串)。空字符串会被吞掉,不触发回调。
+/// 仅负责呈现 + 收集输入。创建副作用由调用方完成:
+/// - 提供 [onSubmitCapture] 时,启用**自然语言捕获**——实时解析输入里的
+///   日期 / 时间 / 重复词,在输入框上方显示可见的预览 chip,提交时回传
+///   结构化 [CaptureResult]。
+/// - 否则回退到 [onSubmit],只拿去空后的 title 字符串。
 ///
-/// 样式遵循 ui_design_spec §7.1:
-///   - surfaceContainerHigh 背景
-///   - add_circle_outline 前缀图标
-///   - 16px 圆角
-///
-/// 美化:
-///   - 获取焦点时容器上浮(translateY) + 阴影增加
-///   - 发送按钮有/无文字时颜色过渡
-///   - 提交成功后短暂 ✓ 反馈
-class QuickCreateInput extends StatefulWidget {
+/// 空字符串会被吞掉,不触发回调。样式遵循 ui_design_spec §7.1。
+class QuickCreateInput extends ConsumerStatefulWidget {
   const QuickCreateInput({
     required this.onSubmit,
+    this.onSubmitCapture,
     this.hint = '添加任务…',
     super.key,
   });
 
   final Future<void> Function(String title) onSubmit;
+
+  /// 提供时启用自然语言捕获,回传解析后的结构化结果。
+  final Future<void> Function(CaptureResult result)? onSubmitCapture;
   final String hint;
 
   @override
-  State<QuickCreateInput> createState() => _QuickCreateInputState();
+  ConsumerState<QuickCreateInput> createState() => _QuickCreateInputState();
 }
 
-class _QuickCreateInputState extends State<QuickCreateInput>
+class _QuickCreateInputState extends ConsumerState<QuickCreateInput>
     with SingleTickerProviderStateMixin {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
@@ -39,6 +42,7 @@ class _QuickCreateInputState extends State<QuickCreateInput>
   bool _showSuccess = false;
   bool _hasFocus = false;
   bool _hasText = false;
+  CaptureResult? _preview;
 
   @override
   void initState() {
@@ -61,8 +65,19 @@ class _QuickCreateInputState extends State<QuickCreateInput>
   }
 
   void _onTextChange() {
-    final has = _controller.text.trim().isNotEmpty;
-    if (has != _hasText) setState(() => _hasText = has);
+    final text = _controller.text.trim();
+    final has = text.isNotEmpty;
+    CaptureResult? preview;
+    if (widget.onSubmitCapture != null && has) {
+      final parsed = ref.read(captureParserProvider).parse(text);
+      if (parsed.hasMeta) preview = parsed;
+    }
+    if (has != _hasText || preview != _preview) {
+      setState(() {
+        _hasText = has;
+        _preview = preview;
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -70,8 +85,14 @@ class _QuickCreateInputState extends State<QuickCreateInput>
     if (raw.isEmpty || _submitting) return;
     setState(() => _submitting = true);
     try {
-      await widget.onSubmit(raw);
+      final capture = widget.onSubmitCapture;
+      if (capture != null) {
+        await capture(ref.read(captureParserProvider).parse(raw));
+      } else {
+        await widget.onSubmit(raw);
+      }
       _controller.clear();
+      _preview = null;
       // 短暂显示成功反馈
       setState(() => _showSuccess = true);
       await Future<void>.delayed(MotionDurations.bouncy);
@@ -124,98 +145,155 @@ class _QuickCreateInputState extends State<QuickCreateInput>
             Spacing.sm,
             Spacing.sm,
           ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(Radii.card),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: Spacing.xs),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: Spacing.sm),
-                  child: AnimatedRotation(
-                    turns: _hasFocus ? 0.125 : 0, // 45° 旋转
-                    duration: MotionDurations.fast,
-                    curve: MotionCurves.bouncySpring,
-                    child: AppIcons.svgIcon(AppIcons.add, size: 22),
-                  ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_preview != null) _CapturePreview(result: _preview!),
+              Container(
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(Radii.card),
                 ),
-                const SizedBox(width: Spacing.sm),
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    enabled: !_submitting,
-                    onSubmitted: (_) => _submit(),
-                    textInputAction: TextInputAction.done,
-                    style: theme.textTheme.bodyMedium,
-                    decoration: InputDecoration(
-                      hintText: widget.hint,
-                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.outline,
-                      ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      fillColor: Colors.transparent,
-                      filled: false,
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: Spacing.md,
+                padding: const EdgeInsets.symmetric(horizontal: Spacing.xs),
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: Spacing.sm),
+                      child: AnimatedRotation(
+                        turns: _hasFocus ? 0.125 : 0, // 45° 旋转
+                        duration: MotionDurations.fast,
+                        curve: MotionCurves.bouncySpring,
+                        child: AppIcons.svgIcon(AppIcons.add, size: 22),
                       ),
                     ),
-                  ),
-                ),
-                if (_submitting)
-                  const Padding(
-                    padding: EdgeInsets.all(Spacing.sm),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                else
-                  AnimatedSwitcher(
-                    duration: MotionDurations.fast,
-                    transitionBuilder: (child, anim) =>
-                        ScaleTransition(scale: anim, child: child),
-                    child: _showSuccess
-                        ? IconButton(
-                            key: const ValueKey('success'),
-                            icon: AppIcons.svgIcon(
-                              AppIcons.completedStatus,
-                              size: 20,
-                            ),
-                            onPressed: null,
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.green.shade400.withValues(
-                                alpha: 0.15,
-                              ),
-                              shape: const CircleBorder(),
-                              padding: const EdgeInsets.all(Spacing.sm),
-                              minimumSize: const Size(34, 34),
-                            ),
-                          )
-                        : IconButton(
-                            key: const ValueKey('send'),
-                            icon: AppIcons.svgIcon(AppIcons.send, size: 20),
-                            onPressed: _submit,
-                            tooltip: '创建',
-                            style: IconButton.styleFrom(
-                              backgroundColor: _hasText
-                                  ? scheme.primaryContainer
-                                  : Colors.transparent,
-                              shape: const CircleBorder(),
-                              padding: const EdgeInsets.all(Spacing.sm),
-                              minimumSize: const Size(34, 34),
-                            ),
+                    const SizedBox(width: Spacing.sm),
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        enabled: !_submitting,
+                        onSubmitted: (_) => _submit(),
+                        textInputAction: TextInputAction.done,
+                        style: theme.textTheme.bodyMedium,
+                        decoration: InputDecoration(
+                          hintText: widget.hint,
+                          hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.outline,
                           ),
-                  ),
-              ],
-            ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          fillColor: Colors.transparent,
+                          filled: false,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: Spacing.md,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_submitting)
+                      const Padding(
+                        padding: EdgeInsets.all(Spacing.sm),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    else
+                      AnimatedSwitcher(
+                        duration: MotionDurations.fast,
+                        transitionBuilder: (child, anim) =>
+                            ScaleTransition(scale: anim, child: child),
+                        child: _showSuccess
+                            ? IconButton(
+                                key: const ValueKey('success'),
+                                icon: AppIcons.svgIcon(
+                                  AppIcons.completedStatus,
+                                  size: 20,
+                                ),
+                                onPressed: null,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.green.shade400
+                                      .withValues(alpha: 0.15),
+                                  shape: const CircleBorder(),
+                                  padding: const EdgeInsets.all(Spacing.sm),
+                                  minimumSize: const Size(34, 34),
+                                ),
+                              )
+                            : IconButton(
+                                key: const ValueKey('send'),
+                                icon: AppIcons.svgIcon(AppIcons.send, size: 20),
+                                onPressed: _submit,
+                                tooltip: '创建',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: _hasText
+                                      ? scheme.primaryContainer
+                                      : Colors.transparent,
+                                  shape: const CircleBorder(),
+                                  padding: const EdgeInsets.all(Spacing.sm),
+                                  minimumSize: const Size(34, 34),
+                                ),
+                              ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 自然语言捕获的预览条:展示解析出的日期 / 提醒 / 重复,提交即应用。
+class _CapturePreview extends StatelessWidget {
+  const _CapturePreview({required this.result});
+
+  final CaptureResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final chips = <Widget>[];
+
+    void chip(IconData icon, String label) {
+      chips.add(
+        Chip(
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          avatar: Icon(icon, size: 14, color: scheme.primary),
+          label: Text(label),
+          labelStyle: theme.textTheme.labelSmall?.copyWith(
+            color: scheme.primary,
+          ),
+          backgroundColor: scheme.primaryContainer.withValues(alpha: 0.4),
+          side: BorderSide.none,
+        ),
+      );
+    }
+
+    if (result.repeatRuleBody != null) {
+      final summary =
+          RecurrenceRuleDraft.fromRuleBody(
+            result.repeatRuleBody!,
+          )?.describe() ??
+          '重复';
+      chip(Icons.repeat_rounded, summary);
+    }
+    if (result.remindAt != null) {
+      chip(Icons.notifications_rounded, formatDateTimeCn(result.remindAt!));
+    } else if (result.dueAt != null) {
+      chip(Icons.event_rounded, formatDateCn(result.dueAt!));
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: Spacing.xs, left: Spacing.xs),
+        child: Wrap(spacing: Spacing.xs, children: chips),
       ),
     );
   }
