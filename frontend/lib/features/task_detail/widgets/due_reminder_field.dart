@@ -160,100 +160,32 @@ const _timePresets = <(String, int, int)>[
   ('20:00', 20, 0),
 ];
 
-class _ScheduleSheet extends ConsumerStatefulWidget {
+DateTime _endOfToday() {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day, 23, 59);
+}
+
+Task? _currentTask(WidgetRef ref) => ref.read(currentTaskProvider).valueOrNull;
+
+/// 排期面板。各子区块按字段**精确订阅**(Riverpod select),点提醒只重建提醒区、
+/// 点日期才重建日历——避免任一编辑都重绘开销大的内嵌日历造成的卡顿。
+class _ScheduleSheet extends ConsumerWidget {
   const _ScheduleSheet();
 
   @override
-  ConsumerState<_ScheduleSheet> createState() => _ScheduleSheetState();
-}
-
-class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
-  TaskRepository get _repo => ref.read(taskRepositoryProvider);
-
-  static DateTime _endOfToday() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, 23, 59);
-  }
-
-  void _setDueDate(Task task, DateTime date) {
-    final prev = task.dueAt;
-    final h = prev?.hour ?? 23;
-    final m = prev?.minute ?? 59;
-    _repo.update(
-      task.id,
-      knownVersion: task.version,
-      dueAt: Value(DateTime(date.year, date.month, date.day, h, m)),
-    );
-  }
-
-  void _setDueTime(Task task, int hour, int minute) {
-    final base = task.dueAt ?? DateTime.now();
-    _repo.update(
-      task.id,
-      knownVersion: task.version,
-      dueAt: Value(DateTime(base.year, base.month, base.day, hour, minute)),
-    );
-  }
-
-  Future<void> _pickCustomTime(Task task) async {
-    final initial = TimeOfDay.fromDateTime(task.dueAt ?? DateTime.now());
-    final t = await showTimePicker(context: context, initialTime: initial);
-    if (t == null || !mounted) return;
-    _setDueTime(task, t.hour, t.minute);
-  }
-
-  void _clearDue(Task task) {
-    _repo.update(
-      task.id,
-      knownVersion: task.version,
-      dueAt: const Value(null),
-      remindAt: const Value(null),
-    );
-  }
-
-  void _setReminderOffset(Task task, Duration off) {
-    final due = task.dueAt ?? _endOfToday();
-    _repo.update(
-      task.id,
-      knownVersion: task.version,
-      dueAt: Value(due),
-      remindAt: Value(due.subtract(off)),
-    );
-  }
-
-  void _toggleReminder(Task task, {required bool enable}) {
-    if (enable) {
-      _setReminderOffset(task, Duration.zero);
-    } else {
-      _repo.update(
-        task.id,
-        knownVersion: task.version,
-        remindAt: const Value(null),
-      );
-    }
-  }
-
-  CalendarDatePicker2Config _calendarConfig(ColorScheme scheme) {
-    return CalendarDatePicker2Config(
-      calendarType: CalendarDatePicker2Type.single,
-      firstDayOfWeek: 1,
-      selectedDayHighlightColor: scheme.primary,
-      weekdayLabels: const ['日', '一', '二', '三', '四', '五', '六'],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final task = ref.watch(currentTaskProvider).valueOrNull;
-    if (task == null) return const SizedBox.shrink();
+    final taskId = ref.watch(
+      currentTaskProvider.select((a) => a.valueOrNull?.id),
+    );
+    if (taskId == null) return const SizedBox.shrink();
+    final initialRule = ref.read(currentTaskProvider).valueOrNull?.repeatRule;
 
-    final due = task.dueAt;
-    final hasReminder = task.remindAt != null;
-    final currentOffset = (due != null && task.remindAt != null)
-        ? due.difference(task.remindAt!)
-        : null;
+    Divider divider() => Divider(
+      height: Spacing.xl,
+      color: scheme.outlineVariant.withValues(alpha: 0.4),
+    );
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -275,112 +207,250 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
                   ),
                 ),
                 const Spacer(),
-                if (due != null)
-                  TextButton.icon(
-                    onPressed: () => _clearDue(task),
-                    icon: const Icon(Icons.close_rounded, size: 16),
-                    label: const Text('清除'),
-                  ),
+                _DueClearButton(taskId: taskId),
               ],
             ),
             const SizedBox(height: Spacing.xs),
-
-            // ── 内嵌日历 ──
-            CalendarDatePicker2(
-              config: _calendarConfig(scheme),
-              value: [if (due != null) due],
-              onValueChanged: (dates) {
-                final first = dates.isNotEmpty ? dates.first : null;
-                if (first != null) _setDueDate(task, first);
-              },
-            ),
-
+            _DueCalendar(taskId: taskId),
             const SizedBox(height: Spacing.xs),
-            // ── 截止时间 ──
             _Label(text: '截止时间', scheme: scheme),
-            Wrap(
-              spacing: Spacing.sm,
-              children: [
-                for (final (label, h, m) in _timePresets)
-                  ChoiceChip(
-                    label: Text(label),
-                    selected: due != null && due.hour == h && due.minute == m,
-                    onSelected: due == null
-                        ? null
-                        : (_) => _setDueTime(task, h, m),
-                  ),
-                ActionChip(
-                  avatar: const Icon(Icons.schedule_rounded, size: 16),
-                  label: Text(
-                    due != null &&
-                            !_timePresets.any(
-                              (p) => due.hour == p.$2 && due.minute == p.$3,
-                            )
-                        ? '${due.hour.toString().padLeft(2, '0')}:'
-                              '${due.minute.toString().padLeft(2, '0')}'
-                        : '自定义',
-                  ),
-                  onPressed: due == null ? null : () => _pickCustomTime(task),
-                ),
-              ],
-            ),
-
-            Divider(
-              height: Spacing.xl,
-              color: scheme.outlineVariant.withValues(alpha: 0.4),
-            ),
-
-            // ── 提醒 ──
-            Row(
-              children: [
-                Icon(
-                  Icons.notifications_outlined,
-                  size: 20,
-                  color: hasReminder ? scheme.primary : scheme.outline,
-                ),
-                const SizedBox(width: Spacing.md),
-                Text('提醒', style: theme.textTheme.bodyLarge),
-                const Spacer(),
-                Switch(
-                  value: hasReminder,
-                  onChanged: (v) => _toggleReminder(task, enable: v),
-                ),
-              ],
-            ),
-            if (hasReminder) ...[
-              const SizedBox(height: Spacing.xs),
-              Wrap(
-                spacing: Spacing.sm,
-                children: [
-                  for (final (label, off) in _reminderOffsets)
-                    ChoiceChip(
-                      label: Text(label),
-                      selected: currentOffset == off,
-                      onSelected: (_) => _setReminderOffset(task, off),
-                    ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: Spacing.xs),
-                child: Text(
-                  '提醒时间:${formatDateTimeCn(task.remindAt!)}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.outline,
-                  ),
-                ),
-              ),
-            ],
-
-            Divider(
-              height: Spacing.xl,
-              color: scheme.outlineVariant.withValues(alpha: 0.4),
-            ),
-
-            // ── 重复(独立有状态区块:本地草稿 + debounce 写库,连点间隔不重建日历)──
-            _RecurrenceSection(taskId: task.id, initialRule: task.repeatRule),
+            _TimeChips(taskId: taskId),
+            divider(),
+            _ReminderBlock(taskId: taskId),
+            divider(),
+            _RecurrenceSection(taskId: taskId, initialRule: initialRule),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 「清除排期」按钮:仅订阅「是否有截止日」。
+class _DueClearButton extends ConsumerWidget {
+  const _DueClearButton({required this.taskId});
+  final String taskId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasDue = ref.watch(
+      currentTaskProvider.select((a) => a.valueOrNull?.dueAt != null),
+    );
+    if (!hasDue) return const SizedBox.shrink();
+    return TextButton.icon(
+      onPressed: () {
+        final t = _currentTask(ref);
+        if (t == null) return;
+        ref
+            .read(taskRepositoryProvider)
+            .update(
+              t.id,
+              knownVersion: t.version,
+              dueAt: const Value(null),
+              remindAt: const Value(null),
+            );
+      },
+      icon: const Icon(Icons.close_rounded, size: 16),
+      label: const Text('清除'),
+    );
+  }
+}
+
+/// 内嵌日历:仅订阅截止日的「日期」部分(时分变化不重建)。
+class _DueCalendar extends ConsumerWidget {
+  const _DueCalendar({required this.taskId});
+  final String taskId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final dueDay = ref.watch(
+      currentTaskProvider.select((a) {
+        final d = a.valueOrNull?.dueAt;
+        return d == null ? null : DateTime(d.year, d.month, d.day);
+      }),
+    );
+    return CalendarDatePicker2(
+      config: CalendarDatePicker2Config(
+        calendarType: CalendarDatePicker2Type.single,
+        firstDayOfWeek: 1,
+        selectedDayHighlightColor: scheme.primary,
+        weekdayLabels: const ['日', '一', '二', '三', '四', '五', '六'],
+      ),
+      value: [if (dueDay != null) dueDay],
+      onValueChanged: (dates) {
+        final first = dates.isNotEmpty ? dates.first : null;
+        if (first == null) return;
+        final t = _currentTask(ref);
+        if (t == null) return;
+        final prev = t.dueAt;
+        final h = prev?.hour ?? 23;
+        final m = prev?.minute ?? 59;
+        ref
+            .read(taskRepositoryProvider)
+            .update(
+              t.id,
+              knownVersion: t.version,
+              dueAt: Value(DateTime(first.year, first.month, first.day, h, m)),
+            );
+      },
+    );
+  }
+}
+
+/// 截止时间快捷 chip:仅订阅 dueAt。
+class _TimeChips extends ConsumerStatefulWidget {
+  const _TimeChips({required this.taskId});
+  final String taskId;
+
+  @override
+  ConsumerState<_TimeChips> createState() => _TimeChipsState();
+}
+
+class _TimeChipsState extends ConsumerState<_TimeChips> {
+  void _setTime(int hour, int minute) {
+    final t = _currentTask(ref);
+    if (t == null) return;
+    final base = t.dueAt ?? DateTime.now();
+    ref
+        .read(taskRepositoryProvider)
+        .update(
+          t.id,
+          knownVersion: t.version,
+          dueAt: Value(DateTime(base.year, base.month, base.day, hour, minute)),
+        );
+  }
+
+  Future<void> _pickCustom(DateTime? due) async {
+    final initial = TimeOfDay.fromDateTime(due ?? DateTime.now());
+    final picked = await showTimePicker(context: context, initialTime: initial);
+    if (picked == null || !mounted) return;
+    _setTime(picked.hour, picked.minute);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final due = ref.watch(
+      currentTaskProvider.select((a) => a.valueOrNull?.dueAt),
+    );
+    final isCustom =
+        due != null &&
+        !_timePresets.any((p) => due.hour == p.$2 && due.minute == p.$3);
+    return Wrap(
+      spacing: Spacing.sm,
+      children: [
+        for (final (label, h, m) in _timePresets)
+          ChoiceChip(
+            label: Text(label),
+            selected: due != null && due.hour == h && due.minute == m,
+            onSelected: due == null ? null : (_) => _setTime(h, m),
+          ),
+        ActionChip(
+          avatar: const Icon(Icons.schedule_rounded, size: 16),
+          label: Text(
+            isCustom
+                ? '${due.hour.toString().padLeft(2, '0')}:'
+                      '${due.minute.toString().padLeft(2, '0')}'
+                : '自定义',
+          ),
+          onPressed: due == null ? null : () => _pickCustom(due),
+        ),
+      ],
+    );
+  }
+}
+
+/// 提醒区块:仅订阅 (dueAt, remindAt)。点提醒 chip 只重建本区,不碰日历。
+class _ReminderBlock extends ConsumerWidget {
+  const _ReminderBlock({required this.taskId});
+  final String taskId;
+
+  void _setOffset(WidgetRef ref, Duration off) {
+    final t = _currentTask(ref);
+    if (t == null) return;
+    final due = t.dueAt ?? _endOfToday();
+    ref
+        .read(taskRepositoryProvider)
+        .update(
+          t.id,
+          knownVersion: t.version,
+          dueAt: Value(due),
+          remindAt: Value(due.subtract(off)),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final rec = ref.watch(
+      currentTaskProvider.select((a) {
+        final t = a.valueOrNull;
+        return (due: t?.dueAt, remind: t?.remindAt);
+      }),
+    );
+    final hasReminder = rec.remind != null;
+    final currentOffset = (rec.due != null && rec.remind != null)
+        ? rec.due!.difference(rec.remind!)
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.notifications_outlined,
+              size: 20,
+              color: hasReminder ? scheme.primary : scheme.outline,
+            ),
+            const SizedBox(width: Spacing.md),
+            Text('提醒', style: theme.textTheme.bodyLarge),
+            const Spacer(),
+            Switch(
+              value: hasReminder,
+              onChanged: (v) {
+                if (v) {
+                  _setOffset(ref, Duration.zero);
+                } else {
+                  final t = _currentTask(ref);
+                  if (t == null) return;
+                  ref
+                      .read(taskRepositoryProvider)
+                      .update(
+                        t.id,
+                        knownVersion: t.version,
+                        remindAt: const Value(null),
+                      );
+                }
+              },
+            ),
+          ],
+        ),
+        if (hasReminder) ...[
+          const SizedBox(height: Spacing.xs),
+          Wrap(
+            spacing: Spacing.sm,
+            children: [
+              for (final (label, off) in _reminderOffsets)
+                ChoiceChip(
+                  label: Text(label),
+                  selected: currentOffset == off,
+                  onSelected: (_) => _setOffset(ref, off),
+                ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: Spacing.xs),
+            child: Text(
+              '提醒时间:${formatDateTimeCn(rec.remind!)}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.outline,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
