@@ -198,23 +198,14 @@ class _ScheduleSheet extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Text(
-                  '排期',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                _DueClearButton(taskId: taskId),
-              ],
+            Text(
+              '排期',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            const SizedBox(height: Spacing.xs),
-            _DueCalendar(taskId: taskId),
-            const SizedBox(height: Spacing.xs),
-            _Label(text: '截止时间', scheme: scheme),
-            _TimeChips(taskId: taskId),
+            const SizedBox(height: Spacing.sm),
+            _DueSection(taskId: taskId),
             divider(),
             _ReminderBlock(taskId: taskId),
             divider(),
@@ -226,32 +217,178 @@ class _ScheduleSheet extends ConsumerWidget {
   }
 }
 
-/// 「清除排期」按钮:仅订阅「是否有截止日」。
-class _DueClearButton extends ConsumerWidget {
-  const _DueClearButton({required this.taskId});
+/// 截止日 + 截止时间区块。
+///
+/// 默认紧凑:一行「今天/明天/本周末/选日期」快捷 + 截止时间 chip。大日历**默认收起**,
+/// 点「选日期」才就地展开(非弹窗),避免常驻占地 + 选「每周」时被 sheet 改尺寸连带重绘。
+class _DueSection extends ConsumerStatefulWidget {
+  const _DueSection({required this.taskId});
   final String taskId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final hasDue = ref.watch(
-      currentTaskProvider.select((a) => a.valueOrNull?.dueAt != null),
+  ConsumerState<_DueSection> createState() => _DueSectionState();
+}
+
+class _DueSectionState extends ConsumerState<_DueSection> {
+  bool _calendarOpen = false;
+
+  static bool _sameDay(DateTime? a, DateTime b) =>
+      a != null && a.year == b.year && a.month == b.month && a.day == b.day;
+
+  void _setDate(DateTime date) {
+    final t = _currentTask(ref);
+    if (t == null) return;
+    final prev = t.dueAt;
+    final h = prev?.hour ?? 23;
+    final m = prev?.minute ?? 59;
+    ref
+        .read(taskRepositoryProvider)
+        .update(
+          t.id,
+          knownVersion: t.version,
+          dueAt: Value(DateTime(date.year, date.month, date.day, h, m)),
+        );
+  }
+
+  void _setTime(int hour, int minute) {
+    final t = _currentTask(ref);
+    if (t == null) return;
+    final base = t.dueAt ?? DateTime.now();
+    ref
+        .read(taskRepositoryProvider)
+        .update(
+          t.id,
+          knownVersion: t.version,
+          dueAt: Value(DateTime(base.year, base.month, base.day, hour, minute)),
+        );
+  }
+
+  Future<void> _pickCustomTime(DateTime? due) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(due ?? DateTime.now()),
     );
-    if (!hasDue) return const SizedBox.shrink();
-    return TextButton.icon(
-      onPressed: () {
-        final t = _currentTask(ref);
-        if (t == null) return;
-        ref
-            .read(taskRepositoryProvider)
-            .update(
-              t.id,
-              knownVersion: t.version,
-              dueAt: const Value(null),
-              remindAt: const Value(null),
-            );
-      },
-      icon: const Icon(Icons.close_rounded, size: 16),
-      label: const Text('清除'),
+    if (picked == null || !mounted) return;
+    _setTime(picked.hour, picked.minute);
+  }
+
+  void _clear() {
+    final t = _currentTask(ref);
+    if (t == null) return;
+    ref
+        .read(taskRepositoryProvider)
+        .update(
+          t.id,
+          knownVersion: t.version,
+          dueAt: const Value(null),
+          remindAt: const Value(null),
+        );
+    setState(() => _calendarOpen = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final due = ref.watch(
+      currentTaskProvider.select((a) => a.valueOrNull?.dueAt),
+    );
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final weekend = today.add(
+      Duration(days: (DateTime.saturday - today.weekday) % 7),
+    );
+    final isCustomTime =
+        due != null &&
+        !_timePresets.any((p) => due.hour == p.$2 && due.minute == p.$3);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            _Label(text: '截止日', scheme: scheme),
+            const Spacer(),
+            if (due != null)
+              TextButton.icon(
+                onPressed: _clear,
+                icon: const Icon(Icons.close_rounded, size: 16),
+                label: const Text('清除'),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+          ],
+        ),
+        // ── 日期快捷 + 展开日历 ──
+        Wrap(
+          spacing: Spacing.sm,
+          children: [
+            ChoiceChip(
+              label: const Text('今天'),
+              selected: _sameDay(due, today),
+              onSelected: (_) => _setDate(today),
+            ),
+            ChoiceChip(
+              label: const Text('明天'),
+              selected: _sameDay(due, tomorrow),
+              onSelected: (_) => _setDate(tomorrow),
+            ),
+            ChoiceChip(
+              label: const Text('本周末'),
+              selected: _sameDay(due, weekend),
+              onSelected: (_) => _setDate(weekend),
+            ),
+            ActionChip(
+              avatar: Icon(
+                _calendarOpen ? Icons.expand_less_rounded : Icons.event_rounded,
+                size: 16,
+              ),
+              label: Text(
+                due != null &&
+                        !_sameDay(due, today) &&
+                        !_sameDay(due, tomorrow) &&
+                        !_sameDay(due, weekend)
+                    ? formatDateCn(due)
+                    : '选日期',
+              ),
+              onPressed: () => setState(() => _calendarOpen = !_calendarOpen),
+            ),
+          ],
+        ),
+        // ── 内嵌日历(默认收起;RepaintBoundary 隔离重绘)──
+        if (_calendarOpen)
+          Padding(
+            padding: const EdgeInsets.only(top: Spacing.xs),
+            child: RepaintBoundary(child: _DueCalendar(taskId: widget.taskId)),
+          ),
+
+        const SizedBox(height: Spacing.sm),
+        _Label(text: '截止时间', scheme: scheme),
+        Wrap(
+          spacing: Spacing.sm,
+          children: [
+            for (final (label, h, m) in _timePresets)
+              ChoiceChip(
+                label: Text(label),
+                selected: due != null && due.hour == h && due.minute == m,
+                onSelected: due == null ? null : (_) => _setTime(h, m),
+              ),
+            ActionChip(
+              avatar: const Icon(Icons.schedule_rounded, size: 16),
+              label: Text(
+                isCustomTime
+                    ? '${due.hour.toString().padLeft(2, '0')}:'
+                          '${due.minute.toString().padLeft(2, '0')}'
+                    : '自定义',
+              ),
+              onPressed: due == null ? null : () => _pickCustomTime(due),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -294,68 +431,6 @@ class _DueCalendar extends ConsumerWidget {
               dueAt: Value(DateTime(first.year, first.month, first.day, h, m)),
             );
       },
-    );
-  }
-}
-
-/// 截止时间快捷 chip:仅订阅 dueAt。
-class _TimeChips extends ConsumerStatefulWidget {
-  const _TimeChips({required this.taskId});
-  final String taskId;
-
-  @override
-  ConsumerState<_TimeChips> createState() => _TimeChipsState();
-}
-
-class _TimeChipsState extends ConsumerState<_TimeChips> {
-  void _setTime(int hour, int minute) {
-    final t = _currentTask(ref);
-    if (t == null) return;
-    final base = t.dueAt ?? DateTime.now();
-    ref
-        .read(taskRepositoryProvider)
-        .update(
-          t.id,
-          knownVersion: t.version,
-          dueAt: Value(DateTime(base.year, base.month, base.day, hour, minute)),
-        );
-  }
-
-  Future<void> _pickCustom(DateTime? due) async {
-    final initial = TimeOfDay.fromDateTime(due ?? DateTime.now());
-    final picked = await showTimePicker(context: context, initialTime: initial);
-    if (picked == null || !mounted) return;
-    _setTime(picked.hour, picked.minute);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final due = ref.watch(
-      currentTaskProvider.select((a) => a.valueOrNull?.dueAt),
-    );
-    final isCustom =
-        due != null &&
-        !_timePresets.any((p) => due.hour == p.$2 && due.minute == p.$3);
-    return Wrap(
-      spacing: Spacing.sm,
-      children: [
-        for (final (label, h, m) in _timePresets)
-          ChoiceChip(
-            label: Text(label),
-            selected: due != null && due.hour == h && due.minute == m,
-            onSelected: due == null ? null : (_) => _setTime(h, m),
-          ),
-        ActionChip(
-          avatar: const Icon(Icons.schedule_rounded, size: 16),
-          label: Text(
-            isCustom
-                ? '${due.hour.toString().padLeft(2, '0')}:'
-                      '${due.minute.toString().padLeft(2, '0')}'
-                : '自定义',
-          ),
-          onPressed: due == null ? null : () => _pickCustom(due),
-        ),
-      ],
     );
   }
 }
