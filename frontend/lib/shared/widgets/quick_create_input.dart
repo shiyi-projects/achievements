@@ -4,6 +4,7 @@ import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/features/task_detail/widgets/date_helpers.dart';
 import 'package:achievements/shared/animations/motion_tokens.dart';
+import 'package:achievements/shared/widgets/capture_help_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -78,6 +79,19 @@ class _QuickCreateInputState extends ConsumerState<QuickCreateInput>
         _preview = preview;
       });
     }
+  }
+
+  /// 打开「智能输入」说明面板;点选示例后自动填入并聚焦,顺带触发预览。
+  void _showHelp() {
+    showCaptureHelp(
+      context,
+      onPick: (text) {
+        _controller.text = text;
+        _controller.selection = TextSelection.collapsed(offset: text.length);
+        // 设置 text 会触发 _onTextChange 监听 → 预览 chip 自动出现。
+        _focusNode.requestFocus();
+      },
+    );
   }
 
   Future<void> _submit() async {
@@ -191,6 +205,17 @@ class _QuickCreateInputState extends ConsumerState<QuickCreateInput>
                         ),
                       ),
                     ),
+                    // 智能模式下提供「?」说明入口(纯标题模式不显示)。
+                    if (widget.onSubmitCapture != null && !_submitting)
+                      IconButton(
+                        icon: const Icon(Icons.help_outline_rounded, size: 20),
+                        color: scheme.outline,
+                        tooltip: '智能输入说明',
+                        onPressed: _showHelp,
+                        padding: const EdgeInsets.all(Spacing.sm),
+                        constraints: const BoxConstraints(),
+                        visualDensity: VisualDensity.compact,
+                      ),
                     if (_submitting)
                       const Padding(
                         padding: EdgeInsets.all(Spacing.sm),
