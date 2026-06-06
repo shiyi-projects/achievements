@@ -5,6 +5,7 @@ import 'package:achievements/core/notifications/reminder_checker.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
+import 'package:achievements/core/update/update_checker.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/features/insights/insights_page.dart';
 import 'package:achievements/features/calendar/calendar_page.dart';
@@ -75,6 +76,19 @@ class AppShell extends ConsumerWidget {
         }
       });
     }
+
+    // 启动自动检查更新:有新版本时弹一次轻量提示,引导去「设置 → 检查更新」。
+    ref.listen(updateCheckProvider, (_, next) {
+      final info = next.valueOrNull;
+      if (info == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('发现新版本 v${info.version},可在「设置 → 检查更新」获取'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    });
 
     // Windows 端托盘/窗口监听器把 UI 意图丢到 shellCommandProvider,这里统一兑现。
     ref.listen<ShellCommand?>(shellCommandProvider, (_, cmd) {

@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:achievements/core/app_info.dart';
 import 'package:achievements/core/sync/sync_coordinator.dart';
 import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/update/update_checker.dart';
 import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:achievements/features/auth/auth_session.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
@@ -623,23 +625,99 @@ class _AccountSection extends ConsumerWidget {
 // About
 // ─────────────────────────────────────────────────────────────────────
 
-class _AboutSection extends StatelessWidget {
+class _AboutSection extends ConsumerStatefulWidget {
   const _AboutSection();
+
+  @override
+  ConsumerState<_AboutSection> createState() => _AboutSectionState();
+}
+
+class _AboutSectionState extends ConsumerState<_AboutSection> {
+  bool _checking = false;
+
+  Future<void> _checkUpdate() async {
+    setState(() => _checking = true);
+    final info = await ref.read(updateCheckerProvider).check();
+    if (!mounted) return;
+    setState(() => _checking = false);
+    if (info == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已是最新版本(或暂时无法连接 GitHub)')));
+    } else {
+      await _showUpdateDialog(info);
+    }
+  }
+
+  Future<void> _showUpdateDialog(UpdateInfo info) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.system_update_rounded),
+        title: Text('发现新版本 v${info.version}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('前往下载页面获取最新版:'),
+            const SizedBox(height: Spacing.sm),
+            SelectableText(info.url, style: Theme.of(ctx).textTheme.bodySmall),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('稍后'),
+          ),
+          FilledButton.tonal(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: info.url));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('下载链接已复制')));
+            },
+            child: const Text('复制链接'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Column(
       children: [
         ListTile(
           leading: const Icon(Icons.info_outline_rounded),
           title: const Text('版本'),
+          subtitle: Text('by $kAuthor'),
           trailing: Text(
-            '0.0.1',
+            'v$kAppVersion',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: scheme.onSurfaceVariant,
             ),
           ),
+        ),
+        ListTile(
+          leading: _checking
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.system_update_rounded),
+          title: const Text('检查更新'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: _checking ? null : _checkUpdate,
+        ),
+        _LinkTile(icon: Icons.code_rounded, label: 'GitHub', url: kGithubUrl),
+        _LinkTile(
+          icon: Icons.smart_display_outlined,
+          label: '哔哩哔哩',
+          url: kBilibiliUrl,
         ),
         ListTile(
           leading: const Icon(Icons.description_outlined),
@@ -648,6 +726,39 @@ class _AboutSection extends StatelessWidget {
           onTap: () => showLicensePage(context: context),
         ),
       ],
+    );
+  }
+}
+
+/// 一行可复制的链接(点击复制到剪贴板)。桌面无统一打开浏览器依赖,这里用复制方案。
+class _LinkTile extends StatelessWidget {
+  const _LinkTile({required this.icon, required this.label, required this.url});
+
+  final IconData icon;
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(label),
+      subtitle: Text(
+        url,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.outline,
+        ),
+      ),
+      trailing: const Icon(Icons.copy_rounded, size: 18),
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: url));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$label 链接已复制')));
+      },
     );
   }
 }
