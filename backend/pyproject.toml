@@ -17,6 +17,7 @@ dependencies = [
     "pydantic-settings>=2.3",
     "python-multipart>=0.0.9",
     "httpx>=0.27",
+    "pyjwt>=2.8",
 ]
 
 [dependency-groups]
@@ -47,7 +48,7 @@ select = ["E", "F", "W", "I", "B", "UP", "N", "S", "RUF", "ASYNC", "SIM"]
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106"]
+"tests/**" = ["S101", "S105", "S106", "S107"]
 "alembic/env.py" = ["E402"]
 
 [tool.ruff.format]
