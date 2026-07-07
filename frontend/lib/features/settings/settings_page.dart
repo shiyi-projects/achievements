@@ -516,7 +516,7 @@ class _AccountSection extends ConsumerWidget {
                       style: theme.textTheme.bodyLarge,
                     ),
                     Text(
-                      'OLib #${session.olibUserId} · ${session.profile.role}',
+                      session.profile.inWecom ? '微信登录 · 社群成员' : '微信登录',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
