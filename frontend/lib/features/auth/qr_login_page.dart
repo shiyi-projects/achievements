@@ -16,7 +16,7 @@ class QrLoginPage extends ConsumerStatefulWidget {
 class _QrLoginPageState extends ConsumerState<QrLoginPage> {
   Timer? _timer;
   Timer? _expiryTimer;
-  String? _anonToken;
+  String? _sceneId;
   String? _qrUrl;
   String? _error;
   bool _loading = true;
@@ -46,15 +46,14 @@ class _QrLoginPageState extends ConsumerState<QrLoginPage> {
     });
     try {
       final repo = ref.read(authRepositoryProvider);
-      final registered = await repo.register();
-      final qr = await repo.qrcode(registered.anonToken);
+      final qr = await repo.qrcode();
       if (!mounted) return;
       final uri = Uri.tryParse(qr.qrUrl);
       if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
         throw StateError('二维码地址无效: ${qr.qrUrl}');
       }
       setState(() {
-        _anonToken = registered.anonToken;
+        _sceneId = qr.sceneId;
         _qrUrl = qr.qrUrl;
         _loading = false;
       });
@@ -80,10 +79,10 @@ class _QrLoginPageState extends ConsumerState<QrLoginPage> {
   }
 
   Future<void> _poll() async {
-    final token = _anonToken;
-    if (token == null) return;
+    final sceneId = _sceneId;
+    if (sceneId == null) return;
     try {
-      final session = await ref.read(authRepositoryProvider).status(token);
+      final session = await ref.read(authRepositoryProvider).status(sceneId);
       if (session == null) return;
       _timer?.cancel();
       await ref.read(authControllerProvider.notifier).setSession(session);

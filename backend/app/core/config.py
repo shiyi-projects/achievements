@@ -37,16 +37,16 @@ class Settings(BaseSettings):
     storage_backend: Literal["local", "oss"] = "local"
     storage_local_root: str = "./storage/attachments"
 
-    # Auth
+    # Auth — 身份收口到 SCC(软件控制中心)统一身份中台
     auth_enabled: bool = False
     local_user_id: str = "00000000-0000-0000-0000-000000000001"
-    jwt_secret: str = "change-me-in-production"  # noqa: S105 — placeholder default; override via env
-    jwt_alg: str = "HS256"
-    jwt_access_ttl_min: int = 30
-    jwt_refresh_ttl_days: int = 14
-    olib_base_url: str = "https://wxauth.11xy.cn"
-    olib_timeout_seconds: float = 8.0
-    auth_profile_cache_ttl_seconds: int = 60
+    # SCC 客户端接入:后端代理公众号扫码登录,并用共享密钥离线验签 client JWT。
+    # 部署时把下面三项在 .env 回填(scc_jwt_secret 走安全渠道,不入库)。
+    scc_base_url: str = "https://scc.example.com"
+    scc_app_id: int = 0
+    scc_jwt_secret: str = "change-me-shared-with-scc"  # noqa: S105 — 占位;SCC 的 JWT_SECRET_KEY,仅验签
+    scc_jwt_alg: str = "HS256"
+    scc_timeout_seconds: float = 8.0
 
     @field_validator("app_cors_origins", mode="before")
     @classmethod

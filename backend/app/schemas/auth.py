@@ -1,47 +1,37 @@
-"""Authentication DTOs for OLib/WeChat QR login."""
+"""Authentication DTOs for SCC WeChat MP QR login."""
 
 from __future__ import annotations
 
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, HttpUrl
-
-AllowedOlibRole = Literal["authorized", "community", "admin"]
-OlibRole = Literal["unauthorized", "authorized", "community", "admin", "banned"]
-
-
-class AuthRegisterRequest(BaseModel):
-    device_id: str = Field(min_length=1, max_length=64)
-    platform: Literal["android", "windows", "ios", "other"] = "other"
-
-
-class AuthRegisterResponse(BaseModel):
-    anon_token: str
-    expires_in: int
+from pydantic import BaseModel, HttpUrl
 
 
 class QrCodeResponse(BaseModel):
+    """公众号扫码登录二维码(后端代理 SCC 生成)。"""
+
     qr_url: HttpUrl
+    scene_id: str
     expire_seconds: int
+
+
+class UserProfile(BaseModel):
+    """登录成功后回给客户端的用户资料(来自 SCC)。"""
+
+    id: int  # SCC user_id
+    nickname: str | None = None
+    avatar_url: str | None = None
+    openid: str | None = None
+    unionid: str | None = None
+    in_wecom: bool = False
 
 
 class AuthStatusResponse(BaseModel):
     status: Literal["unauthorized", "authorized"]
-    token: str | None = None
-    olib_user_id: int | None = None
-    app_user_id: UUID | None = None
+    token: str | None = None  # SCC client token(全局唯一鉴权凭据)
+    app_user_id: UUID | None = None  # Achievements 内部用户 UUID
     profile: UserProfile | None = None
-
-
-class UserProfile(BaseModel):
-    id: int
-    device_id: str | None = None
-    openid: str | None = None
-    nickname: str | None = None
-    avatar_url: str | None = None
-    platform: str | None = None
-    role: OlibRole
 
 
 class LogoutResponse(BaseModel):
