@@ -20,11 +20,3 @@ async def test_healthz_ok(client: AsyncClient) -> None:
     assert payload["status"] == "ok"
     assert "timestamp" in payload
     assert payload["version"]
-
-
-async def test_auth_register_validates_device_payload(client: AsyncClient) -> None:
-    response = await client.post(
-        "/api/v1/auth/register",
-        json={"email": "a@b.com", "password": "x" * 8},
-    )
-    assert response.status_code == 422

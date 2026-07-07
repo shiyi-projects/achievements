@@ -1,49 +1,45 @@
 class AuthProfile {
   const AuthProfile({
     required this.id,
-    required this.role,
-    this.deviceId,
     this.openid,
+    this.unionid,
     this.nickname,
     this.avatarUrl,
-    this.platform,
+    this.inWecom = false,
   });
 
   factory AuthProfile.fromJson(Map<String, dynamic> json) {
     return AuthProfile(
       id: json['id'] as int,
-      role: json['role'] as String,
-      deviceId: json['device_id'] as String?,
       openid: json['openid'] as String?,
+      unionid: json['unionid'] as String?,
       nickname: json['nickname'] as String?,
       avatarUrl: json['avatar_url'] as String?,
-      platform: json['platform'] as String?,
+      inWecom: json['in_wecom'] as bool? ?? false,
     );
   }
 
+  /// SCC user_id
   final int id;
-  final String role;
-  final String? deviceId;
   final String? openid;
+  final String? unionid;
   final String? nickname;
   final String? avatarUrl;
-  final String? platform;
+  final bool inWecom;
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'role': role,
-    'device_id': deviceId,
     'openid': openid,
+    'unionid': unionid,
     'nickname': nickname,
     'avatar_url': avatarUrl,
-    'platform': platform,
+    'in_wecom': inWecom,
   };
 }
 
 class AuthSession {
   const AuthSession({
     required this.token,
-    required this.olibUserId,
     required this.appUserId,
     required this.profile,
   });
@@ -51,20 +47,18 @@ class AuthSession {
   factory AuthSession.fromJson(Map<String, dynamic> json) {
     return AuthSession(
       token: json['token'] as String,
-      olibUserId: json['olib_user_id'] as int,
       appUserId: json['app_user_id'] as String,
       profile: AuthProfile.fromJson(json['profile'] as Map<String, dynamic>),
     );
   }
 
+  /// SCC client token(全局唯一鉴权凭据)
   final String token;
-  final int olibUserId;
   final String appUserId;
   final AuthProfile profile;
 
   Map<String, dynamic> toJson() => {
     'token': token,
-    'olib_user_id': olibUserId,
     'app_user_id': appUserId,
     'profile': profile.toJson(),
   };
