@@ -8,6 +8,8 @@
 - **Local-first**:本地 Drift(SQLite)是全量数据源,UI 只读本地;写操作在 Drift 事务里同时落业务表 + 一行 `outbox`(暂存区,类似 `git add`)。
 - **逐实体增量合并**:同步是按实体(folder / list / task / tag / task_tag)逐条的增量协议,**不是整库快照覆盖**。不同设备改不同实体不会互相覆盖;只有改同一条时才按 LWW 取新。
 - **游标增量**:`pull` 用服务端 `updated_at` 游标 `since` 取 `(since, now]` 的变更;响应里的 `cursor` 是服务端「拉取这一刻」的 UTC now,客户端存下次回传。
+- **重叠窗口**:服务端查询实际用 `since - SINCE_OVERLAP`(60s,`sync_service.py`)。push 里各行 `updated_at` 在逐条 flush 时生成、commit 在整批末尾,并发 pull 的 cursor 可能晚于这些 `updated_at` 却读不到未提交行;严格 `> since` 会永久漏掉它们。宁可重复下发(客户端落库幂等)也不丢。
+- **脏实体保护**:客户端 pull 落库时跳过 outbox 中仍有 pending mutation 的实体(`'$entity:$id'` 键匹配),避免服务端旧值覆盖本地未推送的修改;两端差异交由 push 的 conflict/LWW 收敛。pull 到 purge 墓碑则**不跳过**:物理删本地行并清掉该实体残留的 outbox 行(实体已死,推了也没意义)。
 
 ## 2. 删除两态(关键)
 
@@ -29,7 +31,11 @@
 |---|---|---|
 | 移入回收站 | `deleted_at = now()` | `delete` |
 | 从回收站恢复 | `deleted_at = null` | `upsert`(payload `{deleted_at: null}`) |
-| 回收站「永久删除」 | 物理删本地行 | `purge` |
+| 回收站「永久删除」 | 物理删本地行(递归含全部后代子任务 + 标签关联行) | 自身与**每个后代**各一条 `purge` |
+
+> purge 必须逐行发:服务端 GC 物理删父行时 FK CASCADE 带走的子行**不会留墓碑**,其他端收不到。task_tag 关联同理——task/tag 墓碑在各端落地时由客户端本地一并清关联行,不单独发 mutation。
+>
+> ⚠️ 重复系列 override 的「删某次」(EXDATE)**必须用 `upsert` 携带完整字段 + `deleted_at`**,不能用 `delete` + 空 payload:override 往往是「新建即软删」,服务端对不存在实体的 `delete` 是幂等 no-op,软删行永远不会被创建,跳过的发生点无法跨端传播(`task_repository._upsertOverride`)。
 
 > ⚠️ 永久删除**必须**用 `purge` 而非 `delete`。`delete` 只软删,会被下次 pull 当增量重新落库,导致已永久删除的任务又出现在回收站(回收站视图正是 `deletedAt 非空`)。这是本次重构修复的核心 bug。
 
@@ -111,7 +117,9 @@ Mutation 信封:
 | **本地写入**(outbox 非空) | 500ms 防抖后 `push`;outbox 空则不发 |
 | **网络恢复**(offline→online 边沿) | 只 `push` flush 未推送的本地改动,**不自动 pull** |
 | **手动** | 下拉刷新 / 设置页「立即同步」→ `runFullSync()` |
-| **失败重试** | pull/push 报 error/offline → 延时重试直到成功 |
+| **失败重试** | pull/push 报 error/offline → 30s 后重试直到成功 |
+
+**outbox retry 语义**:网络断 / 5xx 等**暂时性**错误只记 `last_error`,**不消耗 retry 预算**(否则离线几轮 30s 重试就把 pending 行推进死信,恢复网络后本地改动永远不上云);只有服务端明确 `rejected`(永久性错误)才 `retry_count + 1`,达到上限(5)后成为死信不再重发。
 
 **已移除**的自动触发:App 切回前台(resume)、窗口聚焦、30s 周期轮询。远端变更靠启动拉取或用户手动刷新获取。
 
@@ -121,8 +129,14 @@ Mutation 信封:
 - 迁移:`alembic/versions/e3f1a2b4c5d6_add_purge_tombstone_and_task_tag_sync.py`。
 - 前端:`lib/core/sync/sync_engine.dart`(落库/墓碑/冲突)、`lib/core/sync/sync_coordinator.dart`(触发)、`lib/data/repositories/{task,tag,outbox}_repository.dart`。
 
-## 7. 已知限制
+## 7. 同步字段范围
+
+Task 的 `recurrence_parent_id` / `occurrence_date` / `estimated_minutes` **参与同步**(pull 落库与 push payload 都含);`focused_seconds` 与 `FocusPlans` / `TaskSteps` / `FocusSessions` 表**仅本地**,不进 outbox。
+
+## 8. 已知限制
 
 - 跨设备只在「启动 / 手动刷新」时拉取远端变更,App 开着期间不会自动看到其它设备的改动(按产品决策刻意如此)。
 - 离线超过保留期(30 天)的设备回来后,可能持有已被服务端 GC 的墓碑对应的本地行(孤儿,可手动软删),不会自动清理。
 - LWW 用本地时钟与服务端 `updated_at` 比较,存在时钟漂移风险(沿用既有实现,未变更)。
+- rejected 死信(retry 耗尽)目前无 UI 暴露与清理入口。
+- 手动「立即同步」在已有同步进行中时被合并(不排队),极端情况下点了没反应。
