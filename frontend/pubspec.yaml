@@ -1,7 +1,7 @@
 name: achievements
 description: Achievements - cross-platform Todo app (Windows + Android)
 publish_to: none
-version: 0.3.0+6
+version: 0.3.1+7
 environment:
   sdk: ^3.8.1
 
