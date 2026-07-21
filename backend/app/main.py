@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from uuid import UUID
 
 from fastapi import FastAPI, Request
@@ -13,6 +14,7 @@ from fastapi.responses import JSONResponse
 from app import __version__
 from app.api.v1 import api_router
 from app.core.config import get_settings
+from app.core.db_keepalive import start_db_keepalive
 from app.core.logging import configure_logging
 from app.db.session import SessionLocal
 from app.services.list_service import ensure_system_lists
@@ -26,7 +28,14 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     if not settings.auth_enabled:
         async with SessionLocal() as session:
             await ensure_system_lists(session, UUID(settings.local_user_id))
-    yield
+    keepalive = start_db_keepalive(settings.db_keepalive_interval_hours)
+    try:
+        yield
+    finally:
+        if keepalive is not None:
+            keepalive.cancel()
+            with suppress(asyncio.CancelledError):
+                await keepalive
 
 
 def create_app() -> FastAPI:
