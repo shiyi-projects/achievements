@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 
+import 'package:achievements/core/sync/outbox_grouping.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
 import 'package:achievements/data/remote/api_client.dart';
@@ -85,7 +85,10 @@ class SyncEngine {
     final pending = await _outbox.pending();
     if (pending.isEmpty) return SyncStatus.idle;
 
-    final mutations = [for (final row in pending) _toMutation(row)];
+    // 同一实体的连续 upsert 合并为一条 mutation 发送,消除同批链式 base
+    // 陈旧导致的伪 conflict(详见 outbox_grouping.dart)。
+    final groups = groupPending(pending);
+    final mutations = [for (final g in groups) g.toMutation()];
 
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -95,7 +98,7 @@ class SyncEngine {
       );
       final data = response.data;
       if (data == null) return SyncStatus.error;
-      await _applyPushResponse(pending, data);
+      await _applyPushResponse(groups, data);
       return SyncStatus.idle;
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) return SyncStatus.error;
@@ -117,55 +120,51 @@ class SyncEngine {
     }
   }
 
-  Map<String, dynamic> _toMutation(OutboxData row) {
-    return {
-      'entity': row.entity,
-      'op': row.op,
-      'id': row.entityId,
-      'base_version': row.baseVersion,
-      'payload': jsonDecode(row.payload) as Map<String, dynamic>,
-    };
-  }
-
   Future<void> _applyPushResponse(
-    List<OutboxData> pending,
+    List<MutationGroup> groups,
     Map<String, dynamic> data,
   ) async {
     final results = _list(data['results']);
     // 服务端按请求顺序返回 results,因此可以按下标配对。
-    for (var i = 0; i < pending.length && i < results.length; i++) {
-      await _handleResult(pending[i], results[i]);
+    for (var i = 0; i < groups.length && i < results.length; i++) {
+      await _handleResult(groups[i], results[i]);
     }
   }
 
   Future<void> _handleResult(
-    OutboxData row,
+    MutationGroup group,
     Map<String, dynamic> result,
   ) async {
     final status = result['status'] as String?;
     switch (status) {
       case 'applied':
         await _db.transaction(() async {
-          if (row.op == 'upsert') {
+          if (group.op == 'upsert') {
             final v = result['version'] as int?;
             if (v != null) {
-              await _updateLocalVersion(row.entity, row.entityId, v);
+              await _updateLocalVersion(group.entity, group.entityId, v);
             }
           }
-          await _outbox.deleteById(row.id);
+          for (final row in group.rows) {
+            await _outbox.deleteById(row.id);
+          }
         });
       case 'conflict':
-        await _resolveConflict(row, result);
+        await _resolveConflict(group, result);
       case 'rejected':
-        debugPrint('sync: rejected ${row.entity}/${row.entityId}');
-        await _outbox.markFailed(row.id, 'rejected by server');
+        debugPrint('sync: rejected ${group.entity}/${group.entityId}');
+        for (final row in group.rows) {
+          await _outbox.markFailed(row.id, 'rejected by server');
+        }
       default:
-        await _outbox.markFailed(row.id, 'unknown status: $status');
+        for (final row in group.rows) {
+          await _outbox.markFailed(row.id, 'unknown status: $status');
+        }
     }
   }
 
   Future<void> _resolveConflict(
-    OutboxData row,
+    MutationGroup group,
     Map<String, dynamic> result,
   ) async {
     final serverValue = result['server_value'];
@@ -173,37 +172,46 @@ class SyncEngine {
     if (serverValue is! Map<String, dynamic> || serverVersion == null) {
       // 防御:服务端没给 server_value,只能放弃本地 mutation。
       debugPrint(
-        'sync: conflict without server_value, dropping ${row.entity}/${row.entityId}',
+        'sync: conflict without server_value, dropping '
+        '${group.entity}/${group.entityId}',
       );
-      await _outbox.deleteById(row.id);
+      for (final row in group.rows) {
+        await _outbox.deleteById(row.id);
+      }
       return;
     }
     // 永久删除是终态,不参与 LWW:若服务端已是墓碑则完成,否则跟随服务端 version
     // 重试,直到 base_version 对上后 apply,保证 purge 最终生效。
-    if (row.op == 'purge') {
+    if (group.op == 'purge') {
       if (serverValue['purged_at'] != null) {
-        await _outbox.deleteById(row.id);
+        for (final row in group.rows) {
+          await _outbox.deleteById(row.id);
+        }
       } else {
-        await _outbox.updateBaseVersion(row.id, serverVersion);
+        await _outbox.updateBaseVersion(group.rows.first.id, serverVersion);
       }
       return;
     }
     final serverUpdatedAt = _dt(serverValue['updated_at']);
-    final localTs = row.createdAt;
+    // 组内最后一次本地写入的时刻代表整组意图。
+    final localTs = group.latestCreatedAt;
     final localWins =
         serverUpdatedAt == null || localTs.isAfter(serverUpdatedAt);
 
     if (localWins) {
-      // 本地新:把 baseVersion 升到 server.version,下一轮 push 重发。
-      await _outbox.updateBaseVersion(row.id, serverVersion);
+      // 本地新:把组首行 baseVersion 升到 server.version(下一轮重新分组时
+      // 组的 baseVersion 取首行),下一轮 push 重发。
+      await _outbox.updateBaseVersion(group.rows.first.id, serverVersion);
     } else {
-      // 服务端新:落 server_value,丢弃本地 mutation。
+      // 服务端新:落 server_value,丢弃整组本地 mutation。
       await _db.transaction(() async {
-        await _applyServerValue(row.entity, serverValue);
-        await _outbox.deleteById(row.id);
+        await _applyServerValue(group.entity, serverValue);
+        for (final row in group.rows) {
+          await _outbox.deleteById(row.id);
+        }
       });
       debugPrint(
-        'sync: server wins for ${row.entity}/${row.entityId} '
+        'sync: server wins for ${group.entity}/${group.entityId} '
         '(local=$localTs, server=$serverUpdatedAt)',
       );
       // TODO(phase3): 写入 activities 表留痕
@@ -451,7 +459,11 @@ class SyncEngine {
       completedAt: Value(_dt(r['completed_at'])),
       archivedAt: Value(_dt(r['archived_at'])),
       starred: Value(r['starred'] as bool? ?? false),
-      estimatedMinutes: Value(r['estimated_minutes'] as int?),
+      // 区分「key 缺失」与「显式 null」:旧版后端(迁移未部署)不返回此字段,
+      // 缺失时保留本地值,避免升级窗口内被清空。
+      estimatedMinutes: r.containsKey('estimated_minutes')
+          ? Value(r['estimated_minutes'] as int?)
+          : const Value.absent(),
       createdAt: Value(_dt(r['created_at']) ?? DateTime.now()),
       updatedAt: Value(_dt(r['updated_at']) ?? DateTime.now()),
       deletedAt: Value(_dt(r['deleted_at'])),

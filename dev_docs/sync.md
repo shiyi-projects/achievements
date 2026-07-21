@@ -119,6 +119,8 @@ Mutation 信封:
 | **手动** | 下拉刷新 / 设置页「立即同步」→ `runFullSync()` |
 | **失败重试** | pull/push 报 error/offline → 30s 后重试直到成功 |
 
+**push 批内合并**:同一实体的多条 upsert 在发送前合并为**一条** mutation(payload 按入队序浅合并,baseVersion 取首条,LWW 时戳取末条;delete/purge 打断合并,task_tag 永不合并,见 `lib/core/sync/outbox_grouping.dart`)。否则同批第 2 条起 baseVersion 必然陈旧 → 伪 conflict → LWW 拿「入队时刻」对比「前一条刚在服务端的应用时刻」必输 → 用户在 debounce 窗口内的连续操作被静默回滚。
+
 **outbox retry 语义**:网络断 / 5xx 等**暂时性**错误只记 `last_error`,**不消耗 retry 预算**(否则离线几轮 30s 重试就把 pending 行推进死信,恢复网络后本地改动永远不上云);只有服务端明确 `rejected`(永久性错误)才 `retry_count + 1`,达到上限(5)后成为死信不再重发。
 
 **已移除**的自动触发:App 切回前台(resume)、窗口聚焦、30s 周期轮询。远端变更靠启动拉取或用户手动刷新获取。
