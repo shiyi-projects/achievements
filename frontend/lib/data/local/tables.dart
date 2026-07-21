@@ -143,7 +143,7 @@ class Outbox extends Table {
   /// folder / list / task / tag / task_tag
   TextColumn get entity => text()();
 
-  /// upsert / delete
+  /// upsert / delete / purge
   TextColumn get op => text()();
 
   /// 业务实体的 UUID 主键(关联表用 ``${taskId}:${tagId}`` 占位)。

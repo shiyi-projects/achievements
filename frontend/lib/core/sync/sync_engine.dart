@@ -100,8 +100,10 @@ class SyncEngine {
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) return SyncStatus.error;
       debugPrint('sync push failed: ${e.type} ${e.message}');
+      // 网络类错误是暂时的:只记 lastError,不消耗 retry 预算(重试由
+      // SyncCoordinator 的 30s 定时器驱动)。
       for (final row in pending) {
-        await _outbox.markFailed(row.id, '${e.type}:${e.message ?? ""}');
+        await _outbox.noteError(row.id, '${e.type}:${e.message ?? ""}');
       }
       return e.type == DioExceptionType.connectionError
           ? SyncStatus.offline
@@ -109,7 +111,7 @@ class SyncEngine {
     } catch (e, st) {
       debugPrint('sync push threw: $e\n$st');
       for (final row in pending) {
-        await _outbox.markFailed(row.id, e.toString());
+        await _outbox.noteError(row.id, e.toString());
       }
       return SyncStatus.error;
     }
@@ -272,10 +274,18 @@ class SyncEngine {
           _db.taskLists,
         )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
       case 'task':
+        // 标签关联行随任务墓碑一并物理清理:服务端 GC 靠 FK CASCADE 删关联,
+        // 不会为 task_tag 单独下发墓碑。
+        await (_db.delete(
+          _db.taskTags,
+        )..where((tt) => tt.taskId.equals(id))).go();
         await (_db.delete(
           _db.tasks,
         )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
       case 'tag':
+        await (_db.delete(
+          _db.taskTags,
+        )..where((tt) => tt.tagId.equals(id))).go();
         await (_db.delete(
           _db.tags,
         )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
@@ -284,45 +294,65 @@ class SyncEngine {
 
   /// 把服务端 SyncPullResponse 落入本地 Drift。
   ///
-  /// 策略:服务端是 source of truth。普通行 insertOnConflictUpdate;**永久删除墓碑**
-  /// (purged_at 非空)物理删本地行——绝不能 insert,否则已永久删除的任务会随
-  /// deleted_at 复活到回收站。软删行(deleted_at 非空、purged_at 为空)正常落,
-  /// UI 查询据 deletedAt 过滤,显示在回收站。
+  /// 策略:
+  /// - **永久删除墓碑**(purged_at 非空)物理删本地行——绝不能 insert,否则已
+  ///   永久删除的任务会随 deleted_at 复活到回收站;同时清掉该实体残留的 outbox
+  ///   行(实体已死,继续推送无意义)。
+  /// - **脏实体**(outbox 有 pending mutation)跳过,不让服务端旧值覆盖本地
+  ///   未推送的修改;两端差异交由 push 的 conflict/LWW 流程收敛。
+  /// - 其余行 insertOnConflictUpdate。软删行(deleted_at 非空、purged_at 为空)
+  ///   正常落,UI 查询据 deletedAt 过滤,显示在回收站。
   Future<void> _applyPullResponse(Map<String, dynamic> data) async {
     await _db.transaction(() async {
-      for (final raw in _list(data['folders'])) {
+      final dirty = await _outbox.pendingEntityKeys();
+
+      Future<void> applyRow(
+        String entity,
+        Map<String, dynamic> raw,
+        Future<void> Function() upsert,
+      ) async {
+        final id = raw['id'] as String;
         if (raw['purged_at'] != null) {
-          await _deleteLocalById('folder', raw['id'] as String);
-        } else {
-          await _db
-              .into(_db.folders)
-              .insertOnConflictUpdate(_foldersCompanion(raw));
+          await _deleteLocalById(entity, id);
+          await _outbox.deleteByEntity(entity, id);
+          return;
         }
+        if (dirty.contains('$entity:$id')) return;
+        await upsert();
+      }
+
+      for (final raw in _list(data['folders'])) {
+        await applyRow(
+          'folder',
+          raw,
+          () => _db
+              .into(_db.folders)
+              .insertOnConflictUpdate(_foldersCompanion(raw)),
+        );
       }
       for (final raw in _list(data['lists'])) {
-        if (raw['purged_at'] != null) {
-          await _deleteLocalById('list', raw['id'] as String);
-        } else {
-          await _db
+        await applyRow(
+          'list',
+          raw,
+          () => _db
               .into(_db.taskLists)
-              .insertOnConflictUpdate(_taskListsCompanion(raw));
-        }
+              .insertOnConflictUpdate(_taskListsCompanion(raw)),
+        );
       }
       for (final raw in _list(data['tasks'])) {
-        if (raw['purged_at'] != null) {
-          await _deleteLocalById('task', raw['id'] as String);
-        } else {
-          await _db
-              .into(_db.tasks)
-              .insertOnConflictUpdate(_tasksCompanion(raw));
-        }
+        await applyRow(
+          'task',
+          raw,
+          () =>
+              _db.into(_db.tasks).insertOnConflictUpdate(_tasksCompanion(raw)),
+        );
       }
       for (final raw in _list(data['tags'])) {
-        if (raw['purged_at'] != null) {
-          await _deleteLocalById('tag', raw['id'] as String);
-        } else {
-          await _db.into(_db.tags).insertOnConflictUpdate(_tagsCompanion(raw));
-        }
+        await applyRow(
+          'tag',
+          raw,
+          () => _db.into(_db.tags).insertOnConflictUpdate(_tagsCompanion(raw)),
+        );
       }
       for (final raw in _list(data['task_tags'])) {
         final taskId = raw['task_id'] as String;
@@ -414,11 +444,14 @@ class SyncEngine {
       dueAt: Value(_dt(r['due_at'])),
       remindAt: Value(_dt(r['remind_at'])),
       repeatRule: Value(r['repeat_rule'] as String?),
+      recurrenceParentId: Value(r['recurrence_parent_id'] as String?),
+      occurrenceDate: Value(_dt(r['occurrence_date'])),
       color: Value(r['color'] as String?),
       sortOrder: Value(r['sort_order'] as int? ?? 0),
       completedAt: Value(_dt(r['completed_at'])),
       archivedAt: Value(_dt(r['archived_at'])),
       starred: Value(r['starred'] as bool? ?? false),
+      estimatedMinutes: Value(r['estimated_minutes'] as int?),
       createdAt: Value(_dt(r['created_at']) ?? DateTime.now()),
       updatedAt: Value(_dt(r['updated_at']) ?? DateTime.now()),
       deletedAt: Value(_dt(r['deleted_at'])),

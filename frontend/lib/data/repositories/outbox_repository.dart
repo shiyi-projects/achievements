@@ -67,7 +67,8 @@ class OutboxRepository {
     return (_db.delete(_db.outbox)..where((t) => t.id.equals(id))).go();
   }
 
-  /// rejected 或网络错:retryCount + 1,记录最近一次 error。
+  /// 服务端明确 rejected(永久性错误):retryCount + 1,记录最近一次 error。
+  /// 达到 [pending] 的 retryLimit 后不再重发(死信)。
   Future<void> markFailed(int id, String error) {
     return _db.customUpdate(
       'UPDATE outbox SET retry_count = retry_count + 1, last_error = ? '
@@ -77,12 +78,42 @@ class OutboxRepository {
     );
   }
 
+  /// 网络断 / 服务端 5xx 等**暂时性**错误:只记 lastError,不消耗 retry 预算。
+  /// 否则离线期间 30s 重试循环几轮就会把 pending 行推进死信,网络恢复后
+  /// 本地改动永远不再上云。
+  Future<void> noteError(int id, String error) {
+    return (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
+      OutboxCompanion(lastError: Value(error)),
+    );
+  }
+
   /// LWW 冲突:本地新但 base_version 已陈旧。把 outbox 行的 baseVersion
   /// 改为服务端最新 version,等下一轮 push 再发。createdAt 保留,排序不变。
   Future<void> updateBaseVersion(int id, int newBaseVersion) {
     return (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
       OutboxCompanion(baseVersion: Value(newBaseVersion)),
     );
+  }
+
+  /// 当前 outbox 中所有(含 retry 耗尽)mutation 的 `'$entity:$entityId'` 键集。
+  /// pull 落库据此跳过「脏」实体,避免服务端旧值覆盖本地未推送的修改;
+  /// 冲突统一交由 push 的 conflict/LWW 流程收敛。
+  Future<Set<String>> pendingEntityKeys() async {
+    final rows = await (_db.selectOnly(
+      _db.outbox,
+    )..addColumns([_db.outbox.entity, _db.outbox.entityId])).get();
+    return {
+      for (final r in rows)
+        '${r.read(_db.outbox.entity)}:${r.read(_db.outbox.entityId)}',
+    };
+  }
+
+  /// 删除某实体的全部 outbox 行。pull 到 purge 墓碑(实体已被永久删除)时
+  /// 调用,避免继续推送已死实体的 mutation。
+  Future<void> deleteByEntity(String entity, String entityId) {
+    return (_db.delete(_db.outbox)
+          ..where((t) => t.entity.equals(entity) & t.entityId.equals(entityId)))
+        .go();
   }
 
   /// 监听 outbox 行数:SyncEngine 据此触发批量推送。
