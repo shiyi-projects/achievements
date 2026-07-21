@@ -55,3 +55,6 @@ class Task(Base, SyncableMixin):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     starred: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="0")
+    # 预估总工时(分钟),智能专注规划用。客户端一直随 upsert 推送,此前服务端
+    # 无此列被静默丢弃,导致换设备后预估工时丢失。
+    estimated_minutes: Mapped[int | None] = mapped_column(nullable=True)

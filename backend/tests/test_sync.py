@@ -11,6 +11,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Task
+from app.services.sync_service import SINCE_OVERLAP
 
 
 async def _create_list(client: AsyncClient, name: str = "Inbox") -> UUID:
@@ -49,10 +50,19 @@ async def test_incremental_pull_returns_only_delta(
     await asyncio.sleep(0.05)
     await client.post("/api/v1/tasks", json={"list_id": str(list_id), "title": "After cursor"})
 
+    # since=first_cursor:新 task 必须在(防丢是硬约束);旧 list 落在
+    # SINCE_OVERLAP 重叠窗口内允许重复下发(客户端落库幂等),不断言排除。
     second = await client.get("/api/v1/sync/pull", params={"since": first_cursor})
     assert second.status_code == 200
     body = second.json()
-    # 旧 list 不应再回(未被更新),仅新 task
+    assert [t["title"] for t in body["tasks"]] == ["After cursor"]
+
+    # 把 since 推后一个重叠窗口:effective_since 回到 first_cursor,增量过滤
+    # 仍生效——窗口外的旧 list 不回,新 task 仍在。
+    shifted = (datetime.fromisoformat(first_cursor) + SINCE_OVERLAP).isoformat()
+    third = await client.get("/api/v1/sync/pull", params={"since": shifted})
+    assert third.status_code == 200
+    body = third.json()
     assert body["lists"] == []
     assert [t["title"] for t in body["tasks"]] == ["After cursor"]
 
@@ -120,6 +130,53 @@ async def test_push_creates_new_entities(client: AsyncClient) -> None:
     pull = (await client.get("/api/v1/sync/pull")).json()
     assert any(item["id"] == list_id for item in pull["lists"])
     assert any(t["id"] == task_id and t["priority"] == 2 for t in pull["tasks"])
+
+
+@pytest.mark.asyncio
+async def test_push_upsert_creates_soft_deleted_override(client: AsyncClient) -> None:
+    """EXDATE 路径:重复系列「删某次」的 override 往往是「新建即软删」。
+
+    客户端对这种行发 upsert 并携带完整字段 + deleted_at(不能用 delete + 空
+    payload,那对不存在的实体是幂等 no-op),服务端必须创建出软删行并随 delta
+    下发,否则跳过的发生点无法跨端传播。
+    """
+    list_id = await _create_list(client, "Recurring")
+    template = (
+        await client.post(
+            "/api/v1/tasks",
+            json={"list_id": str(list_id), "title": "每日站会", "repeat_rule": "FREQ=DAILY"},
+        )
+    ).json()
+    override_id = str(uuid4())
+    occurrence = datetime.now(UTC).isoformat()
+
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task",
+                    "op": "upsert",
+                    "id": override_id,
+                    "base_version": 0,
+                    "payload": {
+                        "list_id": str(list_id),
+                        "title": "每日站会",
+                        "recurrence_parent_id": template["id"],
+                        "occurrence_date": occurrence,
+                        "deleted_at": occurrence,
+                    },
+                }
+            ]
+        },
+    )
+    assert push.json()["results"][0]["status"] == "applied"
+
+    pull = (await client.get("/api/v1/sync/pull")).json()
+    row = next(t for t in pull["tasks"] if t["id"] == override_id)
+    assert row["deleted_at"] is not None
+    assert row["recurrence_parent_id"] == template["id"]
+    assert row["occurrence_date"] is not None
 
 
 @pytest.mark.asyncio
