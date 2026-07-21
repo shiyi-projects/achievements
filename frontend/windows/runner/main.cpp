@@ -21,7 +21,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     if (mutex) ::CloseHandle(mutex);
     HWND existing = ::FindWindowW(kWindowClassName, nullptr);
     if (existing) {
-      if (::IsIconic(existing)) ::ShowWindow(existing, SW_RESTORE);
+      if (::IsIconic(existing)) {
+        ::ShowWindow(existing, SW_RESTORE);
+      } else if (!::IsWindowVisible(existing)) {
+        // 已有实例可能驻留托盘(窗口隐藏而非最小化);若托盘图标已丢失
+        // (如 explorer 重启),用户将永远无法唤出窗口 → 这里直接显示。
+        ::ShowWindow(existing, SW_SHOW);
+      }
       ::SetForegroundWindow(existing);
     }
     return EXIT_SUCCESS;
