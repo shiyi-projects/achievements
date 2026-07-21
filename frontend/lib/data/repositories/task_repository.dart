@@ -243,25 +243,28 @@ class TaskRepository {
               updatedAt: Value(now),
             ),
           );
+      // 一律走 upsert 并携带完整字段:override 行往往是「新建即软删」(EXDATE),
+      // 若发 `delete` + 空 payload,服务端对不存在的实体幂等 no-op,软删行永远
+      // 不会被创建,跳过的发生点无法传播到其他端。deleted_at 显式携带(可为
+      // null),与本地 insertOnConflictUpdate 覆盖 deletedAt 的语义对齐。
       await _outbox.enqueue(
         entity: 'task',
-        op: deletedAt != null ? 'delete' : 'upsert',
+        op: 'upsert',
         entityId: id,
         baseVersion: existing?.version ?? 0,
-        payload: deletedAt != null
-            ? const {}
-            : {
-                'list_id': template.listId,
-                'title': template.title,
-                'notes': template.notes,
-                'priority': template.priority,
-                'due_at': occurrence.toUtc().toIso8601String(),
-                'remind_at': remindAt?.toUtc().toIso8601String(),
-                'starred': template.starred,
-                'recurrence_parent_id': template.id,
-                'occurrence_date': occurrence.toUtc().toIso8601String(),
-                'completed_at': completedAt?.toUtc().toIso8601String(),
-              },
+        payload: {
+          'list_id': template.listId,
+          'title': template.title,
+          'notes': template.notes,
+          'priority': template.priority,
+          'due_at': occurrence.toUtc().toIso8601String(),
+          'remind_at': remindAt?.toUtc().toIso8601String(),
+          'starred': template.starred,
+          'recurrence_parent_id': template.id,
+          'occurrence_date': occurrence.toUtc().toIso8601String(),
+          'completed_at': completedAt?.toUtc().toIso8601String(),
+          'deleted_at': deletedAt?.toUtc().toIso8601String(),
+        },
       );
     });
   }
@@ -427,19 +430,40 @@ class TaskRepository {
   /// 在回收站(回收站视图正是 `deletedAt 非空`)。
   Future<void> hardDelete(String id) async {
     await _db.transaction(() async {
-      final current =
-          await (_db.select(_db.tasks)
-                ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
-              .getSingleOrNull();
-      await (_db.delete(
-        _db.tasks,
-      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
-      if (current != null) {
+      // 递归收集自身 + 全部后代子任务,逐个 purge:服务端 GC 物理删父行时
+      // FK CASCADE 带走的子行**不会留墓碑**,其他端收不到;必须由发起端为
+      // 每一行显式发 purge。标签关联行同步物理清理(服务端侧随 task 墓碑
+      // 在各端落地时一并清)。
+      final rows = <Task>[];
+      var frontier = <String>[id];
+      while (frontier.isNotEmpty) {
+        final batch =
+            await (_db.select(_db.tasks)..where(
+                  (t) =>
+                      t.userId.equals(_userId) &
+                      (t.id.isIn(frontier) | t.parentId.isIn(frontier)),
+                ))
+                .get();
+        final known = {for (final r in rows) r.id};
+        final fresh = [
+          for (final r in batch)
+            if (!known.contains(r.id)) r,
+        ];
+        rows.addAll(fresh);
+        frontier = [for (final r in fresh) r.id];
+      }
+      for (final row in rows) {
+        await (_db.delete(
+          _db.taskTags,
+        )..where((tt) => tt.taskId.equals(row.id))).go();
+        await (_db.delete(
+          _db.tasks,
+        )..where((t) => t.id.equals(row.id) & t.userId.equals(_userId))).go();
         await _outbox.enqueue(
           entity: 'task',
           op: 'purge',
-          entityId: id,
-          baseVersion: current.version,
+          entityId: row.id,
+          baseVersion: row.version,
           payload: const {},
         );
       }

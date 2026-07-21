@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 
+import 'package:achievements/core/sync/outbox_grouping.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
 import 'package:achievements/data/remote/api_client.dart';
@@ -85,7 +85,10 @@ class SyncEngine {
     final pending = await _outbox.pending();
     if (pending.isEmpty) return SyncStatus.idle;
 
-    final mutations = [for (final row in pending) _toMutation(row)];
+    // 同一实体的连续 upsert 合并为一条 mutation 发送,消除同批链式 base
+    // 陈旧导致的伪 conflict(详见 outbox_grouping.dart)。
+    final groups = groupPending(pending);
+    final mutations = [for (final g in groups) g.toMutation()];
 
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -95,13 +98,15 @@ class SyncEngine {
       );
       final data = response.data;
       if (data == null) return SyncStatus.error;
-      await _applyPushResponse(pending, data);
+      await _applyPushResponse(groups, data);
       return SyncStatus.idle;
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) return SyncStatus.error;
       debugPrint('sync push failed: ${e.type} ${e.message}');
+      // 网络类错误是暂时的:只记 lastError,不消耗 retry 预算(重试由
+      // SyncCoordinator 的 30s 定时器驱动)。
       for (final row in pending) {
-        await _outbox.markFailed(row.id, '${e.type}:${e.message ?? ""}');
+        await _outbox.noteError(row.id, '${e.type}:${e.message ?? ""}');
       }
       return e.type == DioExceptionType.connectionError
           ? SyncStatus.offline
@@ -109,61 +114,57 @@ class SyncEngine {
     } catch (e, st) {
       debugPrint('sync push threw: $e\n$st');
       for (final row in pending) {
-        await _outbox.markFailed(row.id, e.toString());
+        await _outbox.noteError(row.id, e.toString());
       }
       return SyncStatus.error;
     }
   }
 
-  Map<String, dynamic> _toMutation(OutboxData row) {
-    return {
-      'entity': row.entity,
-      'op': row.op,
-      'id': row.entityId,
-      'base_version': row.baseVersion,
-      'payload': jsonDecode(row.payload) as Map<String, dynamic>,
-    };
-  }
-
   Future<void> _applyPushResponse(
-    List<OutboxData> pending,
+    List<MutationGroup> groups,
     Map<String, dynamic> data,
   ) async {
     final results = _list(data['results']);
     // 服务端按请求顺序返回 results,因此可以按下标配对。
-    for (var i = 0; i < pending.length && i < results.length; i++) {
-      await _handleResult(pending[i], results[i]);
+    for (var i = 0; i < groups.length && i < results.length; i++) {
+      await _handleResult(groups[i], results[i]);
     }
   }
 
   Future<void> _handleResult(
-    OutboxData row,
+    MutationGroup group,
     Map<String, dynamic> result,
   ) async {
     final status = result['status'] as String?;
     switch (status) {
       case 'applied':
         await _db.transaction(() async {
-          if (row.op == 'upsert') {
+          if (group.op == 'upsert') {
             final v = result['version'] as int?;
             if (v != null) {
-              await _updateLocalVersion(row.entity, row.entityId, v);
+              await _updateLocalVersion(group.entity, group.entityId, v);
             }
           }
-          await _outbox.deleteById(row.id);
+          for (final row in group.rows) {
+            await _outbox.deleteById(row.id);
+          }
         });
       case 'conflict':
-        await _resolveConflict(row, result);
+        await _resolveConflict(group, result);
       case 'rejected':
-        debugPrint('sync: rejected ${row.entity}/${row.entityId}');
-        await _outbox.markFailed(row.id, 'rejected by server');
+        debugPrint('sync: rejected ${group.entity}/${group.entityId}');
+        for (final row in group.rows) {
+          await _outbox.markFailed(row.id, 'rejected by server');
+        }
       default:
-        await _outbox.markFailed(row.id, 'unknown status: $status');
+        for (final row in group.rows) {
+          await _outbox.markFailed(row.id, 'unknown status: $status');
+        }
     }
   }
 
   Future<void> _resolveConflict(
-    OutboxData row,
+    MutationGroup group,
     Map<String, dynamic> result,
   ) async {
     final serverValue = result['server_value'];
@@ -171,37 +172,46 @@ class SyncEngine {
     if (serverValue is! Map<String, dynamic> || serverVersion == null) {
       // 防御:服务端没给 server_value,只能放弃本地 mutation。
       debugPrint(
-        'sync: conflict without server_value, dropping ${row.entity}/${row.entityId}',
+        'sync: conflict without server_value, dropping '
+        '${group.entity}/${group.entityId}',
       );
-      await _outbox.deleteById(row.id);
+      for (final row in group.rows) {
+        await _outbox.deleteById(row.id);
+      }
       return;
     }
     // 永久删除是终态,不参与 LWW:若服务端已是墓碑则完成,否则跟随服务端 version
     // 重试,直到 base_version 对上后 apply,保证 purge 最终生效。
-    if (row.op == 'purge') {
+    if (group.op == 'purge') {
       if (serverValue['purged_at'] != null) {
-        await _outbox.deleteById(row.id);
+        for (final row in group.rows) {
+          await _outbox.deleteById(row.id);
+        }
       } else {
-        await _outbox.updateBaseVersion(row.id, serverVersion);
+        await _outbox.updateBaseVersion(group.rows.first.id, serverVersion);
       }
       return;
     }
     final serverUpdatedAt = _dt(serverValue['updated_at']);
-    final localTs = row.createdAt;
+    // 组内最后一次本地写入的时刻代表整组意图。
+    final localTs = group.latestCreatedAt;
     final localWins =
         serverUpdatedAt == null || localTs.isAfter(serverUpdatedAt);
 
     if (localWins) {
-      // 本地新:把 baseVersion 升到 server.version,下一轮 push 重发。
-      await _outbox.updateBaseVersion(row.id, serverVersion);
+      // 本地新:把组首行 baseVersion 升到 server.version(下一轮重新分组时
+      // 组的 baseVersion 取首行),下一轮 push 重发。
+      await _outbox.updateBaseVersion(group.rows.first.id, serverVersion);
     } else {
-      // 服务端新:落 server_value,丢弃本地 mutation。
+      // 服务端新:落 server_value,丢弃整组本地 mutation。
       await _db.transaction(() async {
-        await _applyServerValue(row.entity, serverValue);
-        await _outbox.deleteById(row.id);
+        await _applyServerValue(group.entity, serverValue);
+        for (final row in group.rows) {
+          await _outbox.deleteById(row.id);
+        }
       });
       debugPrint(
-        'sync: server wins for ${row.entity}/${row.entityId} '
+        'sync: server wins for ${group.entity}/${group.entityId} '
         '(local=$localTs, server=$serverUpdatedAt)',
       );
       // TODO(phase3): 写入 activities 表留痕
@@ -272,10 +282,18 @@ class SyncEngine {
           _db.taskLists,
         )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
       case 'task':
+        // 标签关联行随任务墓碑一并物理清理:服务端 GC 靠 FK CASCADE 删关联,
+        // 不会为 task_tag 单独下发墓碑。
+        await (_db.delete(
+          _db.taskTags,
+        )..where((tt) => tt.taskId.equals(id))).go();
         await (_db.delete(
           _db.tasks,
         )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
       case 'tag':
+        await (_db.delete(
+          _db.taskTags,
+        )..where((tt) => tt.tagId.equals(id))).go();
         await (_db.delete(
           _db.tags,
         )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
@@ -284,45 +302,65 @@ class SyncEngine {
 
   /// 把服务端 SyncPullResponse 落入本地 Drift。
   ///
-  /// 策略:服务端是 source of truth。普通行 insertOnConflictUpdate;**永久删除墓碑**
-  /// (purged_at 非空)物理删本地行——绝不能 insert,否则已永久删除的任务会随
-  /// deleted_at 复活到回收站。软删行(deleted_at 非空、purged_at 为空)正常落,
-  /// UI 查询据 deletedAt 过滤,显示在回收站。
+  /// 策略:
+  /// - **永久删除墓碑**(purged_at 非空)物理删本地行——绝不能 insert,否则已
+  ///   永久删除的任务会随 deleted_at 复活到回收站;同时清掉该实体残留的 outbox
+  ///   行(实体已死,继续推送无意义)。
+  /// - **脏实体**(outbox 有 pending mutation)跳过,不让服务端旧值覆盖本地
+  ///   未推送的修改;两端差异交由 push 的 conflict/LWW 流程收敛。
+  /// - 其余行 insertOnConflictUpdate。软删行(deleted_at 非空、purged_at 为空)
+  ///   正常落,UI 查询据 deletedAt 过滤,显示在回收站。
   Future<void> _applyPullResponse(Map<String, dynamic> data) async {
     await _db.transaction(() async {
-      for (final raw in _list(data['folders'])) {
+      final dirty = await _outbox.pendingEntityKeys();
+
+      Future<void> applyRow(
+        String entity,
+        Map<String, dynamic> raw,
+        Future<void> Function() upsert,
+      ) async {
+        final id = raw['id'] as String;
         if (raw['purged_at'] != null) {
-          await _deleteLocalById('folder', raw['id'] as String);
-        } else {
-          await _db
-              .into(_db.folders)
-              .insertOnConflictUpdate(_foldersCompanion(raw));
+          await _deleteLocalById(entity, id);
+          await _outbox.deleteByEntity(entity, id);
+          return;
         }
+        if (dirty.contains('$entity:$id')) return;
+        await upsert();
+      }
+
+      for (final raw in _list(data['folders'])) {
+        await applyRow(
+          'folder',
+          raw,
+          () => _db
+              .into(_db.folders)
+              .insertOnConflictUpdate(_foldersCompanion(raw)),
+        );
       }
       for (final raw in _list(data['lists'])) {
-        if (raw['purged_at'] != null) {
-          await _deleteLocalById('list', raw['id'] as String);
-        } else {
-          await _db
+        await applyRow(
+          'list',
+          raw,
+          () => _db
               .into(_db.taskLists)
-              .insertOnConflictUpdate(_taskListsCompanion(raw));
-        }
+              .insertOnConflictUpdate(_taskListsCompanion(raw)),
+        );
       }
       for (final raw in _list(data['tasks'])) {
-        if (raw['purged_at'] != null) {
-          await _deleteLocalById('task', raw['id'] as String);
-        } else {
-          await _db
-              .into(_db.tasks)
-              .insertOnConflictUpdate(_tasksCompanion(raw));
-        }
+        await applyRow(
+          'task',
+          raw,
+          () =>
+              _db.into(_db.tasks).insertOnConflictUpdate(_tasksCompanion(raw)),
+        );
       }
       for (final raw in _list(data['tags'])) {
-        if (raw['purged_at'] != null) {
-          await _deleteLocalById('tag', raw['id'] as String);
-        } else {
-          await _db.into(_db.tags).insertOnConflictUpdate(_tagsCompanion(raw));
-        }
+        await applyRow(
+          'tag',
+          raw,
+          () => _db.into(_db.tags).insertOnConflictUpdate(_tagsCompanion(raw)),
+        );
       }
       for (final raw in _list(data['task_tags'])) {
         final taskId = raw['task_id'] as String;
@@ -414,11 +452,18 @@ class SyncEngine {
       dueAt: Value(_dt(r['due_at'])),
       remindAt: Value(_dt(r['remind_at'])),
       repeatRule: Value(r['repeat_rule'] as String?),
+      recurrenceParentId: Value(r['recurrence_parent_id'] as String?),
+      occurrenceDate: Value(_dt(r['occurrence_date'])),
       color: Value(r['color'] as String?),
       sortOrder: Value(r['sort_order'] as int? ?? 0),
       completedAt: Value(_dt(r['completed_at'])),
       archivedAt: Value(_dt(r['archived_at'])),
       starred: Value(r['starred'] as bool? ?? false),
+      // 区分「key 缺失」与「显式 null」:旧版后端(迁移未部署)不返回此字段,
+      // 缺失时保留本地值,避免升级窗口内被清空。
+      estimatedMinutes: r.containsKey('estimated_minutes')
+          ? Value(r['estimated_minutes'] as int?)
+          : const Value.absent(),
       createdAt: Value(_dt(r['created_at']) ?? DateTime.now()),
       updatedAt: Value(_dt(r['updated_at']) ?? DateTime.now()),
       deletedAt: Value(_dt(r['deleted_at'])),
