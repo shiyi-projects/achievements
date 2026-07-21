@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # 走 Supabase Transaction Pooler(端口 6543)等不持有连接的 PgBouncer 兼容池时需开启,
     # 否则 asyncpg 的预编译语句缓存会与连接复用冲突。直连/Session Pooler 保持 false 性能更好。
     database_disable_statement_cache: bool = False
+    # 数据库保活间隔(小时)。Supabase free tier 闲置约 7 天自动暂停,周期性
+    # SELECT 1 维持活跃;<= 0 禁用(自托管库无需保活时可关)。
+    db_keepalive_interval_hours: float = 6.0
 
     # Redis
     redis_url: str = "redis://redis:6379/0"
