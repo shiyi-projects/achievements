@@ -49,6 +49,12 @@ from app.schemas.task_list import TaskListRead
 # 回来时拿不到墓碑(它仍持有本地副本,无害,只是不会被远端清掉)。
 PURGE_RETENTION = timedelta(days=30)
 
+# pull 增量查询的重叠窗口。push 里各行的 updated_at 在逐条 flush 时生成,而
+# commit 在整批末尾;并发 pull 拿到的 cursor 可能晚于这些 updated_at,却因事务
+# 隔离读不到未提交的行——若严格用 updated_at > since,这些变更会被永久漏掉。
+# 查询时把 since 回退此窗口,宁可重复下发(客户端落库幂等)也不丢。
+SINCE_OVERLAP = timedelta(seconds=60)
+
 
 async def pull(
     session: AsyncSession,
@@ -63,11 +69,14 @@ async def pull(
 
     await _gc_purged(session, user_id=user_id, now=cursor)
 
-    folders = await _delta(session, Folder, user_id=user_id, since=since)
-    lists = await _delta(session, TaskList, user_id=user_id, since=since)
-    tasks = await _delta(session, Task, user_id=user_id, since=since)
-    tags = await _delta(session, Tag, user_id=user_id, since=since)
-    task_tags = await _task_tags_delta(session, user_id=user_id, since=since)
+    # 回退重叠窗口防并发提交丢更新,见 SINCE_OVERLAP 注释。
+    effective_since = None if since is None else since - SINCE_OVERLAP
+
+    folders = await _delta(session, Folder, user_id=user_id, since=effective_since)
+    lists = await _delta(session, TaskList, user_id=user_id, since=effective_since)
+    tasks = await _delta(session, Task, user_id=user_id, since=effective_since)
+    tags = await _delta(session, Tag, user_id=user_id, since=effective_since)
+    task_tags = await _task_tags_delta(session, user_id=user_id, since=effective_since)
 
     return SyncPullResponse(
         cursor=cursor,
@@ -349,12 +358,7 @@ async def _apply_task_tag(
         async with session.begin_nested():
             task = await session.get(Task, payload.task_id)
             tag = await session.get(Tag, payload.tag_id)
-            if (
-                task is None
-                or task.user_id != user_id
-                or tag is None
-                or tag.user_id != user_id
-            ):
+            if task is None or task.user_id != user_id or tag is None or tag.user_id != user_id:
                 return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
 
             existing = await session.get(TaskTag, (payload.task_id, payload.tag_id))

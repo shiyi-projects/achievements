@@ -49,6 +49,7 @@ class TaskPayload(_Base):
     completed_at: datetime | None = None
     archived_at: datetime | None = None
     starred: bool | None = None
+    estimated_minutes: int | None = None
     deleted_at: datetime | None = None
 
 

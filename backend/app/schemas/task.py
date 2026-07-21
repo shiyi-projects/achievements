@@ -61,6 +61,7 @@ class TaskRead(BaseModel):
     completed_at: datetime | None
     archived_at: datetime | None
     starred: bool
+    estimated_minutes: int | None
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
