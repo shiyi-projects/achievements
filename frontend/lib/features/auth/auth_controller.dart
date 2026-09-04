@@ -3,7 +3,7 @@ import 'package:achievements/features/auth/account_operation_gate.dart';
 import 'package:achievements/features/auth/auth_repository.dart';
 import 'package:achievements/features/auth/auth_session.dart';
 import 'package:achievements/state/current_view.dart';
-import 'package:achievements/state/expanded_folders.dart';
+import 'package:achievements/state/expanded_lists.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:achievements/state/selected_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -125,7 +125,7 @@ class AuthController extends StateNotifier<AuthState> {
     _ref.invalidate(selectedListIdProvider);
     _ref.invalidate(selectedTaskIdProvider);
     _ref.invalidate(currentViewNotifierProvider);
-    _ref.invalidate(expandedFoldersProvider);
+    _ref.invalidate(expandedListsProvider);
   }
 }
 

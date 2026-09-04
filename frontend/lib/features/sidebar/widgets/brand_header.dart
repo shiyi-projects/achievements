@@ -128,6 +128,11 @@ class _SyncStatusIndicatorState extends ConsumerState<SyncStatusIndicator>
         theme.colorScheme.outline,
         '离线，暂存本地',
       ),
+      SyncStatus.upgradeRequired => (
+        AppIcons.cloudError,
+        theme.colorScheme.error,
+        '版本过旧，请升级后才能同步',
+      ),
     };
 
     final iconWidget = SvgPicture.asset(

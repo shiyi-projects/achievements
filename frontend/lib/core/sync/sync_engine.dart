@@ -15,7 +15,14 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'sync_engine.g.dart';
 
 /// 同步状态。Sidebar / AppBar 指示器据此显示 icon + 文案。
-enum SyncStatus { idle, syncing, error, offline }
+///
+/// [upgradeRequired]:服务端已升级到本客户端不认识的同步协议(426),重试无用,
+/// 必须换新版本。与 [error] 分开是为了给用户一个可行动的提示,而不是让它在
+/// 「同步失败」里无限重试。
+enum SyncStatus { idle, syncing, error, offline, upgradeRequired }
+
+/// 服务端拒绝旧客户端时回的 HTTP 状态码。
+const int kUpgradeRequiredStatus = 426;
 
 /// 客户端同步引擎。
 ///
@@ -64,6 +71,10 @@ class SyncEngine {
       return SyncStatus.idle;
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) return SyncStatus.error;
+      if (e.response?.statusCode == kUpgradeRequiredStatus) {
+        debugPrint('sync pull refused: client too old, upgrade required');
+        return SyncStatus.upgradeRequired;
+      }
       debugPrint('sync pull failed: ${e.type} ${e.message}');
       return e.type == DioExceptionType.connectionError
           ? SyncStatus.offline
@@ -133,6 +144,12 @@ class SyncEngine {
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) {
         return (status: SyncStatus.error, needsAnotherRound: false);
+      }
+      if (e.response?.statusCode == kUpgradeRequiredStatus) {
+        // 协议不兼容,重试无意义:不消耗 retry 预算,原样留着 outbox,
+        // 等用户升级后一次性推上去。
+        debugPrint('sync push refused: client too old, upgrade required');
+        return (status: SyncStatus.upgradeRequired, needsAnotherRound: false);
       }
       debugPrint('sync push failed: ${e.type} ${e.message}');
       // 网络类错误是暂时的:只记 lastError,不消耗 retry 预算(重试由
@@ -303,10 +320,6 @@ class SyncEngine {
     int version,
   ) async {
     switch (entity) {
-      case 'folder':
-        await (_db.update(_db.folders)
-              ..where((t) => t.id.equals(entityId) & t.userId.equals(_userId)))
-            .write(FoldersCompanion(version: Value(version)));
       case 'list':
         await (_db.update(_db.taskLists)
               ..where((t) => t.id.equals(entityId) & t.userId.equals(_userId)))
@@ -332,10 +345,6 @@ class SyncEngine {
       return;
     }
     switch (entity) {
-      case 'folder':
-        await _db
-            .into(_db.folders)
-            .insertOnConflictUpdate(_foldersCompanion(value));
       case 'list':
         await _db
             .into(_db.taskLists)
@@ -352,10 +361,6 @@ class SyncEngine {
   /// 物理删除本地实体行(永久删除墓碑落地)。
   Future<void> _deleteLocalById(String entity, String id) async {
     switch (entity) {
-      case 'folder':
-        await (_db.delete(
-          _db.folders,
-        )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).go();
       case 'list':
         await (_db.delete(
           _db.taskLists,
@@ -422,15 +427,6 @@ class SyncEngine {
         await upsert();
       }
 
-      for (final raw in _list(data['folders'])) {
-        await applyRow(
-          'folder',
-          raw,
-          () => _db
-              .into(_db.folders)
-              .insertOnConflictUpdate(_foldersCompanion(raw)),
-        );
-      }
       for (final raw in _list(data['lists'])) {
         await applyRow(
           'list',
@@ -508,24 +504,12 @@ class SyncEngine {
   static DateTime? _dt(Object? v) =>
       v == null ? null : DateTime.parse(v as String);
 
-  FoldersCompanion _foldersCompanion(Map<String, dynamic> r) {
-    return FoldersCompanion(
-      id: Value(r['id'] as String),
-      userId: Value(_userId),
-      name: Value(r['name'] as String),
-      sortOrder: Value(r['sort_order'] as int? ?? 0),
-      createdAt: Value(_dt(r['created_at']) ?? DateTime.now()),
-      updatedAt: Value(_dt(r['updated_at']) ?? DateTime.now()),
-      deletedAt: Value(_dt(r['deleted_at'])),
-      version: Value(r['version'] as int? ?? 1),
-    );
-  }
-
   TaskListsCompanion _taskListsCompanion(Map<String, dynamic> r) {
     return TaskListsCompanion(
       id: Value(r['id'] as String),
       userId: Value(_userId),
-      folderId: Value(r['folder_id'] as String?),
+      parentId: Value(r['parent_id'] as String?),
+      trashedWith: Value(r['trashed_with'] as String?),
       name: Value(r['name'] as String),
       color: Value(r['color'] as String?),
       icon: Value(r['icon'] as String?),
@@ -545,6 +529,7 @@ class SyncEngine {
       userId: Value(_userId),
       listId: Value(r['list_id'] as String),
       parentId: Value(r['parent_id'] as String?),
+      trashedWith: Value(r['trashed_with'] as String?),
       title: Value(r['title'] as String),
       notes: Value(r['notes'] as String?),
       priority: Value(r['priority'] as int? ?? 0),

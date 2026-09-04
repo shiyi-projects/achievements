@@ -6,7 +6,7 @@
 ## 1. 总体模型
 
 - **Local-first**:本地 Drift(SQLite)是全量数据源,UI 只读本地;写操作在 Drift 事务里同时落业务表 + 一行 `outbox`(暂存区,类似 `git add`)。
-- **逐实体增量合并**:同步是按实体(folder / list / task / tag / task_tag)逐条的增量协议,**不是整库快照覆盖**。不同设备改不同实体不会互相覆盖;只有改同一条时才按 LWW 取新。
+- **逐实体增量合并**:同步是按实体(list / task / tag / task_tag)逐条的增量协议,**不是整库快照覆盖**。不同设备改不同实体不会互相覆盖;只有改同一条时才按 LWW 取新。
 - **游标增量**:`pull` 用服务端 `updated_at` 游标 `since` 取 `(since, now]` 的变更;响应里的 `cursor` 是服务端「拉取这一刻」的 UTC now,客户端存下次回传。
 - **重叠窗口**:服务端查询实际用 `since - SINCE_OVERLAP`(60s,`sync_service.py`)。push 里各行 `updated_at` 在逐条 flush 时生成、commit 在整批末尾,并发 pull 的 cursor 可能晚于这些 `updated_at` 却读不到未提交行;严格 `> since` 会永久漏掉它们。宁可重复下发(客户端落库幂等)也不丢。
 - **脏实体保护**:客户端 pull 落库时跳过 outbox 中仍有 pending mutation 的实体(`'$entity:$id'` 键匹配),避免服务端旧值覆盖本地未推送的修改;两端差异交由 push 的 conflict/LWW 收敛。pull 到 purge 墓碑则**不跳过**:物理删本地行并清掉该实体残留的 outbox 行(实体已死,推了也没意义)。
@@ -61,6 +61,8 @@
 
 鉴权:`Authorization: Bearer <token>`(`auth_enabled=false` 时回落到 `local_user_id`,开发/测试用)。
 
+**客户端版本门槛**:两个端点都要求 `X-Client-Version` 头。低于 `app.core.client_version.MIN_CLIENT_VERSION`(或缺失 —— 旧版本根本不发)一律回 **426 Upgrade Required**,body 为 `{"detail": {"code": "client_upgrade_required", "message": ...}}`。客户端收到后停止重试并提示升级(`SyncStatus.upgradeRequired`),outbox 原样保留,升级后一次性推上去。
+
 ### GET `/api/v1/sync/pull?since=<ISO datetime>`
 
 `since` 省略 = 首次全量拉取(新设备据此从云端拉全量)。响应:
@@ -68,8 +70,7 @@
 ```jsonc
 {
   "cursor": "2026-06-01T12:00:00+00:00",   // 下次 pull 回传
-  "folders": [FolderRead, ...],
-  "lists":   [TaskListRead, ...],
+  "lists":   [TaskListRead, ...],          // 清单树,带 parent_id / trashed_with
   "tasks":   [TaskRead, ...],
   "tags":    [TagRead, ...],
   "task_tags": [TaskTagRead, ...]
@@ -77,7 +78,7 @@
 ```
 
 - 返回行**包含**软删(`deleted_at != null`)与永久删除墓碑(`purged_at != null`);客户端据此分别置回收站态 / 物理删本地行。
-- 四个主实体 `*Read` 均含 `deleted_at`、`purged_at`、`version`、`updated_at`。
+- 三个主实体 `*Read` 均含 `deleted_at`、`purged_at`、`version`、`updated_at`。
 - `TaskTagRead`:`{ task_id, tag_id, created_at, updated_at, deleted_at }`,`deleted_at` 非空表示该关联已被移除(删除墓碑)。
 
 ### POST `/api/v1/sync/push`
@@ -90,7 +91,7 @@ Mutation 信封:
 
 ```jsonc
 {
-  "entity": "folder|list|task|tag|task_tag",
+  "entity": "list|task|tag|task_tag",
   "op":     "upsert|delete|purge",
   "id":     "<uuid>",          // 主实体主键;task_tag 是复合键,此处用 task_id 占位,真正主键在 payload
   "base_version": 1,           // 客户端认为的服务端 version(task_tag 不参与,传 0)

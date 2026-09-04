@@ -1,6 +1,6 @@
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/data/local/database.dart';
-import 'package:achievements/data/repositories/folder_repository.dart';
+import 'package:achievements/data/models/list_tree.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,9 +20,6 @@ class ListDropdown extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final lists = ref.watch(movableListsProvider);
-    final folders = ref
-        .watch(allFoldersProvider)
-        .maybeWhen(data: (d) => d, orElse: () => const <Folder>[]);
     final currentName =
         lists
             .where((l) => l.id == currentListId)
@@ -31,18 +28,10 @@ class ListDropdown extends ConsumerWidget {
         '—';
 
     final inbox = lists.where((l) => l.isSystem).toList();
-    final rootLists = lists
-        .where((l) => !l.isSystem && l.folderId == null)
-        .toList();
-    final folderIds = folders.map((f) => f.id).toSet();
-    final byFolder = <String, List<TaskList>>{};
-    for (final l in lists.where((l) => !l.isSystem && l.folderId != null)) {
-      if (folderIds.contains(l.folderId)) {
-        byFolder.putIfAbsent(l.folderId!, () => []).add(l);
-      } else {
-        rootLists.add(l);
-      }
-    }
+    // 清单树全展开:选目标清单时不该还要先展开一层层父节点。
+    final rows = flattenTree(buildListTree(lists), {
+      for (final l in lists) l.id,
+    });
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
@@ -58,24 +47,8 @@ class ListDropdown extends ConsumerWidget {
         ),
         itemBuilder: (_) => [
           for (final l in inbox) _buildItem(l, scheme),
-          for (final l in rootLists) _buildItem(l, scheme),
-          for (final folder in folders) ...[
-            if (byFolder.containsKey(folder.id)) ...[
-              PopupMenuItem<String>(
-                enabled: false,
-                height: 32,
-                child: Text(
-                  folder.name,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.outline,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-              for (final l in byFolder[folder.id]!)
-                _buildItem(l, scheme, indent: true),
-            ],
-          ],
+          for (final row in rows)
+            _buildItem(row.list, scheme, depth: row.depth - 1),
         ],
         child: Container(
           padding: const EdgeInsets.symmetric(
@@ -90,7 +63,7 @@ class ListDropdown extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.folder_outlined,
+                Icons.list_rounded,
                 size: 16,
                 color: scheme.onSurfaceVariant,
               ),
@@ -114,12 +87,12 @@ class ListDropdown extends ConsumerWidget {
   PopupMenuItem<String> _buildItem(
     TaskList l,
     ColorScheme scheme, {
-    bool indent = false,
+    int depth = 0,
   }) {
     return PopupMenuItem<String>(
       value: l.id,
       child: Padding(
-        padding: EdgeInsets.only(left: indent ? Spacing.base : 0),
+        padding: EdgeInsets.only(left: depth * Spacing.base),
         child: Row(
           children: [
             Icon(

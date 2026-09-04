@@ -417,6 +417,11 @@ class _SyncStatusTile extends ConsumerWidget {
       SyncStatus.syncing => (Icons.cloud_sync_rounded, scheme.primary, '同步中…'),
       SyncStatus.error => (Icons.error_outline_rounded, scheme.error, '同步失败'),
       SyncStatus.offline => (Icons.cloud_off_rounded, scheme.outline, '离线'),
+      SyncStatus.upgradeRequired => (
+        Icons.system_update_rounded,
+        scheme.error,
+        '版本过旧，升级后才能同步',
+      ),
     };
 
     return SettingsTile(

@@ -2,6 +2,7 @@ import 'package:achievements/core/constants.dart';
 import 'package:achievements/core/id.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/local/database_provider.dart';
+import 'package:achievements/data/models/list_tree.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/outbox_repository.dart';
 import 'package:achievements/features/auth/auth_controller.dart';
@@ -410,15 +411,17 @@ class TaskRepository {
       final current = await (_db.select(
         _db.tasks,
       )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).getSingle();
-      await (_db.update(_db.tasks)
-            ..where((t) => t.id.equals(id) & t.userId.equals(_userId)))
-          .write(const TasksCompanion(deletedAt: Value(null)));
+      await (_db.update(
+        _db.tasks,
+      )..where((t) => t.id.equals(id) & t.userId.equals(_userId))).write(
+        const TasksCompanion(deletedAt: Value(null), trashedWith: Value(null)),
+      );
       await _outbox.enqueue(
         entity: 'task',
         op: 'upsert',
         entityId: id,
         baseVersion: current.version,
-        payload: const {'deleted_at': null},
+        payload: const {'deleted_at': null, 'trashed_with': null},
       );
     });
   }
@@ -475,7 +478,11 @@ class TaskRepository {
 
   /// 单一事实源:根据 [list] 计算 WHERE 表达式。watchForList /
   /// watchCountForList 共用,保证视觉列表与 Sidebar 徽标数字一致。
-  _TaskFilter _filterFor(TaskList list) {
+  ///
+  /// [subtreeIds] 是该清单及其全部后代清单的 id(由调用方从清单树算出)。
+  /// 用户清单的任务视图与徽标都是整棵子树的聚合——父清单里既能直接放任务,
+  /// 也能收纳子清单,打开它自然要看到全部。
+  _TaskFilter _filterFor(TaskList list, List<String> subtreeIds) {
     if (list.isSystem) {
       switch (SystemListKind.fromValue(list.systemKind)) {
         case SystemListKind.today:
@@ -505,33 +512,38 @@ class TaskRepository {
               t.deletedAt.isNull() &
               t.completedAt.isNotNull();
         case SystemListKind.trash:
-          return (t) => t.userId.equals(_userId) & t.deletedAt.isNotNull();
+          // 随清单级联进回收站的任务不单独列出——它们跟着那条清单条目整体
+          // 还原,逐条铺开只会把回收站淹掉。
+          return (t) =>
+              t.userId.equals(_userId) &
+              t.deletedAt.isNotNull() &
+              t.trashedWith.isNull();
         case SystemListKind.inbox:
         case null:
           return (t) =>
               t.userId.equals(_userId) &
               t.deletedAt.isNull() &
-              t.listId.equals(list.id) &
+              t.listId.isIn(subtreeIds) &
               t.parentId.isNull();
       }
     }
     return (t) =>
         t.userId.equals(_userId) &
         t.deletedAt.isNull() &
-        t.listId.equals(list.id) &
+        t.listId.isIn(subtreeIds) &
         t.parentId.isNull();
   }
 
-  Stream<List<Task>> watchForList(TaskList list) {
+  Stream<List<Task>> watchForList(TaskList list, List<String> subtreeIds) {
     return _watchWith(
-      _filterFor(list),
+      _filterFor(list, subtreeIds),
       reverseForTrash: list.systemKind == 'trash',
     );
   }
 
   /// 监听某清单的任务数量(Sidebar 徽标);与 [watchForList] 同口径。
-  Stream<int> watchCountForList(TaskList list) {
-    final filter = _filterFor(list);
+  Stream<int> watchCountForList(TaskList list, List<String> subtreeIds) {
+    final filter = _filterFor(list, subtreeIds);
     final countExpr = _db.tasks.id.count();
     final query = _db.selectOnly(_db.tasks)
       ..addColumns([countExpr])
@@ -599,7 +611,7 @@ TaskRepository taskRepository(Ref ref) {
   );
 }
 
-/// 当前选中清单的任务流(主视图用)。
+/// 当前选中清单的任务流(主视图用)。父清单展示整棵子树的聚合。
 @riverpod
 Stream<List<Task>> tasksForCurrentList(Ref ref) async* {
   final list = await ref.watch(currentListProvider.future);
@@ -607,7 +619,11 @@ Stream<List<Task>> tasksForCurrentList(Ref ref) async* {
     yield const <Task>[];
     return;
   }
-  yield* ref.watch(taskRepositoryProvider).watchForList(list);
+  // watch 清单流:新增 / 移动子清单后聚合范围要跟着变。
+  final all = await ref.watch(allListsProvider.future);
+  yield* ref
+      .watch(taskRepositoryProvider)
+      .watchForList(list, subtreeIdsOf(list.id, all));
 }
 
 /// 监听某父任务的直接子任务。
@@ -617,15 +633,18 @@ Stream<List<Task>> subtasksOf(Ref ref, String parentId) {
 }
 
 /// 某清单的任务数量(Sidebar 徽标)。家族参数用 listId 字符串避免在
-/// codegen 端引入 Drift 数据类的等值/哈希依赖。
+/// codegen 端引入 Drift 数据类的等值/哈希依赖。父清单计的是整棵子树。
 @riverpod
 Stream<int> taskCountForListId(Ref ref, String listId) async* {
-  final list = await ref.watch(listRepositoryProvider).findById(listId);
+  final all = await ref.watch(allListsProvider.future);
+  final list = all.where((l) => l.id == listId).firstOrNull;
   if (list == null) {
     yield 0;
     return;
   }
-  yield* ref.watch(taskRepositoryProvider).watchCountForList(list);
+  yield* ref
+      .watch(taskRepositoryProvider)
+      .watchCountForList(list, subtreeIdsOf(listId, all));
 }
 
 /// 日历视图:指定月份内有 due_at 的任务流。[monthStart] 为当月 1 日 00:00。

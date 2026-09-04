@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:achievements/core/app_info.dart';
 import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:achievements/features/auth/auth_session.dart';
 import 'package:dio/dio.dart';
@@ -58,5 +59,9 @@ BaseOptions _baseOptions() {
     sendTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 15),
     contentType: 'application/json',
+    // 同步协议的版本门槛靠它判定:清单树取代文件夹后,旧客户端推上来的
+    // mutation 已无法解释,服务端据此回 426 让用户去升级,而不是让旧端把
+    // 请求一遍遍重试成死信。
+    headers: const {'X-Client-Version': kAppVersion},
   );
 }

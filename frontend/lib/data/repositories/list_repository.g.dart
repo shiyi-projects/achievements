@@ -42,6 +42,25 @@ final allListsProvider = AutoDisposeStreamProvider<List<TaskList>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AllListsRef = AutoDisposeStreamProviderRef<List<TaskList>>;
+String _$trashedListsHash() => r'9e727e657fed0ea54c5f5f4bfa42f8ff0f46e077';
+
+/// 回收站里的清单条目。
+///
+/// Copied from [trashedLists].
+@ProviderFor(trashedLists)
+final trashedListsProvider = AutoDisposeStreamProvider<List<TaskList>>.internal(
+  trashedLists,
+  name: r'trashedListsProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$trashedListsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TrashedListsRef = AutoDisposeStreamProviderRef<List<TaskList>>;
 String _$inboxListHash() => r'79a00bb9345c4c1b7245fb2489f0b96a43ca6cde';
 
 /// 默认 Inbox 清单(系统种子)。Smart filter 视图下的快速创建落到这里。
@@ -63,8 +82,8 @@ final inboxListProvider = FutureProvider<TaskList?>.internal(
 typedef InboxListRef = FutureProviderRef<TaskList?>;
 String _$movableListsHash() => r'0454a0481547ac68a573d48e0577354d54d2f414';
 
-/// 任务可被移动到的目标清单:Inbox + 全部用户自定义清单。其他系统清单
-/// (today/important/planned 等)是智能过滤,不存储任务,无法作为目标。
+/// 任务可被移动到的目标清单:Inbox + 全部用户清单(树里的任何一级都能装任务)。
+/// 其他系统清单(today/important/planned 等)是智能过滤,不存储任务。
 ///
 /// Copied from [movableLists].
 @ProviderFor(movableLists)

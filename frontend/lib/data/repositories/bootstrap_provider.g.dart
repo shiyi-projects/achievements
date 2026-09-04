@@ -6,7 +6,7 @@ part of 'bootstrap_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appBootstrapHash() => r'f9a68f416839b53730a68a13305ba8e0f6266d26';
+String _$appBootstrapHash() => r'da77330e66c6dc207142f1339f7226217460e4c6';
 
 /// 应用启动期一次性初始化:
 ///   1. 种入系统清单(幂等)

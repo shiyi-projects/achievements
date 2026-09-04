@@ -431,6 +431,15 @@ class _SyncStatusIcon extends ConsumerWidget {
           message: '同步失败,30 秒后重试',
           child: AppIcons.svgIcon(AppIcons.cloudError, size: 20),
         ),
+        SyncStatus.upgradeRequired => Tooltip(
+          key: const ValueKey('upgrade-required'),
+          message: '客户端版本过旧,升级后才能继续同步',
+          child: Icon(
+            Icons.system_update_rounded,
+            size: 20,
+            color: scheme.error,
+          ),
+        ),
       },
     );
   }

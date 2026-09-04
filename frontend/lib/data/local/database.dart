@@ -9,7 +9,6 @@ part 'database.g.dart';
 
 @DriftDatabase(
   tables: [
-    Folders,
     TaskLists,
     Tasks,
     Tags,
@@ -29,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration {
@@ -109,8 +108,90 @@ class AppDatabase extends _$AppDatabase {
             'ALTER TABLE tasks ADD COLUMN occurrence_date INTEGER',
           );
         }
+        // v11 → v12:废除 folders 表,清单改为自引用树(parent_id)。
+        if (from < 12) {
+          await _mergeFoldersIntoLists(m);
+        }
       },
     );
+  }
+
+  /// v11 → v12:把 `folders` 并入 `task_lists`。
+  ///
+  /// 迁移后「文件夹」不再是独立实体——每个文件夹变成一个顶层用户清单(沿用
+  /// 原 id,保证同步主键不错位),原先挂在它下面的清单改为它的子清单。
+  ///
+  /// 步骤:
+  ///   1. `task_lists` 加 `parent_id`,原 `folder_id` 平移过去;
+  ///   2. `folders` 每行插成一条顶层清单,sort_order 先落到一个负数段,
+  ///      保证迁移后仍排在原根清单之前(与旧 UI「文件夹恒在上」的视觉一致);
+  ///   3. 顶层用户清单重编号为连续 0..n;
+  ///   4. 重建 `task_lists` 丢掉 `folder_id` 列,重建唯一索引,drop `folders`。
+  Future<void> _mergeFoldersIntoLists(Migrator m) async {
+    await _addColumnIfAbsent(
+      'task_lists',
+      'parent_id',
+      'ALTER TABLE task_lists ADD COLUMN parent_id TEXT',
+    );
+    // 级联删除标记(回收站整体还原用)。先于下面的 alterTable 加,使重建表时
+    // 该列已存在于旧表,可直接复制。
+    await _addColumnIfAbsent(
+      'task_lists',
+      'trashed_with',
+      'ALTER TABLE task_lists ADD COLUMN trashed_with TEXT',
+    );
+    await _addColumnIfAbsent(
+      'tasks',
+      'trashed_with',
+      'ALTER TABLE tasks ADD COLUMN trashed_with TEXT',
+    );
+    if (await _columnExists('task_lists', 'folder_id')) {
+      await customStatement(
+        'UPDATE task_lists SET parent_id = folder_id WHERE folder_id IS NOT NULL',
+      );
+    }
+    if (await _tableExists('folders')) {
+      await customStatement('''
+        INSERT OR IGNORE INTO task_lists
+          (id, user_id, name, sort_order, is_system,
+           created_at, updated_at, deleted_at, version)
+        SELECT id, user_id, name, sort_order - 1000000, 0,
+               created_at, updated_at, deleted_at, version
+          FROM folders
+      ''');
+    }
+    // 顶层用户清单(文件夹迁移来的 + 原根清单)重编号为连续序号。
+    await customStatement('''
+      UPDATE task_lists
+         SET sort_order = (
+               SELECT COUNT(*) FROM task_lists t2
+                WHERE t2.user_id = task_lists.user_id
+                  AND t2.is_system = 0
+                  AND t2.parent_id IS NULL
+                  AND (t2.sort_order < task_lists.sort_order
+                       OR (t2.sort_order = task_lists.sort_order
+                           AND t2.id < task_lists.id))
+             )
+       WHERE is_system = 0 AND parent_id IS NULL
+    ''');
+    // 按新 schema 重建 task_lists —— folder_id 不在新 schema 中,自然丢弃。
+    // TableMigration 在 drift 里仍标记为 experimental,但它是官方给出的删列
+    // 手段(SQLite 早期不支持 DROP COLUMN),手写建表 + 搬数据只会更脆。
+    // ignore: experimental_member_use
+    await m.alterTable(TableMigration(taskLists));
+    // 重建表会带走索引,补回来。
+    await _ensureSystemKindIndex();
+    if (await _tableExists('folders')) {
+      await customStatement('DROP TABLE folders');
+    }
+  }
+
+  Future<bool> _tableExists(String table) async {
+    final rows = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1",
+      variables: [Variable<String>(table)],
+    ).get();
+    return rows.isNotEmpty;
   }
 
   /// 查询某表是否已存在某列(走 PRAGMA table_info)。
@@ -157,6 +238,10 @@ class AppDatabase extends _$AppDatabase {
                      WHERE dup_id <> keeper_id)
     ''');
     await customStatement('DROP TABLE _dup_system_lists');
+    await _ensureSystemKindIndex();
+  }
+
+  Future<void> _ensureSystemKindIndex() async {
     await customStatement(
       'CREATE UNIQUE INDEX IF NOT EXISTS uq_task_lists_user_system_kind_active '
       'ON task_lists (user_id, system_kind) '
