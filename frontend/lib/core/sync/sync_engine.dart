@@ -74,16 +74,40 @@ class SyncEngine {
   ///
   /// 处理 push 响应:
   /// - `applied`:本地 row.version 更新为服务端最新值,outbox 行删除。
-  /// - `conflict`:对比 outbox.createdAt(本地写入时戳)与 server_value.updated_at
-  ///   * 本地新 → 把 outbox.baseVersion 改为 server.version,下一轮 push 再发
-  ///   * 服务端新 → 用 server_value 覆盖本地行,outbox 行删除(Phase 3 接 activities
-  ///     表后再写一笔留痕)
+  /// - `conflict`:
+  ///   * 删除类终态(delete / purge)不参与 LWW,跟随服务端 version 重试直到生效
+  ///   * 其余对比 outbox.createdAt(本地写入时戳)与 server_value.updated_at
+  ///     - 本地新 → 把 outbox.baseVersion 改为 server.version,重发
+  ///     - 服务端新 → 用 server_value 覆盖本地行,outbox 行删除(Phase 3 接
+  ///       activities 表后再写一笔留痕)
   /// - `rejected`:服务端拒收(payload 校验失败 / 不允许的实体等),outbox 行删除。
   ///
   /// 整体网络异常:全部 mutation `markFailed`,retry_count 用尽后自然退出循环。
+  ///
+  /// conflict 走「跟随服务端 version 重试」时,重发必须在**本次调用内**完成:
+  /// 那条路径只改 outbox 行的 baseVersion、不改行数,watchPendingCount 不保证
+  /// 再次触发 push,漏掉就要等 30s 重试或下一次本地写入。
   Future<SyncStatus> pushOnce({CancelToken? cancelToken}) async {
+    var status = SyncStatus.idle;
+    for (var round = 0; round < _maxPushRounds; round++) {
+      final outcome = await _pushRound(cancelToken: cancelToken);
+      status = outcome.status;
+      // 只有本轮干净结束、且确实有行等着重发,才值得再来一轮。
+      if (status != SyncStatus.idle || !outcome.needsAnotherRound) break;
+    }
+    return status;
+  }
+
+  /// 单轮 push 的上限。防止两端持续互相改同一实体时在一次调用里空转。
+  static const int _maxPushRounds = 3;
+
+  Future<({SyncStatus status, bool needsAnotherRound})> _pushRound({
+    CancelToken? cancelToken,
+  }) async {
     final pending = await _outbox.pending();
-    if (pending.isEmpty) return SyncStatus.idle;
+    if (pending.isEmpty) {
+      return (status: SyncStatus.idle, needsAnotherRound: false);
+    }
 
     // 同一实体的连续 upsert 合并为一条 mutation 发送,消除同批链式 base
     // 陈旧导致的伪 conflict(详见 outbox_grouping.dart)。
@@ -97,41 +121,52 @@ class SyncEngine {
         cancelToken: cancelToken,
       );
       final data = response.data;
-      if (data == null) return SyncStatus.error;
-      await _applyPushResponse(groups, data);
-      return SyncStatus.idle;
+      if (data == null) {
+        return (status: SyncStatus.error, needsAnotherRound: false);
+      }
+      final retry = await _applyPushResponse(groups, data);
+      return (status: SyncStatus.idle, needsAnotherRound: retry);
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.cancel) return SyncStatus.error;
+      if (e.type == DioExceptionType.cancel) {
+        return (status: SyncStatus.error, needsAnotherRound: false);
+      }
       debugPrint('sync push failed: ${e.type} ${e.message}');
       // 网络类错误是暂时的:只记 lastError,不消耗 retry 预算(重试由
       // SyncCoordinator 的 30s 定时器驱动)。
       for (final row in pending) {
         await _outbox.noteError(row.id, '${e.type}:${e.message ?? ""}');
       }
-      return e.type == DioExceptionType.connectionError
-          ? SyncStatus.offline
-          : SyncStatus.error;
+      return (
+        status: e.type == DioExceptionType.connectionError
+            ? SyncStatus.offline
+            : SyncStatus.error,
+        needsAnotherRound: false,
+      );
     } catch (e, st) {
       debugPrint('sync push threw: $e\n$st');
       for (final row in pending) {
         await _outbox.noteError(row.id, e.toString());
       }
-      return SyncStatus.error;
+      return (status: SyncStatus.error, needsAnotherRound: false);
     }
   }
 
-  Future<void> _applyPushResponse(
+  /// 返回是否有 group 被安排了重发(conflict 抬高 baseVersion 后等下一轮)。
+  Future<bool> _applyPushResponse(
     List<MutationGroup> groups,
     Map<String, dynamic> data,
   ) async {
     final results = _list(data['results']);
+    var needsAnotherRound = false;
     // 服务端按请求顺序返回 results,因此可以按下标配对。
     for (var i = 0; i < groups.length && i < results.length; i++) {
-      await _handleResult(groups[i], results[i]);
+      if (await _handleResult(groups[i], results[i])) needsAnotherRound = true;
     }
+    return needsAnotherRound;
   }
 
-  Future<void> _handleResult(
+  /// 返回 true 表示该 group 已被安排重发,调用方应再跑一轮 push。
+  Future<bool> _handleResult(
     MutationGroup group,
     Map<String, dynamic> result,
   ) async {
@@ -139,31 +174,36 @@ class SyncEngine {
     switch (status) {
       case 'applied':
         await _db.transaction(() async {
-          if (group.op == 'upsert') {
-            final v = result['version'] as int?;
-            if (v != null) {
-              await _updateLocalVersion(group.entity, group.entityId, v);
-            }
+          // 服务端对 delete / purge 同样 bump version 并返回新值;不回写会让
+          // 本地 version 永久落后一格,此后这一行的每次操作都带着陈旧的
+          // base_version,必然冲突并被 LWW 赌时间戳。purge 时本地行已被物理
+          // 删除,这条 UPDATE 影响 0 行,无害。
+          final v = result['version'] as int?;
+          if (v != null) {
+            await _updateLocalVersion(group.entity, group.entityId, v);
           }
           for (final row in group.rows) {
             await _outbox.deleteById(row.id);
           }
         });
+        return false;
       case 'conflict':
-        await _resolveConflict(group, result);
+        return _resolveConflict(group, result);
       case 'rejected':
         debugPrint('sync: rejected ${group.entity}/${group.entityId}');
         for (final row in group.rows) {
           await _outbox.markFailed(row.id, 'rejected by server');
         }
+        return false;
       default:
         for (final row in group.rows) {
           await _outbox.markFailed(row.id, 'unknown status: $status');
         }
+        return false;
     }
   }
 
-  Future<void> _resolveConflict(
+  Future<bool> _resolveConflict(
     MutationGroup group,
     Map<String, dynamic> result,
   ) async {
@@ -178,19 +218,35 @@ class SyncEngine {
       for (final row in group.rows) {
         await _outbox.deleteById(row.id);
       }
-      return;
+      return false;
     }
-    // 永久删除是终态,不参与 LWW:若服务端已是墓碑则完成,否则跟随服务端 version
-    // 重试,直到 base_version 对上后 apply,保证 purge 最终生效。
-    if (group.op == 'purge') {
-      if (serverValue['purged_at'] != null) {
-        for (final row in group.rows) {
-          await _outbox.deleteById(row.id);
-        }
-      } else {
-        await _outbox.updateBaseVersion(group.rows.first.id, serverVersion);
+    // 删除是终态,不参与 LWW。删除是用户的显式意图,不该被「服务端 updated_at
+    // 更晚」吞掉 —— 尤其当那个更晚的时刻正是同批前一条 upsert 刚刚造成的:
+    // 拿本地入队时刻去比,服务端恒胜,删除被静默丢弃。
+    // 若服务端已达成该终态则完成,否则跟随服务端 version 重试,直到 base_version
+    // 对上后 apply。
+    if (group.op == 'purge' || group.op == 'delete') {
+      final reached = group.op == 'purge'
+          ? serverValue['purged_at'] != null
+          : serverValue['deleted_at'] != null ||
+                serverValue['purged_at'] != null;
+      if (reached) {
+        await _db.transaction(() async {
+          // 目标已达成(可能是另一端先删的),把服务端 version 收下,免得本地
+          // 继续拿陈旧 version 去撞下一次冲突。
+          await _updateLocalVersion(
+            group.entity,
+            group.entityId,
+            serverVersion,
+          );
+          for (final row in group.rows) {
+            await _outbox.deleteById(row.id);
+          }
+        });
+        return false;
       }
-      return;
+      await _outbox.updateBaseVersion(group.rows.first.id, serverVersion);
+      return true;
     }
     final serverUpdatedAt = _dt(serverValue['updated_at']);
     // 组内最后一次本地写入的时刻代表整组意图。
@@ -202,6 +258,7 @@ class SyncEngine {
       // 本地新:把组首行 baseVersion 升到 server.version(下一轮重新分组时
       // 组的 baseVersion 取首行),下一轮 push 重发。
       await _outbox.updateBaseVersion(group.rows.first.id, serverVersion);
+      return true;
     } else {
       // 服务端新:落 server_value,丢弃整组本地 mutation。
       await _db.transaction(() async {
@@ -215,6 +272,7 @@ class SyncEngine {
         '(local=$localTs, server=$serverUpdatedAt)',
       );
       // TODO(phase3): 写入 activities 表留痕
+      return false;
     }
   }
 

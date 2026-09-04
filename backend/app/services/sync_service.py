@@ -203,8 +203,17 @@ async def push(
 
     使用 savepoint 隔离每条 mutation,一条 FK 违例不会破坏整个 session。
     按 entity 依赖顺序排序:folder → list → task → tag → task_tag。
+
+    **批内因果链**:客户端本地行的 version 只在 push 收到 ``applied`` 后才回写,
+    所以同一实体在一批里的第 2 条起必然带着陈旧的 base_version(如离线期间
+    「改标题 → 删除」)。这不是并发冲突,是同一客户端同一批请求内的因果顺序;
+    若照常判 conflict,客户端 LWW 会拿「本地入队时刻」比「服务端刚应用前一条的
+    时刻」,后者恒晚 → 服务端恒胜 → 用户的删除被静默吞掉。这里记住本批已成功
+    应用过的实体,对其后继 mutation 跳过 base_version 检查、直接按序接续。
+    跨批次的真并发(另一台设备的写)不在此集合中,仍照常判 conflict。
     """
-    # 按依赖排序,父实体先于子实体
+    # 按依赖排序,父实体先于子实体。sort 是稳定的,同一实体内部保持客户端
+    # 入队顺序 —— 批内因果链接续依赖这一点。
     order: dict[str, int] = {
         "folder": 0,
         "list": 1,
@@ -215,10 +224,17 @@ async def push(
     indexed = list(enumerate(request.mutations))
     indexed.sort(key=lambda pair: order.get(pair[1].entity, 99))
 
+    # 本批已成功应用过的实体。task_tag 不参与:它无 version、不做乐观并发,
+    # 且 Mutation.id 只是占位(真正主键在 payload)。
+    applied_in_batch: set[tuple[str, str]] = set()
+
     # slot for results, preserve original order
     results: list[MutationResult | None] = [None] * len(request.mutations)
     for orig_idx, mut in indexed:
-        results[orig_idx] = await _apply_one(session, user_id, mut)
+        result = await _apply_one(session, user_id, mut, applied_in_batch)
+        if result.status == "applied" and mut.entity != "task_tag":
+            applied_in_batch.add((mut.entity, str(mut.id)))
+        results[orig_idx] = result
 
     await session.commit()
     return SyncPushResponse(
@@ -231,6 +247,7 @@ async def _apply_one(
     session: AsyncSession,
     user_id: UUID,
     mut: Mutation,
+    applied_in_batch: set[tuple[str, str]] | None = None,
 ) -> MutationResult:
     if mut.entity == "task_tag":
         return await _apply_task_tag(session, user_id, mut)
@@ -290,7 +307,12 @@ async def _apply_one(
             if existing.user_id != user_id:
                 return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
 
-            if existing.version != mut.base_version:
+            # 本批已应用过这一实体 → 当前这条是它的因果后继,base_version 必然
+            # 陈旧,按序接续而不判冲突(见 push 的 docstring)。
+            in_batch = (
+                applied_in_batch is not None and (mut.entity, str(mut.id)) in applied_in_batch
+            )
+            if existing.version != mut.base_version and not in_batch:
                 return MutationResult(
                     entity=mut.entity,
                     id=mut.id,

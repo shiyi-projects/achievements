@@ -255,6 +255,201 @@ async def test_push_delete_soft_deletes(client: AsyncClient) -> None:
     assert fetched.json()["deleted_at"] is not None
 
 
+# ---- 批内因果链 -----------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_push_batch_upsert_then_delete_both_apply(client: AsyncClient) -> None:
+    """离线期间「改标题 → 删除」:两条 mutation 带着相同的陈旧 base_version。
+
+    客户端本地 version 只在收到 applied 后才回写,所以第 2 条起必然陈旧。
+    服务端须按序接续而不是判 conflict —— 否则客户端 LWW 会拿「本地入队时刻」
+    比「服务端刚应用第 1 条的时刻」,后者恒晚,删除被静默吞掉。
+    """
+    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    task_id = (
+        await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "交年报"})
+    ).json()["id"]
+
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task",
+                    "op": "upsert",
+                    "id": task_id,
+                    "base_version": 1,
+                    "payload": {"title": "交年报(终版)"},
+                },
+                {
+                    "entity": "task",
+                    "op": "delete",
+                    "id": task_id,
+                    "base_version": 1,  # 陈旧:第 1 条已把服务端推到 2
+                    "payload": {},
+                },
+            ]
+        },
+    )
+    results = push.json()["results"]
+    assert [r["status"] for r in results] == ["applied", "applied"]
+    assert [r["version"] for r in results] == [2, 3]
+
+    fetched = (await client.get(f"/api/v1/tasks/{task_id}")).json()
+    assert fetched["title"] == "交年报(终版)"
+    assert fetched["deleted_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_push_batch_repeated_upserts_chain(client: AsyncClient) -> None:
+    """同一实体在一批里连改三次,全部按序生效,version 逐条递增。"""
+    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+
+    def mutation(name: str) -> dict[str, object]:
+        return {
+            "entity": "list",
+            "op": "upsert",
+            "id": list_id,
+            "base_version": 1,
+            "payload": {"name": name},
+        }
+
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={"mutations": [mutation("A"), mutation("B"), mutation("C")]},
+    )
+    results = push.json()["results"]
+    assert [r["status"] for r in results] == ["applied"] * 3
+    assert [r["version"] for r in results] == [2, 3, 4]
+
+    pull = (await client.get("/api/v1/sync/pull")).json()
+    assert next(item for item in pull["lists"] if item["id"] == list_id)["name"] == "C"
+
+
+@pytest.mark.asyncio
+async def test_push_batch_purge_after_upsert_applies(client: AsyncClient) -> None:
+    """「编辑 → 永久删除」同批也须接续,墓碑必须落地。"""
+    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    task_id = (
+        await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "gone"})
+    ).json()["id"]
+
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "task",
+                    "op": "upsert",
+                    "id": task_id,
+                    "base_version": 1,
+                    "payload": {"title": "gone (edited)"},
+                },
+                {
+                    "entity": "task",
+                    "op": "purge",
+                    "id": task_id,
+                    "base_version": 1,
+                    "payload": {},
+                },
+            ]
+        },
+    )
+    assert [r["status"] for r in push.json()["results"]] == ["applied", "applied"]
+
+    pull = (await client.get("/api/v1/sync/pull")).json()
+    assert next(t for t in pull["tasks"] if t["id"] == task_id)["purged_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_push_cross_batch_stale_version_still_conflicts(
+    client: AsyncClient,
+) -> None:
+    """批内接续不能放过真正的并发:另一批推上去的写仍须判 conflict。"""
+    list_id = (await client.post("/api/v1/lists", json={"name": "Local"})).json()["id"]
+
+    # 第一批:模拟另一台设备把 version 推到 2
+    first = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "list",
+                    "op": "upsert",
+                    "id": list_id,
+                    "base_version": 1,
+                    "payload": {"name": "Device B"},
+                }
+            ]
+        },
+    )
+    assert first.json()["results"][0]["status"] == "applied"
+
+    # 第二批:本设备仍以为是 version 1 → 必须冲突,不能被当成因果后继
+    second = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "list",
+                    "op": "upsert",
+                    "id": list_id,
+                    "base_version": 1,
+                    "payload": {"name": "Device A"},
+                }
+            ]
+        },
+    )
+    result = second.json()["results"][0]
+    assert result["status"] == "conflict"
+    assert result["version"] == 2
+    assert result["server_value"]["name"] == "Device B"
+
+
+@pytest.mark.asyncio
+async def test_push_batch_conflict_does_not_leak_to_other_entity(
+    client: AsyncClient,
+) -> None:
+    """接续集合按实体隔离:A 实体在批内接续,不能让 B 实体的陈旧 base 蒙混过关。"""
+    a_id = (await client.post("/api/v1/lists", json={"name": "A"})).json()["id"]
+    b_id = (await client.post("/api/v1/lists", json={"name": "B"})).json()["id"]
+
+    push = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "mutations": [
+                {
+                    "entity": "list",
+                    "op": "upsert",
+                    "id": a_id,
+                    "base_version": 1,
+                    "payload": {"name": "A1"},
+                },
+                {
+                    "entity": "list",
+                    "op": "upsert",
+                    "id": a_id,
+                    "base_version": 1,
+                    "payload": {"name": "A2"},
+                },
+                {
+                    "entity": "list",
+                    "op": "upsert",
+                    "id": b_id,
+                    "base_version": 99,  # 与任何真实 version 都对不上
+                    "payload": {"name": "B1"},
+                },
+            ]
+        },
+    )
+    assert [r["status"] for r in push.json()["results"]] == [
+        "applied",
+        "applied",
+        "conflict",
+    ]
+
+
 @pytest.mark.asyncio
 async def test_push_recurrence_fields_round_trip(client: AsyncClient) -> None:
     """重复模板与 override 字段经 sync push → pull 往返保真。"""
