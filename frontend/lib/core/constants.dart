@@ -20,6 +20,10 @@ const Map<String, String> kLegacySystemListIds = {
   'trash': '01900000-0000-7000-8000-000000000007',
 };
 
+/// 清单树的最大层数(顶层记为 1)。超过此深度的挂靠 / 拖放一律拒绝。
+/// 前端拦交互,后端 sync apply 时兜底,两侧共用同一个数值。
+const int kMaxListDepth = 3;
+
 /// 任务优先级。落库 `tasks.priority` 列,0 / 1 / 2 / 3。
 enum TaskPriority {
   none(0, 'None'),

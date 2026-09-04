@@ -23,8 +23,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Folder, Tag, Task, TaskList, TaskTag
-from app.schemas.folder import FolderRead
+from app.core.list_tree import validate_parent
+from app.models import Tag, Task, TaskList, TaskTag
 from app.schemas.sync import (
     Mutation,
     MutationEntity,
@@ -36,7 +36,6 @@ from app.schemas.sync import (
     TaskTagRead,
 )
 from app.schemas.sync_payload import (
-    FolderPayload,
     TagPayload,
     TaskListPayload,
     TaskPayload,
@@ -74,7 +73,6 @@ async def pull(
     # 回退重叠窗口防并发提交丢更新,见 SINCE_OVERLAP 注释。
     effective_since = None if since is None else since - SINCE_OVERLAP
 
-    folders = await _delta(session, Folder, user_id=user_id, since=effective_since)
     lists = await _delta(session, TaskList, user_id=user_id, since=effective_since)
     tasks = await _delta(session, Task, user_id=user_id, since=effective_since)
     tags = await _delta(session, Tag, user_id=user_id, since=effective_since)
@@ -82,7 +80,6 @@ async def pull(
 
     return SyncPullResponse(
         cursor=cursor,
-        folders=[FolderRead.model_validate(f) for f in folders],
         lists=[TaskListRead.model_validate(item) for item in lists],
         tasks=[TaskRead.model_validate(t) for t in tasks],
         tags=[TagRead.model_validate(t) for t in tags],
@@ -142,7 +139,9 @@ async def _gc_purged(
     """
     threshold = now - PURGE_RETENTION
 
-    for model in (Folder, TaskList, Task, Tag):
+    # 顺序:先 tasks 后 task_lists —— 清单被物理删时 FK CASCADE 会带走任务,
+    # 反过来则不会有问题,但显式按依赖倒序更稳。
+    for model in (Task, TaskList, Tag):
         await session.execute(
             delete(model).where(
                 model.user_id == user_id,
@@ -166,21 +165,18 @@ async def _gc_purged(
 # ---- push -----------------------------------------------------------------
 
 _ENTITY_MODEL: dict[MutationEntity, type[Any]] = {
-    "folder": Folder,
     "list": TaskList,
     "task": Task,
     "tag": Tag,
 }
 
 _ENTITY_PAYLOAD_SCHEMA: dict[MutationEntity, type[Any]] = {
-    "folder": FolderPayload,
     "list": TaskListPayload,
     "task": TaskPayload,
     "tag": TagPayload,
 }
 
 _ENTITY_READ_SCHEMA: dict[MutationEntity, type[Any]] = {
-    "folder": FolderRead,
     "list": TaskListRead,
     "task": TaskRead,
     "tag": TagRead,
@@ -189,7 +185,6 @@ _ENTITY_READ_SCHEMA: dict[MutationEntity, type[Any]] = {
 # Fields that MUST be present (not None) when creating a *new* entity.
 # Maps entity type → list of field names that are NOT NULL in the DB schema.
 _ENTITY_REQUIRED_ON_CREATE: dict[MutationEntity, list[str]] = {
-    "folder": ["name"],
     "list": ["name"],
     "task": ["list_id", "title"],
     "tag": ["name"],
@@ -204,7 +199,7 @@ async def push(
     """批量应用客户端 mutations。单条异常仅自身被 rejected,其他 commit。
 
     使用 savepoint 隔离每条 mutation,一条 FK 违例不会破坏整个 session。
-    按 entity 依赖顺序排序:folder → list → task → tag → task_tag。
+    按 entity 依赖顺序排序:list → tag → task → task_tag。
 
     **批内因果链**:客户端本地行的 version 只在 push 收到 ``applied`` 后才回写,
     所以同一实体在一批里的第 2 条起必然带着陈旧的 base_version(如离线期间
@@ -217,15 +212,16 @@ async def push(
     # 按依赖排序,父实体先于子实体。sort 是稳定的,同一实体内部保持客户端
     # 入队顺序 —— 批内因果链接续依赖这一点。
     order: dict[str, int] = {
-        "folder": 0,
-        "list": 1,
-        "tag": 2,
-        "task": 3,
-        "task_tag": 4,
+        "list": 0,
+        "tag": 1,
+        "task": 2,
+        "task_tag": 3,
     }
     indexed = list(enumerate(request.mutations))
     indexed.sort(key=lambda pair: order.get(pair[1].entity, 99))
-    # task 之间还有批内父子依赖(parent_id / recurrence_parent_id),再排一次。
+    # 清单之间有批内父子依赖(parent_id 自引用),task 之间同样(parent_id /
+    # recurrence_parent_id),各自再排一次。
+    indexed = _sort_lists_by_dependency(indexed)
     indexed = _sort_tasks_by_dependency(indexed)
 
     # 本批已成功应用过的实体。task_tag 不参与:它无 version、不做乐观并发,
@@ -250,16 +246,33 @@ async def push(
 def _sort_tasks_by_dependency(
     indexed: list[tuple[int, Mutation]],
 ) -> list[tuple[int, Mutation]]:
-    """把 task 分片内「引用了本批另一条 task」的 mutation 排到被引用者之后。
+    """tasks 之间有 ``parent_id``(子任务)与 ``recurrence_parent_id``(重复
+    override)两条自引用外键,按依赖重排。见 [_sort_by_dependency]。"""
+    return _sort_by_dependency(indexed, "task", ("parent_id", "recurrence_parent_id"))
 
-    tasks 之间有 ``parent_id``(子任务)与 ``recurrence_parent_id``(重复 override)
-    两条自引用外键。客户端按 outbox ``createdAt`` 发送,父任务通常先建,但离线
-    积累、分组合并、冲突重发都可能打乱顺序;顺序错了会 FK 违例被 rejected,重试
-    耗尽即成死信,那条任务(及其整棵子树)就再也上不了云。
+
+def _sort_lists_by_dependency(
+    indexed: list[tuple[int, Mutation]],
+) -> list[tuple[int, Mutation]]:
+    """清单树的 ``parent_id`` 也是自引用外键:新建子清单和它的父清单可能在同
+    一批里,父清单必须先落库。见 [_sort_by_dependency]。"""
+    return _sort_by_dependency(indexed, "list", ("parent_id",))
+
+
+def _sort_by_dependency(
+    indexed: list[tuple[int, Mutation]],
+    entity: MutationEntity,
+    ref_fields: tuple[str, ...],
+) -> list[tuple[int, Mutation]]:
+    """把某类实体分片内「引用了本批另一条同类实体」的 mutation 排到被引用者之后。
+
+    客户端按 outbox ``createdAt`` 发送,父实体通常先建,但离线积累、分组合并、
+    冲突重发都可能打乱顺序;顺序错了会 FK 违例被 rejected,重试耗尽即成死信,
+    那条实体(及其整棵子树)就再也上不了云。
 
     同一实体的多条 mutation 的**相对顺序保持不变** —— 批内因果链接续依赖这一点。
     """
-    tasks = [(pos, pair) for pos, pair in enumerate(indexed) if pair[1].entity == "task"]
+    tasks = [(pos, pair) for pos, pair in enumerate(indexed) if pair[1].entity == entity]
     if len(tasks) < 2:
         return indexed
 
@@ -273,7 +286,7 @@ def _sort_tasks_by_dependency(
         if mut.op != "upsert":
             return []  # delete / purge 只写时间戳,不引入外键依赖
         out = []
-        for field in ("parent_id", "recurrence_parent_id"):
+        for field in ref_fields:
             value = mut.payload.get(field)
             if isinstance(value, str) and value in ids and value != str(mut.id):
                 out.append(value)
@@ -326,6 +339,26 @@ async def _apply_one(
             mut.id,
             type(exc).__name__,
             exc,
+        )
+        return MutationResult(entity=mut.entity, id=mut.id, status="rejected", reason="validation")
+
+    # 清单树的形状由服务端最终把关:客户端可以是任何版本,一次错误的 parent_id
+    # 会把成环 / 过深的结构同步到所有设备上。
+    if (
+        mut.entity == "list"
+        and mut.op == "upsert"
+        and "parent_id" in mut.payload
+        and not await validate_parent(
+            session,
+            user_id=user_id,
+            list_id=mut.id,
+            parent_id=parsed.parent_id,
+        )
+    ):
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "sync: list %s rejected (invalid parent_id %s)", mut.id, parsed.parent_id
         )
         return MutationResult(entity=mut.entity, id=mut.id, status="rejected", reason="validation")
 

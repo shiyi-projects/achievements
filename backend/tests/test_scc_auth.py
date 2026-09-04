@@ -101,7 +101,7 @@ def test_decode_missing_sub_rejected() -> None:
 @pytest.mark.asyncio
 async def test_protected_route_requires_token(client: AsyncClient) -> None:
     fastapi_app.dependency_overrides[get_settings] = _auth_settings
-    resp = await client.get("/api/v1/lists")
+    resp = await client.get("/api/v1/tasks")
     assert resp.status_code == 401
 
 
@@ -109,9 +109,8 @@ async def test_protected_route_requires_token(client: AsyncClient) -> None:
 async def test_protected_route_accepts_valid_scc_token(client: AsyncClient) -> None:
     fastapi_app.dependency_overrides[get_settings] = _auth_settings
     resp = await client.get(
-        "/api/v1/lists",
+        "/api/v1/tasks",
         headers={"Authorization": f"Bearer {_token()}"},
     )
     assert resp.status_code == 200
-    # 首登会为该 SCC 用户建系统清单
     assert isinstance(resp.json(), list)

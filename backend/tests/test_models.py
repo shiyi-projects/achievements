@@ -8,24 +8,24 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Folder, Tag, Task, TaskList, TaskTag
+from app.models import Tag, Task, TaskList, TaskTag
 
 USER_ID = uuid4()
 
 
 @pytest.mark.asyncio
-async def test_create_folder_and_list(session: AsyncSession) -> None:
-    folder = Folder(name="Work", user_id=USER_ID)
-    session.add(folder)
+async def test_nested_lists(session: AsyncSession) -> None:
+    parent = TaskList(name="Work", user_id=USER_ID)
+    session.add(parent)
     await session.commit()
-    await session.refresh(folder)
+    await session.refresh(parent)
 
-    lst = TaskList(name="Sprint", folder_id=folder.id, user_id=USER_ID)
-    session.add(lst)
+    child = TaskList(name="Sprint", parent_id=parent.id, user_id=USER_ID)
+    session.add(child)
     await session.commit()
-    await session.refresh(lst)
+    await session.refresh(child)
 
-    assert lst.folder_id == folder.id
+    assert child.parent_id == parent.id
 
 
 @pytest.mark.asyncio

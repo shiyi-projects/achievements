@@ -23,24 +23,24 @@ mixin SyncableMixin on Table {
   IntColumn get version => integer().withDefault(const Constant(1))();
 }
 
-class Folders extends Table with SyncableMixin {
-  TextColumn get name => text().withLength(min: 1, max: 100)();
-  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
-
-  @override
-  Set<Column<Object>> get primaryKey => {id};
-}
-
 /// 清单。`isSystem = true` 表示内置(Today / Important / Planned 等),
 /// 不可删除,[systemKind] 标识具体类别。
+///
+/// 用户清单构成一棵树:任何清单都能直接装任务,也能装子清单。[parentId]
+/// 为 null 即顶层。深度上限见 `kMaxListDepth`。旧的 `folders` 表已在
+/// schema v12 并入本表(每个文件夹变成一个顶层清单)。
 class TaskLists extends Table with SyncableMixin {
-  TextColumn get folderId => text().nullable()();
+  /// 父清单 id(自引用)。null 表示顶层。系统清单恒为 null。
+  TextColumn get parentId => text().nullable()();
   TextColumn get name => text().withLength(min: 1, max: 100)();
   TextColumn get color => text().nullable()();
   TextColumn get icon => text().nullable()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   BoolColumn get isSystem => boolean().withDefault(const Constant(false))();
   TextColumn get systemKind => text().nullable()();
+
+  /// 级联删除的来源清单 id,见 [Tasks.trashedWith]。
+  TextColumn get trashedWith => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -83,6 +83,11 @@ class Tasks extends Table with SyncableMixin {
 
   /// 累计专注时长（秒）。每次专注结束后自动累加。
   IntColumn get focusedSeconds => integer().withDefault(const Constant(0))();
+
+  /// 级联删除的来源清单 id。删清单时,被连带软删的任务(以及后代清单)都记下
+  /// 发起删除的那个清单;用户单独删除的任务恒为 null。回收站据此把「一个清单
+  /// 连同它的全部内容」当作整体还原,不会顺带复活先前单独删掉的任务。
+  TextColumn get trashedWith => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -140,7 +145,7 @@ class TaskTags extends Table {
 class Outbox extends Table {
   IntColumn get id => integer().autoIncrement()();
 
-  /// folder / list / task / tag / task_tag
+  /// list / task / tag / task_tag
   TextColumn get entity => text()();
 
   /// upsert / delete / purge

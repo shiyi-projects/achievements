@@ -7,10 +7,7 @@ from uuid import UUID
 import pytest
 from httpx import AsyncClient
 
-
-async def _create_list(client: AsyncClient, name: str = "Inbox") -> UUID:
-    resp = await client.post("/api/v1/lists", json={"name": name})
-    return UUID(resp.json()["id"])
+from tests.helpers import create_list as _create_list
 
 
 async def _create_task(client: AsyncClient, list_id: UUID, title: str) -> UUID:
