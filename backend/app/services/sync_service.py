@@ -20,6 +20,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Folder, Tag, Task, TaskList, TaskTag
@@ -28,6 +29,7 @@ from app.schemas.sync import (
     Mutation,
     MutationEntity,
     MutationResult,
+    RejectionReason,
     SyncPullResponse,
     SyncPushRequest,
     SyncPushResponse,
@@ -203,8 +205,17 @@ async def push(
 
     使用 savepoint 隔离每条 mutation,一条 FK 违例不会破坏整个 session。
     按 entity 依赖顺序排序:folder → list → task → tag → task_tag。
+
+    **批内因果链**:客户端本地行的 version 只在 push 收到 ``applied`` 后才回写,
+    所以同一实体在一批里的第 2 条起必然带着陈旧的 base_version(如离线期间
+    「改标题 → 删除」)。这不是并发冲突,是同一客户端同一批请求内的因果顺序;
+    若照常判 conflict,客户端 LWW 会拿「本地入队时刻」比「服务端刚应用前一条的
+    时刻」,后者恒晚 → 服务端恒胜 → 用户的删除被静默吞掉。这里记住本批已成功
+    应用过的实体,对其后继 mutation 跳过 base_version 检查、直接按序接续。
+    跨批次的真并发(另一台设备的写)不在此集合中,仍照常判 conflict。
     """
-    # 按依赖排序,父实体先于子实体
+    # 按依赖排序,父实体先于子实体。sort 是稳定的,同一实体内部保持客户端
+    # 入队顺序 —— 批内因果链接续依赖这一点。
     order: dict[str, int] = {
         "folder": 0,
         "list": 1,
@@ -214,11 +225,20 @@ async def push(
     }
     indexed = list(enumerate(request.mutations))
     indexed.sort(key=lambda pair: order.get(pair[1].entity, 99))
+    # task 之间还有批内父子依赖(parent_id / recurrence_parent_id),再排一次。
+    indexed = _sort_tasks_by_dependency(indexed)
+
+    # 本批已成功应用过的实体。task_tag 不参与:它无 version、不做乐观并发,
+    # 且 Mutation.id 只是占位(真正主键在 payload)。
+    applied_in_batch: set[tuple[str, str]] = set()
 
     # slot for results, preserve original order
     results: list[MutationResult | None] = [None] * len(request.mutations)
     for orig_idx, mut in indexed:
-        results[orig_idx] = await _apply_one(session, user_id, mut)
+        result = await _apply_one(session, user_id, mut, applied_in_batch)
+        if result.status == "applied" and mut.entity != "task_tag":
+            applied_in_batch.add((mut.entity, str(mut.id)))
+        results[orig_idx] = result
 
     await session.commit()
     return SyncPushResponse(
@@ -227,17 +247,72 @@ async def push(
     )
 
 
+def _sort_tasks_by_dependency(
+    indexed: list[tuple[int, Mutation]],
+) -> list[tuple[int, Mutation]]:
+    """把 task 分片内「引用了本批另一条 task」的 mutation 排到被引用者之后。
+
+    tasks 之间有 ``parent_id``(子任务)与 ``recurrence_parent_id``(重复 override)
+    两条自引用外键。客户端按 outbox ``createdAt`` 发送,父任务通常先建,但离线
+    积累、分组合并、冲突重发都可能打乱顺序;顺序错了会 FK 违例被 rejected,重试
+    耗尽即成死信,那条任务(及其整棵子树)就再也上不了云。
+
+    同一实体的多条 mutation 的**相对顺序保持不变** —— 批内因果链接续依赖这一点。
+    """
+    tasks = [(pos, pair) for pos, pair in enumerate(indexed) if pair[1].entity == "task"]
+    if len(tasks) < 2:
+        return indexed
+
+    ids = {str(pair[1].id) for _, pair in tasks}
+    # 一个 id 可能有多条 mutation;依赖只需指向最早那条(创建行的那条)。
+    first_at: dict[str, int] = {}
+    for local_idx, (_, pair) in enumerate(tasks):
+        first_at.setdefault(str(pair[1].id), local_idx)
+
+    def refs_of(mut: Mutation) -> list[str]:
+        if mut.op != "upsert":
+            return []  # delete / purge 只写时间戳,不引入外键依赖
+        out = []
+        for field in ("parent_id", "recurrence_parent_id"):
+            value = mut.payload.get(field)
+            if isinstance(value, str) and value in ids and value != str(mut.id):
+                out.append(value)
+        return out
+
+    ordered: list[int] = []
+    done: set[int] = set()
+
+    def visit(local_idx: int, path: frozenset[int]) -> None:
+        if local_idx in done or local_idx in path:
+            return  # 已排过,或撞上环(数据异常),按原序落位即可
+        for ref in refs_of(tasks[local_idx][1][1]):
+            visit(first_at[ref], path | {local_idx})
+        if local_idx not in done:
+            done.add(local_idx)
+            ordered.append(local_idx)
+
+    for local_idx in range(len(tasks)):
+        visit(local_idx, frozenset())
+
+    result = list(indexed)
+    slots = [pos for pos, _ in tasks]
+    for slot, local_idx in zip(slots, ordered, strict=True):
+        result[slot] = tasks[local_idx][1]
+    return result
+
+
 async def _apply_one(
     session: AsyncSession,
     user_id: UUID,
     mut: Mutation,
+    applied_in_batch: set[tuple[str, str]] | None = None,
 ) -> MutationResult:
     if mut.entity == "task_tag":
         return await _apply_task_tag(session, user_id, mut)
 
     model = _ENTITY_MODEL.get(mut.entity)
     if model is None:
-        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+        return MutationResult(entity=mut.entity, id=mut.id, status="rejected", reason="unknown")
 
     try:
         payload_schema = _ENTITY_PAYLOAD_SCHEMA[mut.entity]
@@ -252,7 +327,7 @@ async def _apply_one(
             type(exc).__name__,
             exc,
         )
-        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+        return MutationResult(entity=mut.entity, id=mut.id, status="rejected", reason="validation")
 
     # 使用 savepoint 隔离,单条 IntegrityError 不会使整个 session 失效
     try:
@@ -277,7 +352,9 @@ async def _apply_one(
                         mut.id,
                         ", ".join(missing),
                     )
-                    return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+                    return MutationResult(
+                        entity=mut.entity, id=mut.id, status="rejected", reason="validation"
+                    )
 
                 row = model(id=mut.id, user_id=user_id)
                 _assign(row, parsed)
@@ -288,9 +365,32 @@ async def _apply_one(
                 )
 
             if existing.user_id != user_id:
-                return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+                return MutationResult(
+                    entity=mut.entity, id=mut.id, status="rejected", reason="ownership"
+                )
 
-            if existing.version != mut.base_version:
+            # 墓碑是终态,不可复活。upsert 打在已 purge 的行上会把编辑写进墓碑,
+            # 而墓碑随 delta 下发时各端(含发起端)都会物理删本地行 —— 用户刚编辑
+            # 过的任务凭空消失。回 rejected + server_value,让客户端物理删本地行
+            # 并清掉该实体残留的 outbox。delete / purge 打在墓碑上是幂等的,放行。
+            if existing.purged_at is not None and mut.op == "upsert":
+                return MutationResult(
+                    entity=mut.entity,
+                    id=mut.id,
+                    status="rejected",
+                    reason="purged",
+                    version=existing.version,
+                    server_value=_ENTITY_READ_SCHEMA[mut.entity]
+                    .model_validate(existing)
+                    .model_dump(mode="json"),
+                )
+
+            # 本批已应用过这一实体 → 当前这条是它的因果后继,base_version 必然
+            # 陈旧,按序接续而不判冲突(见 push 的 docstring)。
+            in_batch = (
+                applied_in_batch is not None and (mut.entity, str(mut.id)) in applied_in_batch
+            )
+            if existing.version != mut.base_version and not in_batch:
                 return MutationResult(
                     entity=mut.entity,
                     id=mut.id,
@@ -325,7 +425,18 @@ async def _apply_one(
             type(exc).__name__,
             exc,
         )
-        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+        return MutationResult(
+            entity=mut.entity, id=mut.id, status="rejected", reason=_reason_for(exc)
+        )
+
+
+def _reason_for(exc: BaseException) -> RejectionReason:
+    """区分「父实体还没推上去」与真正的永久错误。
+
+    FK 违例是暂时的:父任务下一轮推上去后同一条 mutation 就能成功。批内顺序
+    问题已由 _sort_tasks_by_dependency 根治,剩下的多是跨批次依赖。
+    """
+    return "dependency" if isinstance(exc, IntegrityError) else "validation"
 
 
 async def _apply_task_tag(
@@ -352,14 +463,21 @@ async def _apply_task_tag(
             type(exc).__name__,
             exc,
         )
-        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+        return MutationResult(entity=mut.entity, id=mut.id, status="rejected", reason="validation")
 
     try:
         async with session.begin_nested():
             task = await session.get(Task, payload.task_id)
             tag = await session.get(Tag, payload.tag_id)
-            if task is None or task.user_id != user_id or tag is None or tag.user_id != user_id:
-                return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+            if task is None or tag is None:
+                # 关联的两端还没推上去 —— 暂时错误,下一轮可能就好了。
+                return MutationResult(
+                    entity=mut.entity, id=mut.id, status="rejected", reason="dependency"
+                )
+            if task.user_id != user_id or tag.user_id != user_id:
+                return MutationResult(
+                    entity=mut.entity, id=mut.id, status="rejected", reason="ownership"
+                )
 
             existing = await session.get(TaskTag, (payload.task_id, payload.tag_id))
 
@@ -385,7 +503,9 @@ async def _apply_task_tag(
             type(exc).__name__,
             exc,
         )
-        return MutationResult(entity=mut.entity, id=mut.id, status="rejected")
+        return MutationResult(
+            entity=mut.entity, id=mut.id, status="rejected", reason=_reason_for(exc)
+        )
 
 
 def _assign(row: Any, parsed: Any) -> None:
