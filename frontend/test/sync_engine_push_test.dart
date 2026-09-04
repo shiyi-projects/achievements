@@ -255,6 +255,125 @@ void main() {
     expect(row.version, 2);
   });
 
+  test('rejected reason=purged → 物理删本地行并清该实体 outbox', () async {
+    await seedTask(version: 3);
+    await outbox.enqueue(
+      entity: 'task',
+      op: 'upsert',
+      entityId: taskId,
+      baseVersion: 3,
+      payload: const {'title': '复活?'},
+    );
+
+    final adapter = _FakeAdapter([
+      [
+        {
+          'entity': 'task',
+          'id': taskId,
+          'status': 'rejected',
+          'reason': 'purged',
+          'version': 4,
+          'server_value': {
+            'id': taskId,
+            'title': '交年报',
+            'list_id': 'l-1',
+            'version': 4,
+            'updated_at': '2026-01-01T10:31:00Z',
+            'deleted_at': '2026-01-01T10:00:00Z',
+            'purged_at': '2026-01-01T10:30:00Z',
+          },
+        },
+      ],
+    ]);
+    final status = await engineWith(adapter).pushOnce();
+
+    expect(status, SyncStatus.idle);
+    expect(
+      await (db.select(db.tasks)..where((t) => t.id.equals(taskId))).get(),
+      isEmpty,
+      reason: '墓碑是终态,本地行应被物理删除',
+    );
+    expect(await outbox.pending(), isEmpty);
+  });
+
+  test('rejected 的永久错误消耗重试预算,耗尽后成死信', () async {
+    await seedTask(version: 1);
+    await outbox.enqueue(
+      entity: 'task',
+      op: 'upsert',
+      entityId: taskId,
+      baseVersion: 1,
+      payload: const {'title': 'x'},
+    );
+
+    final adapter = _FakeAdapter([
+      [
+        {
+          'entity': 'task',
+          'id': taskId,
+          'status': 'rejected',
+          'reason': 'validation',
+        },
+      ],
+    ]);
+    final engine = engineWith(adapter);
+    for (var i = 0; i < OutboxRepository.retryLimit; i++) {
+      await engine.pushOnce();
+    }
+
+    expect(await outbox.pending(), isEmpty, reason: '预算耗尽,不再发送');
+    final dead = await outbox.deadLettered();
+    expect(dead, hasLength(1));
+    expect(dead.single.lastError, contains('validation'));
+  });
+
+  test('死信行不再让实体保持脏态(否则 pull 永远跳过它)', () async {
+    await seedTask(version: 1);
+    await outbox.enqueue(
+      entity: 'task',
+      op: 'upsert',
+      entityId: taskId,
+      baseVersion: 1,
+      payload: const {'title': 'x'},
+    );
+
+    expect(await outbox.pendingEntityKeys(), contains('task:$taskId'));
+
+    // 把它推成死信
+    await db.customUpdate(
+      'UPDATE outbox SET retry_count = ?',
+      variables: [Variable.withInt(OutboxRepository.retryLimit)],
+      updates: {db.outbox},
+    );
+
+    expect(
+      await outbox.pendingEntityKeys(),
+      isNot(contains('task:$taskId')),
+      reason: '死信不该冻结实体,服务端的值要能盖回来',
+    );
+  });
+
+  test('retryDeadLettered 让死信行重新入队', () async {
+    await outbox.enqueue(
+      entity: 'task',
+      op: 'upsert',
+      entityId: taskId,
+      baseVersion: 1,
+      payload: const {'title': 'x'},
+    );
+    await db.customUpdate(
+      'UPDATE outbox SET retry_count = ?',
+      variables: [Variable.withInt(OutboxRepository.retryLimit)],
+      updates: {db.outbox},
+    );
+    expect(await outbox.pending(), isEmpty);
+
+    await outbox.retryDeadLettered();
+
+    expect(await outbox.pending(), hasLength(1));
+    expect(await outbox.deadLettered(), isEmpty);
+  });
+
   test('upsert 本地赢时同样在本次调用内重发', () async {
     // 真实路径下本地行与 outbox 在同一事务里写入,所以本地已是新标题。
     await seedTask(version: 1, title: '本地改的');

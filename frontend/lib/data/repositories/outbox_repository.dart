@@ -20,6 +20,14 @@ class SyncCursorKey {
   /// SyncCoordinator 在 pull+push 双双 idle 时写入,设置页据此显示"X 分钟前"。
   /// 注意是本地时钟,跨设备不可比较。
   static const String lastSyncAt = 'last_sync_at';
+
+  /// 一次性存量修复标记(值为 `'true'` 表示已跑过)。
+  ///
+  /// 旧版本的 `applied` 分支只在 `op == 'upsert'` 时回写 version,导致做过
+  /// 软删/永久删除的行的本地 version 永久落后一格;旧版的死信行还会让实体
+  /// 被 pull 永久跳过。这两种坏状态不会因为代码修好就自愈,须在升级后跑一次
+  /// 修复(见 `bootstrap_provider.dart`)。
+  static const String repairV1 = 'repair_v1';
 }
 
 class OutboxRepository {
@@ -54,12 +62,54 @@ class OutboxRepository {
         );
   }
 
+  /// 重试预算。用尽即成死信,不再随 push 发出,须由用户在设置页手动重试或丢弃。
+  ///
+  /// 取 20 而非早先的 5:服务端已能区分永久错误与暂时错误(`reason`),而暂时
+  /// 错误里最常见的「父实体还没推上去」需要跨若干轮才自愈 —— 预算太小会把本可
+  /// 成功的 mutation 过早推进死信。配合协调器的 30s 重试节流,20 次约 10 分钟。
+  static const int retryLimit = 20;
+
   /// 按 createdAt 升序拿出当前未处理的所有 outbox 行(retry_count < limit)。
-  Future<List<OutboxData>> pending({int retryLimit = 5}) {
+  Future<List<OutboxData>> pending({int retryLimit = retryLimit}) {
     return (_db.select(_db.outbox)
           ..where((t) => t.retryCount.isSmallerThanValue(retryLimit))
           ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]))
         .get();
+  }
+
+  /// 重试预算已耗尽的行(死信)。设置页据此暴露「同步失败」入口。
+  Future<List<OutboxData>> deadLettered() {
+    return (_db.select(_db.outbox)
+          ..where((t) => t.retryCount.isBiggerOrEqualValue(retryLimit))
+          ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]))
+        .get();
+  }
+
+  /// 监听死信条数,供设置页显示徽标。
+  Stream<int> watchDeadLetteredCount() {
+    final countExpr = _db.outbox.id.count();
+    return (_db.selectOnly(_db.outbox)
+          ..addColumns([countExpr])
+          ..where(_db.outbox.retryCount.isBiggerOrEqualValue(retryLimit)))
+        .map((row) => row.read(countExpr) ?? 0)
+        .watchSingle();
+  }
+
+  /// 把所有死信行的重试计数清零,下一轮 push 重新尝试(用户手动触发)。
+  Future<void> retryDeadLettered() {
+    return _db.customUpdate(
+      'UPDATE outbox SET retry_count = 0 WHERE retry_count >= ?',
+      variables: [Variable.withInt(retryLimit)],
+      updates: {_db.outbox},
+    );
+  }
+
+  /// 丢弃所有死信行(用户明确放弃这些本地改动)。本地业务表的行保持原样,
+  /// 下一次 pull 会用服务端的值把它们覆盖回去。
+  Future<void> discardDeadLettered() {
+    return (_db.delete(
+      _db.outbox,
+    )..where((t) => t.retryCount.isBiggerOrEqualValue(retryLimit))).go();
   }
 
   /// applied / conflict 已由服务端处理完毕,本地删除。
@@ -95,13 +145,19 @@ class OutboxRepository {
     );
   }
 
-  /// 当前 outbox 中所有(含 retry 耗尽)mutation 的 `'$entity:$entityId'` 键集。
+  /// 仍会被推送的 mutation 的 `'$entity:$entityId'` 键集。
   /// pull 落库据此跳过「脏」实体,避免服务端旧值覆盖本地未推送的修改;
   /// 冲突统一交由 push 的 conflict/LWW 流程收敛。
+  ///
+  /// **死信行不计入**:它们已经不会再被推送了,若仍算作脏,该实体就既推不上去、
+  /// 也永远拒绝服务端下发,在这台设备上彻底冻结。让服务端的值盖回去,至少能
+  /// 回到与云端一致的状态;那笔本地改动的去留交给设置页的手动重试/丢弃。
   Future<Set<String>> pendingEntityKeys() async {
-    final rows = await (_db.selectOnly(
-      _db.outbox,
-    )..addColumns([_db.outbox.entity, _db.outbox.entityId])).get();
+    final rows =
+        await (_db.selectOnly(_db.outbox)
+              ..addColumns([_db.outbox.entity, _db.outbox.entityId])
+              ..where(_db.outbox.retryCount.isSmallerThanValue(retryLimit)))
+            .get();
     return {
       for (final r in rows)
         '${r.read(_db.outbox.entity)}:${r.read(_db.outbox.entityId)}',
@@ -139,6 +195,10 @@ class OutboxRepository {
         .insertOnConflictUpdate(
           SyncCursorsCompanion.insert(key: key, value: value),
         );
+  }
+
+  Future<void> deleteCursor(String key) {
+    return (_db.delete(_db.syncCursors)..where((t) => t.key.equals(key))).go();
   }
 }
 

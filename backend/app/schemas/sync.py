@@ -66,6 +66,15 @@ class SyncPushRequest(BaseModel):
     mutations: list[Mutation]
 
 
+# 拒绝原因。客户端据此决定处置方式:
+# - validation   payload 校验失败 / 建行缺必填字段 —— 永久错误,重试无意义
+# - ownership    实体不属于当前用户 —— 永久错误
+# - unknown      不认识的 entity —— 永久错误
+# - dependency   外键依赖未满足(父实体还没推上去)—— 暂时错误,下一轮可能就好了
+# - purged       目标已是永久删除墓碑 —— 客户端应物理删本地行并清该实体 outbox
+RejectionReason = Literal["validation", "ownership", "unknown", "dependency", "purged"]
+
+
 class MutationResult(BaseModel):
     entity: MutationEntity
     id: UUID
@@ -73,6 +82,8 @@ class MutationResult(BaseModel):
     version: int = 0
     # 冲突时回填服务端最新行(reuse 实体 Read schema 的 dict 形式)
     server_value: dict[str, object] | None = None
+    # rejected 时说明原因;applied / conflict 恒为 None。新增字段,旧客户端忽略即可。
+    reason: RejectionReason | None = None
 
 
 class SyncPushResponse(BaseModel):

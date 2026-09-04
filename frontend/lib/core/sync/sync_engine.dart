@@ -52,10 +52,14 @@ class SyncEngine {
       );
       final data = response.data;
       if (data == null) return SyncStatus.error;
-      await _applyPullResponse(data);
+      final skippedFrom = await _applyPullResponse(data);
+      // 有行被跳过(脏实体)时,游标不能越过它们:那次服务端更新还没落地,
+      // 一旦对应的 outbox 行后来是被丢弃而非推送成功的,它就永远不会再下发。
+      // 把游标压回被跳过行里最早的 updated_at,下轮重拉这一段;服务端的
+      // SINCE_OVERLAP 与客户端的幂等落库保证重复下发无害。
       await _outbox.setCursor(
         SyncCursorKey.lastPulledAt,
-        data['cursor'] as String,
+        skippedFrom?.toUtc().toIso8601String() ?? data['cursor'] as String,
       );
       return SyncStatus.idle;
     } on DioException catch (e) {
@@ -190,9 +194,26 @@ class SyncEngine {
       case 'conflict':
         return _resolveConflict(group, result);
       case 'rejected':
-        debugPrint('sync: rejected ${group.entity}/${group.entityId}');
+        final reason = result['reason'] as String?;
+        if (reason == 'purged') {
+          // 目标已是永久删除墓碑,实体已死。物理删本地行并清掉它残留的 outbox,
+          // 与 pull 到墓碑时的处置一致 —— 继续推它没有意义。
+          await _db.transaction(() async {
+            await _deleteLocalById(group.entity, group.entityId);
+            await _outbox.deleteByEntity(group.entity, group.entityId);
+          });
+          debugPrint(
+            'sync: ${group.entity}/${group.entityId} already purged, '
+            'dropped local row',
+          );
+          return false;
+        }
+        debugPrint(
+          'sync: rejected ${group.entity}/${group.entityId} '
+          '(${reason ?? "unknown"})',
+        );
         for (final row in group.rows) {
-          await _outbox.markFailed(row.id, 'rejected by server');
+          await _outbox.markFailed(row.id, 'rejected: ${reason ?? "unknown"}');
         }
         return false;
       default:
@@ -368,7 +389,18 @@ class SyncEngine {
   ///   未推送的修改;两端差异交由 push 的 conflict/LWW 流程收敛。
   /// - 其余行 insertOnConflictUpdate。软删行(deleted_at 非空、purged_at 为空)
   ///   正常落,UI 查询据 deletedAt 过滤,显示在回收站。
-  Future<void> _applyPullResponse(Map<String, dynamic> data) async {
+  ///
+  /// 返回被跳过的行里最早的 `updated_at`(没有跳过则为 null)。调用方据此决定
+  /// 游标推进到哪里 —— 跳过的区间必须留给下一轮重拉。
+  Future<DateTime?> _applyPullResponse(Map<String, dynamic> data) async {
+    DateTime? skippedFrom;
+    void noteSkipped(Map<String, dynamic> raw) {
+      final ts = _dt(raw['updated_at']);
+      if (ts == null) return;
+      final current = skippedFrom;
+      if (current == null || ts.isBefore(current)) skippedFrom = ts;
+    }
+
     await _db.transaction(() async {
       final dirty = await _outbox.pendingEntityKeys();
 
@@ -383,7 +415,10 @@ class SyncEngine {
           await _outbox.deleteByEntity(entity, id);
           return;
         }
-        if (dirty.contains('$entity:$id')) return;
+        if (dirty.contains('$entity:$id')) {
+          noteSkipped(raw);
+          return;
+        }
         await upsert();
       }
 
@@ -431,7 +466,12 @@ class SyncEngine {
               .go();
           continue;
         }
-        if (!await _ownsTaskAndTag(taskId, tagId)) continue;
+        // 两端还没落地(多半是 task 本身被当作脏实体跳过了)→ 同样不能让
+        // 游标越过这一行,否则这条关联再也不会下发。
+        if (!await _ownsTaskAndTag(taskId, tagId)) {
+          noteSkipped(raw);
+          continue;
+        }
         await _db
             .into(_db.taskTags)
             .insertOnConflictUpdate(
@@ -439,6 +479,7 @@ class SyncEngine {
             );
       }
     });
+    return skippedFrom;
   }
 
   Future<bool> _ownsTaskAndTag(String taskId, String tagId) async {
@@ -569,6 +610,20 @@ class SyncStatusController extends _$SyncStatusController {
 ///
 /// 用手写 StreamProvider 而不是 @Riverpod codegen,避免每次改这块都强制
 /// 跑 build_runner。
+/// outbox 中重试预算已耗尽的条数(死信)。>0 时设置页显示「同步失败」入口,
+/// 让用户能看到、重试或丢弃这些推不上去的本地改动 —— 否则它们只会静默留在
+/// 本地,用户永远不知道有改动没上云。
+final syncFailureCountProvider = StreamProvider<int>((ref) {
+  return ref.watch(outboxRepositoryProvider).watchDeadLetteredCount();
+});
+
+/// 死信明细,供「同步失败」对话框展示。
+final syncFailureListProvider = FutureProvider<List<OutboxData>>((ref) {
+  // watch 计数,重试/丢弃后自动刷新列表。
+  ref.watch(syncFailureCountProvider);
+  return ref.watch(outboxRepositoryProvider).deadLettered();
+});
+
 final lastSyncAtProvider = StreamProvider<DateTime?>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return (db.select(db.syncCursors)
