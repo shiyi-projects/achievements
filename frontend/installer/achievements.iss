@@ -5,7 +5,7 @@
 
 #define MyAppName            "Achievements"
 #define MyAppExeName         "achievements.exe"
-#define MyAppVersion         "0.3.2"
+#define MyAppVersion         "0.4.0"
 #define MyAppPublisher       "shiyi0x7f"
 #define MyAppURL             "https://github.com/shiyi0x7f/achievements"
 ; 项目根 (相对 .iss 所在目录)

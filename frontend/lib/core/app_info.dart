@@ -2,7 +2,7 @@
 ///
 /// [kAppVersion] 由 `scripts/bump_version.py` 与 pubspec/pyproject/installer 一并统一
 /// 维护,**请勿手改**(改版本号一律走脚本,见仓库版本号管理约定)。
-const String kAppVersion = '0.3.2';
+const String kAppVersion = '0.4.0';
 /// 作者。
 const String kAuthor = 'shiyi0x7f';
 
