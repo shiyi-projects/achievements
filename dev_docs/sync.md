@@ -43,9 +43,19 @@
 
 - 客户端 push 带 `base_version`;服务端 `version` 不匹配 → 返回 `conflict` + `server_value`。
 - 客户端比较 `outbox.createdAt`(本地写入时戳)与 `server_value.updated_at`:
-  - 本地新 → 把 outbox 的 `base_version` 升到 `server.version`,下一轮 push 重发。
+  - 本地新 → 把 outbox 的 `base_version` 升到 `server.version`,**在同一次 `pushOnce` 内重发**。
   - 服务端新 → 用 `server_value` 覆盖本地(若 `server_value.purged_at` 非空则物理删本地),丢弃本地 mutation。
-- **purge 是终态,不参与 LWW**:purge 遇 conflict 时,若服务端已是墓碑则完成,否则跟随服务端 version 重试,直到 `base_version` 对上后 apply,保证永久删除最终生效。
+- **delete / purge 是终态,不参与 LWW**:遇 conflict 时,若服务端已达成该终态(purge 看 `purged_at`,delete 看 `deleted_at` 或 `purged_at`)则收下服务端 version 并完成;否则跟随服务端 version 重试,直到 `base_version` 对上后 apply。删除是用户的显式意图,不该被「服务端 `updated_at` 更晚」吞掉。
+- **applied 无条件回写 version**:服务端对 `delete` / `purge` 同样 bump version 并返回。回写只做 upsert 会让本地 version 永久落后一格,此后这一行的每次操作都带陈旧 `base_version`、必然冲突并被 LWW 赌时间戳(典型症状:回收站恢复被静默丢弃)。purge 时本地行已物理删除,该 UPDATE 影响 0 行,无害。
+- **重发必须在本次调用内完成**:「跟随服务端 version 重试」只改 outbox 行的 `baseVersion`、不改行数,`watchPendingCount` 不保证再次触发 push。`pushOnce` 因此内循环最多 `_maxPushRounds`(3)轮,只要上一轮有行被安排重发就继续。
+
+### 批内因果链(服务端)
+
+客户端本地行的 `version` 只在收到 `applied` 后才回写,所以**同一实体在一批里的第 2 条起必然带着陈旧的 `base_version`**(离线期间「改标题 → 删除」「编辑 → 永久删除」)。这不是并发冲突,是同一客户端同一批请求内的因果顺序。
+
+服务端 `push()` 用 `applied_in_batch` 集合记住本批已成功应用过的实体,对其后继 mutation **跳过 `base_version` 检查、直接按序接续**;跨批次的真并发(另一台设备的写)不在集合中,仍照常判 conflict。`indexed.sort` 是稳定排序,同一实体内部保持客户端入队顺序 —— 接续依赖这一点。`task_tag` 不参与(无 version、不做乐观并发,且 `Mutation.id` 只是占位)。
+
+> 不修的话:第 1 条 applied 把服务端 `updated_at` 刷新到「刚刚」,第 2 条 conflict 后客户端拿「本地入队时刻」去比,**服务端恒胜**,用户的删除被静默丢弃且无任何提示。`outbox_grouping` 的 upsert 合并只覆盖了连续 upsert 这一种情形,delete 打断合并后仍会中招。
 
 ## 4. 同步 API 契约
 
@@ -98,14 +108,28 @@ Mutation 信封:
   "cursor": "...",
   "results": [
     { "entity": "...", "id": "...", "status": "applied|conflict|rejected",
-      "version": 2, "server_value": { ... } }   // server_value 仅 conflict 时回填
+      "version": 2, "server_value": { ... }, "reason": "validation" }
   ]
 }
 ```
 
 - `applied`:已写入,`version` 为最新值。实体不存在时:`delete`/`purge` 幂等返回 `applied`(version=1)。
 - `conflict`:`base_version` 与服务端不符,回 `server_value`(实体 Read schema 的 JSON)。
-- `rejected`:payload 校验失败 / 不允许的实体 / 归属不符 / FK 违例(单条 savepoint 隔离,不影响同批其它 mutation)。
+- `rejected`:回 `reason` 说明原因。单条 savepoint 隔离,不影响同批其它 mutation。
+
+`server_value` 在 `conflict` 与 `reason="purged"` 时回填。`reason` 仅 `rejected` 时非空:
+
+| reason | 含义 | 客户端处置 |
+|---|---|---|
+| `validation` | payload 校验失败 / 建行缺必填字段 | 永久错误,消耗重试预算 |
+| `ownership` | 实体不属于当前用户 | 永久错误,消耗重试预算 |
+| `unknown` | 不认识的 entity | 永久错误,消耗重试预算 |
+| `dependency` | 外键依赖未满足(父实体还没推上去) | 暂时错误,下一轮可能自愈 |
+| `purged` | 目标已是永久删除墓碑 | **物理删本地行 + 清该实体 outbox** |
+
+**墓碑不可复活**:`upsert` 打在 `purged_at` 非空的行上一律 `rejected` + `reason="purged"`。否则编辑会写进墓碑行,而墓碑随 delta 下发时各端(含发起端)都会物理删本地行 —— 用户刚编辑过的任务凭空消失。`delete`/`purge` 打在墓碑上是幂等的,放行。
+
+**批内父子依赖排序**:tasks 之间有 `parent_id`(子任务)与 `recurrence_parent_id`(重复 override)两条自引用外键。服务端在 entity 类型排序之后,对 task 分片再做一次拓扑排序(`_sort_tasks_by_dependency`),把引用了本批另一条 task 的 mutation 排到被引用者之后;同一实体多条 mutation 的相对顺序保持不变(批内因果链接续依赖它)。顺序错了会 FK 违例被 rejected,重试耗尽即成死信,那条任务及其整棵子树再也上不了云。
 
 ## 5. 客户端触发策略
 
@@ -121,7 +145,17 @@ Mutation 信封:
 
 **push 批内合并**:同一实体的多条 upsert 在发送前合并为**一条** mutation(payload 按入队序浅合并,baseVersion 取首条,LWW 时戳取末条;delete/purge 打断合并,task_tag 永不合并,见 `lib/core/sync/outbox_grouping.dart`)。否则同批第 2 条起 baseVersion 必然陈旧 → 伪 conflict → LWW 拿「入队时刻」对比「前一条刚在服务端的应用时刻」必输 → 用户在 debounce 窗口内的连续操作被静默回滚。
 
-**outbox retry 语义**:网络断 / 5xx 等**暂时性**错误只记 `last_error`,**不消耗 retry 预算**(否则离线几轮 30s 重试就把 pending 行推进死信,恢复网络后本地改动永远不上云);只有服务端明确 `rejected`(永久性错误)才 `retry_count + 1`,达到上限(5)后成为死信不再重发。
+**outbox retry 语义**:网络断 / 5xx 等**暂时性**错误只记 `last_error`,**不消耗 retry 预算**(否则离线几轮 30s 重试就把 pending 行推进死信,恢复网络后本地改动永远不上云);只有服务端明确 `rejected` 才 `retry_count + 1`,达到 `OutboxRepository.retryLimit`(20)后成为死信不再重发。
+
+预算取 20 而非早先的 5:服务端已能区分永久错误与暂时错误,而 `dependency` 类错误需要跨若干轮才自愈,预算太小会把本可成功的 mutation 过早推进死信。
+
+**死信不冻结实体**:`pendingEntityKeys()`(pull 的脏实体跳过集)**只统计 `retry_count < retryLimit` 的行**。死信行已经不会再被推送,若仍算作脏,该实体就既推不上去、也永远拒绝服务端下发,在这台设备上彻底冻结。让服务端的值盖回去,至少能回到与云端一致的状态。
+
+**死信有出口**:设置页「同步」组在死信数 >0 时显示「N 条本地改动没能同步」,可查看明细(实体 / 操作 / 最后一次错误)并**全部重试**(`retry_count` 清零)或**全部丢弃**(删 outbox 行,本地那几行由下次 pull 用云端值覆盖)。没有这个出口,这些改动只会静默留在本地,用户永远不知道有东西没上云。
+
+**pull 游标不越过被跳过的行**:`_applyPullResponse` 返回被跳过行里最早的 `updated_at`,`pullOnce` 据此写游标(没有跳过则用响应的 `cursor`)。否则一旦那条 outbox 行后来是被丢弃而非推送成功的,服务端那次更新就永远不会再下发。重复下发由 `SINCE_OVERLAP` 与客户端幂等落库兜住。
+
+**存量自愈**:`SyncCursorKey.repairV1` 标记的一次性修复(`bootstrap_provider.dart`),在首次同步门之前跑。清零死信的 `retry_count`(让新的原因分类重新判定)、删掉 `last_pulled_at` 强制一次全量 pull(让服务端的权威 version 覆盖旧版遗留的落后 version)。这两种坏状态不会因为代码修好就自愈。
 
 **已移除**的自动触发:App 切回前台(resume)、窗口聚焦、30s 周期轮询。远端变更靠启动拉取或用户手动刷新获取。
 
@@ -140,5 +174,8 @@ Task 的 `recurrence_parent_id` / `occurrence_date` / `estimated_minutes` **参�
 - 跨设备只在「启动 / 手动刷新」时拉取远端变更,App 开着期间不会自动看到其它设备的改动(按产品决策刻意如此)。
 - 离线超过保留期(30 天)的设备回来后,可能持有已被服务端 GC 的墓碑对应的本地行(孤儿,可手动软删),不会自动清理。
 - LWW 用本地时钟与服务端 `updated_at` 比较,存在时钟漂移风险(沿用既有实现,未变更)。
-- rejected 死信(retry 耗尽)目前无 UI 暴露与清理入口。
+- `dependency` 类 rejected 同样消耗重试预算(只是预算放宽到 20)。父实体被永久删除等「不会自愈的依赖失败」最终仍会进死信,由设置页出口兜底,而不是无限空转。
+- delete / purge 的「跟随服务端 version 重试」无独立次数上限(与既有 purge 行为一致),仅受 `pushOnce` 的 3 轮内循环与协调器 30s 重试节流约束。
+- pull 游标被压回时,若某实体长期是脏的,游标会反复停在同一处、每轮重拉同一段增量。死信不再计入脏集合后这一状态是短暂的,但极端情况下仍会多传。
+- `focused_seconds` 不参与同步(服务端无此列),多设备间专注时长各算各的。
 - 手动「立即同步」在已有同步进行中时被合并(不排队),极端情况下点了没反应。

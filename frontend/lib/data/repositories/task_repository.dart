@@ -430,10 +430,11 @@ class TaskRepository {
   /// 在回收站(回收站视图正是 `deletedAt 非空`)。
   Future<void> hardDelete(String id) async {
     await _db.transaction(() async {
-      // 递归收集自身 + 全部后代子任务,逐个 purge:服务端 GC 物理删父行时
-      // FK CASCADE 带走的子行**不会留墓碑**,其他端收不到;必须由发起端为
-      // 每一行显式发 purge。标签关联行同步物理清理(服务端侧随 task 墓碑
-      // 在各端落地时一并清)。
+      // 递归收集自身 + 全部后代子任务 + 重复系列的 override 行,逐个 purge:
+      // 服务端 GC 物理删父行时 FK CASCADE 带走的子行**不会留墓碑**,其他端
+      // 收不到;必须由发起端为每一行显式发 purge。override 行(recurrenceParentId)
+      // 同样是被 CASCADE 带走的一类,漏掉它们会在各端留下孤儿。标签关联行同步
+      // 物理清理(服务端侧随 task 墓碑在各端落地时一并清)。
       final rows = <Task>[];
       var frontier = <String>[id];
       while (frontier.isNotEmpty) {
@@ -441,7 +442,9 @@ class TaskRepository {
             await (_db.select(_db.tasks)..where(
                   (t) =>
                       t.userId.equals(_userId) &
-                      (t.id.isIn(frontier) | t.parentId.isIn(frontier)),
+                      (t.id.isIn(frontier) |
+                          t.parentId.isIn(frontier) |
+                          t.recurrenceParentId.isIn(frontier)),
                 ))
                 .get();
         final known = {for (final r in rows) r.id};

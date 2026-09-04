@@ -6,6 +6,7 @@ import 'package:achievements/core/sync/sync_engine.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/core/update/update_checker.dart';
+import 'package:achievements/data/repositories/outbox_repository.dart';
 import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:achievements/features/auth/auth_session.dart';
 import 'package:achievements/features/settings/models/app_settings.dart';
@@ -64,6 +65,8 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settingsAsync = ref.watch(settingsNotifierProvider);
+    final syncFailureCount =
+        ref.watch(syncFailureCountProvider).valueOrNull ?? 0;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -108,12 +111,15 @@ class SettingsPage extends ConsumerWidget {
                 footer: '提醒由系统闹钟驱动,App 被后台清理也能到点提醒;为保证准时,建议关闭电池优化并允许自启动。',
                 children: [_KeepAliveSection()],
               ),
-            const SettingsGroup(
+            SettingsGroup(
               title: '同步',
               children: [
-                _SyncStatusTile(),
-                _SyncActionTile(),
-                _AccountSection(),
+                const _SyncStatusTile(),
+                // 只在真有推不上去的改动时出现,避免平时占位。
+                if (syncFailureCount > 0)
+                  _SyncFailuresTile(count: syncFailureCount),
+                const _SyncActionTile(),
+                const _AccountSection(),
               ],
             ),
             const SettingsGroup(
@@ -458,6 +464,119 @@ class _SyncActionTile extends ConsumerWidget {
       onTap: isSyncing
           ? null
           : () => unawaited(ref.read(syncCoordinatorProvider).runFullSync()),
+    );
+  }
+}
+
+/// 推不上去的本地改动(重试预算耗尽)。给用户一个看得见、能处置的出口——
+/// 否则这些改动只会静默留在本地,用户永远不知道它们没上云。
+class _SyncFailuresTile extends ConsumerWidget {
+  const _SyncFailuresTile({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    return SettingsTile(
+      leading: Icons.sync_problem_rounded,
+      leadingColor: scheme.error,
+      title: '$count 条本地改动没能同步',
+      titleColor: scheme.error,
+      value: '查看',
+      onTap: () => unawaited(
+        showDialog<void>(
+          context: context,
+          builder: (_) => const _SyncFailuresDialog(),
+        ),
+      ),
+    );
+  }
+}
+
+class _SyncFailuresDialog extends ConsumerWidget {
+  const _SyncFailuresDialog();
+
+  static const _entityLabels = {
+    'folder': '文件夹',
+    'list': '清单',
+    'task': '任务',
+    'tag': '标签',
+    'task_tag': '标签关联',
+  };
+
+  static const _opLabels = {'upsert': '新建/修改', 'delete': '删除', 'purge': '永久删除'};
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final rows = ref.watch(syncFailureListProvider).valueOrNull ?? const [];
+
+    return AlertDialog(
+      title: const Text('没能同步的改动'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '这些改动重试多次仍被服务端拒绝,已停止自动重试。'
+              '重试会重新排队发送;丢弃后本地这几行会在下次同步时被云端的值覆盖。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: Spacing.md),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: rows.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final row = rows[i];
+                  final entity = _entityLabels[row.entity] ?? row.entity;
+                  final op = _opLabels[row.op] ?? row.op;
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('$entity · $op'),
+                    subtitle: Text(
+                      row.lastError ?? '未知原因',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () async {
+            await ref.read(outboxRepositoryProvider).discardDeadLettered();
+            ref.invalidate(syncFailureListProvider);
+            if (context.mounted) Navigator.of(context).pop();
+          },
+          child: Text('全部丢弃', style: TextStyle(color: theme.colorScheme.error)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('关闭'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            await ref.read(outboxRepositoryProvider).retryDeadLettered();
+            ref.invalidate(syncFailureListProvider);
+            if (context.mounted) Navigator.of(context).pop();
+            unawaited(ref.read(syncCoordinatorProvider).runFullSync());
+          },
+          child: const Text('全部重试'),
+        ),
+      ],
     );
   }
 }
