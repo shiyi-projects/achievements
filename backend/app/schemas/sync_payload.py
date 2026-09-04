@@ -16,14 +16,8 @@ class _Base(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
-class FolderPayload(_Base):
-    name: str | None = None
-    sort_order: int | None = None
-    deleted_at: datetime | None = None
-
-
 class TaskListPayload(_Base):
-    folder_id: UUID | None = None
+    parent_id: UUID | None = None
     name: str | None = None
     color: str | None = None
     icon: str | None = None
@@ -31,6 +25,7 @@ class TaskListPayload(_Base):
     is_system: bool | None = None
     system_kind: str | None = None
     deleted_at: datetime | None = None
+    trashed_with: UUID | None = None
 
 
 class TaskPayload(_Base):
@@ -51,6 +46,7 @@ class TaskPayload(_Base):
     starred: bool | None = None
     estimated_minutes: int | None = None
     deleted_at: datetime | None = None
+    trashed_with: UUID | None = None
 
 
 class TagPayload(_Base):

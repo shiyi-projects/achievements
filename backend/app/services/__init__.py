@@ -1,7 +1,6 @@
 """Service layer aggregator."""
 
 from app.services import (
-    folder_service,
     list_service,
     sync_service,
     tag_service,
@@ -9,7 +8,6 @@ from app.services import (
 )
 
 __all__ = [
-    "folder_service",
     "list_service",
     "sync_service",
     "tag_service",

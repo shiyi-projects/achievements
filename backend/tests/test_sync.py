@@ -18,17 +18,12 @@ from app.services.sync_service import (
     _reason_for,
     _sort_tasks_by_dependency,
 )
-
-
-async def _create_list(client: AsyncClient, name: str = "Inbox") -> UUID:
-    resp = await client.post("/api/v1/lists", json={"name": name})
-    assert resp.status_code == 201
-    return UUID(resp.json()["id"])
+from tests.helpers import create_list
 
 
 @pytest.mark.asyncio
 async def test_initial_pull_returns_full_state(client: AsyncClient) -> None:
-    list_id = await _create_list(client, "Work")
+    list_id = await create_list(client, "Work")
     await client.post("/api/v1/tasks", json={"list_id": str(list_id), "title": "Task A"})
 
     pull = await client.get("/api/v1/sync/pull")
@@ -38,7 +33,7 @@ async def test_initial_pull_returns_full_state(client: AsyncClient) -> None:
     assert body["cursor"]  # ISO timestamp
     assert {item["name"] for item in body["lists"]} == {"Work"}
     assert [t["title"] for t in body["tasks"]] == ["Task A"]
-    assert body["folders"] == []
+    assert "folders" not in body  # 文件夹已并入清单树
     assert body["tags"] == []
     assert body["task_tags"] == []
 
@@ -47,7 +42,7 @@ async def test_initial_pull_returns_full_state(client: AsyncClient) -> None:
 async def test_incremental_pull_returns_only_delta(
     client: AsyncClient,
 ) -> None:
-    list_id = await _create_list(client, "Work")
+    list_id = await create_list(client, "Work")
 
     first = await client.get("/api/v1/sync/pull")
     first_cursor = first.json()["cursor"]
@@ -75,7 +70,7 @@ async def test_incremental_pull_returns_only_delta(
 
 @pytest.mark.asyncio
 async def test_pull_includes_soft_deleted(client: AsyncClient) -> None:
-    list_id = await _create_list(client)
+    list_id = await create_list(client)
     created = (
         await client.post("/api/v1/tasks", json={"list_id": str(list_id), "title": "Trash me"})
     ).json()
@@ -88,7 +83,7 @@ async def test_pull_includes_soft_deleted(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_pull_future_since_returns_empty(client: AsyncClient) -> None:
-    await _create_list(client)
+    await create_list(client)
     future = datetime.now(UTC).replace(year=2099).isoformat()
     pull = await client.get("/api/v1/sync/pull", params={"since": future})
     body = pull.json()
@@ -146,7 +141,7 @@ async def test_push_upsert_creates_soft_deleted_override(client: AsyncClient) ->
     payload,那对不存在的实体是幂等 no-op),服务端必须创建出软删行并随 delta
     下发,否则跳过的发生点无法跨端传播。
     """
-    list_id = await _create_list(client, "Recurring")
+    list_id = await create_list(client, "Recurring")
     template = (
         await client.post(
             "/api/v1/tasks",
@@ -189,7 +184,7 @@ async def test_push_upsert_creates_soft_deleted_override(client: AsyncClient) ->
 async def test_push_update_with_matching_version_bumps(
     client: AsyncClient,
 ) -> None:
-    list_id = (await client.post("/api/v1/lists", json={"name": "Foo"})).json()["id"]
+    list_id = str(await create_list(client, "Foo"))
     push = await client.post(
         "/api/v1/sync/push",
         json={
@@ -213,7 +208,7 @@ async def test_push_update_with_matching_version_bumps(
 async def test_push_stale_base_version_yields_conflict(
     client: AsyncClient,
 ) -> None:
-    list_id = (await client.post("/api/v1/lists", json={"name": "Local"})).json()["id"]
+    list_id = str(await create_list(client, "Local"))
     # 服务端 version=1。客户端送 base_version=0 → 冲突
     push = await client.post(
         "/api/v1/sync/push",
@@ -237,7 +232,7 @@ async def test_push_stale_base_version_yields_conflict(
 
 @pytest.mark.asyncio
 async def test_push_delete_soft_deletes(client: AsyncClient) -> None:
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     task_id = (
         await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "doomed"})
     ).json()["id"]
@@ -272,7 +267,7 @@ async def test_push_batch_upsert_then_delete_both_apply(client: AsyncClient) -> 
     服务端须按序接续而不是判 conflict —— 否则客户端 LWW 会拿「本地入队时刻」
     比「服务端刚应用第 1 条的时刻」,后者恒晚,删除被静默吞掉。
     """
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     task_id = (
         await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "交年报"})
     ).json()["id"]
@@ -310,7 +305,7 @@ async def test_push_batch_upsert_then_delete_both_apply(client: AsyncClient) -> 
 @pytest.mark.asyncio
 async def test_push_batch_repeated_upserts_chain(client: AsyncClient) -> None:
     """同一实体在一批里连改三次,全部按序生效,version 逐条递增。"""
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
 
     def mutation(name: str) -> dict[str, object]:
         return {
@@ -336,7 +331,7 @@ async def test_push_batch_repeated_upserts_chain(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_push_batch_purge_after_upsert_applies(client: AsyncClient) -> None:
     """「编辑 → 永久删除」同批也须接续,墓碑必须落地。"""
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     task_id = (
         await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "gone"})
     ).json()["id"]
@@ -373,7 +368,7 @@ async def test_push_cross_batch_stale_version_still_conflicts(
     client: AsyncClient,
 ) -> None:
     """批内接续不能放过真正的并发:另一批推上去的写仍须判 conflict。"""
-    list_id = (await client.post("/api/v1/lists", json={"name": "Local"})).json()["id"]
+    list_id = str(await create_list(client, "Local"))
 
     # 第一批:模拟另一台设备把 version 推到 2
     first = await client.post(
@@ -418,8 +413,8 @@ async def test_push_batch_conflict_does_not_leak_to_other_entity(
     client: AsyncClient,
 ) -> None:
     """接续集合按实体隔离:A 实体在批内接续,不能让 B 实体的陈旧 base 蒙混过关。"""
-    a_id = (await client.post("/api/v1/lists", json={"name": "A"})).json()["id"]
-    b_id = (await client.post("/api/v1/lists", json={"name": "B"})).json()["id"]
+    a_id = str(await create_list(client, "A"))
+    b_id = str(await create_list(client, "B"))
 
     push = await client.post(
         "/api/v1/sync/push",
@@ -551,7 +546,7 @@ async def test_push_child_before_parent_still_applies(client: AsyncClient) -> No
 
     顺序错了会 FK 违例被 rejected,重试耗尽即成死信,那条任务再也上不了云。
     """
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     parent_id = str(uuid4())
     child_id = str(uuid4())
 
@@ -593,7 +588,7 @@ async def test_push_override_before_template_still_applies(
     client: AsyncClient,
 ) -> None:
     """重复 override 的 recurrence_parent_id 同样参与拓扑排序。"""
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     template_id = str(uuid4())
     override_id = str(uuid4())
 
@@ -635,7 +630,7 @@ async def test_dependency_sort_preserves_same_entity_order(
     client: AsyncClient,
 ) -> None:
     """拓扑排序不能打乱同一实体多条 mutation 的相对顺序(因果链靠它)。"""
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     parent_id = str(uuid4())
     child_id = str(uuid4())
 
@@ -746,7 +741,7 @@ async def test_upsert_onto_tombstone_rejected_as_purged(client: AsyncClient) -> 
     否则编辑会写进墓碑行,而墓碑随 delta 下发时各端(含发起端)都会物理删本地行,
     用户刚编辑过的任务凭空消失。
     """
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     task_id = (
         await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "gone"})
     ).json()["id"]
@@ -795,7 +790,7 @@ async def test_upsert_onto_tombstone_rejected_as_purged(client: AsyncClient) -> 
 @pytest.mark.asyncio
 async def test_delete_onto_tombstone_is_idempotent(client: AsyncClient) -> None:
     """delete / purge 打在墓碑上是幂等的,不受 purged 守卫影响。"""
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     task_id = (
         await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "gone"})
     ).json()["id"]
@@ -836,7 +831,7 @@ async def test_delete_onto_tombstone_is_idempotent(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_push_recurrence_fields_round_trip(client: AsyncClient) -> None:
     """重复模板与 override 字段经 sync push → pull 往返保真。"""
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     template_id = str(uuid4())
     override_id = str(uuid4())
 
@@ -888,7 +883,7 @@ async def test_push_recurrence_fields_round_trip(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_push_purge_writes_tombstone(client: AsyncClient) -> None:
     """purge 写 purged_at 墓碑;pull 仍下发(保留期内),供各端物理删除本地行。"""
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     task_id = (
         await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "gone"})
     ).json()["id"]
@@ -940,7 +935,7 @@ async def test_pull_gc_removes_purged_beyond_retention(
     client: AsyncClient, session: AsyncSession
 ) -> None:
     """purged_at 超过保留期的行,在 pull 时被惰性 GC 物理清除,不再下发。"""
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     task_id = (
         await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "ancient"})
     ).json()["id"]
@@ -966,7 +961,7 @@ async def _create_tag(client: AsyncClient, name: str = "urgent") -> str:
 
 @pytest.mark.asyncio
 async def test_task_tag_upsert_then_delete_sync(client: AsyncClient) -> None:
-    list_id = (await client.post("/api/v1/lists", json={"name": "L"})).json()["id"]
+    list_id = str(await create_list(client, "L"))
     task_id = (await client.post("/api/v1/tasks", json={"list_id": list_id, "title": "t"})).json()[
         "id"
     ]

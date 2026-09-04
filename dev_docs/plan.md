@@ -166,7 +166,7 @@ Achievements/
 |---|---|---|
 | 1 全局 | `app/`、`shared/` | `/auth/*`、`/sync/*` |
 | 2 Today | `features/today` | `/tasks?scope=today` |
-| 3 Sidebar | `features/sidebar` | `/lists`、`/folders` |
+| 3 Sidebar | `features/sidebar` | `/sync`(清单树) |
 | 4 任务 | `features/task` | `/tasks`、`/tasks/{id}/subtasks` |
 | 6 详情 | `features/task_detail` | `/tasks/{id}`、`/tasks/{id}/activities` |
 | 7 提醒 | `features/reminder` + `platform/*` | `/reminders`、APScheduler 推送 |
@@ -191,9 +191,8 @@ Achievements/
 |---|---|---|
 | `users` | id, email, password_hash, display_name, created_at | 账户体系 |
 | `devices` | id, user_id, name, platform, last_sync_at | 多端登录追踪 |
-| `folders` | id, user_id, name, sort_order | 自定义文件夹 |
-| `lists` | id, user_id, folder_id?, name, color, icon, sort_order | 清单(含内置 Today/Important/Planned 等虚拟) |
-| `tasks` | id, user_id, list_id, parent_id?, title, notes, priority, due_at?, remind_at?, repeat_rule?, color?, sort_order, completed_at?, archived_at?, starred, created_at, updated_at, deleted_at, version | 任务/子任务(自引用) |
+| `task_lists` | id, user_id, parent_id?, name, color, icon, sort_order, is_system, system_kind?, trashed_with? | 清单树(自引用,任何一级都能装任务与子清单;含内置 Today/Important/Planned 等虚拟清单)。详见 [list-tree.md](./list-tree.md) |
+| `tasks` | id, user_id, list_id, parent_id?, title, notes, priority, due_at?, remind_at?, repeat_rule?, color?, sort_order, completed_at?, archived_at?, starred, trashed_with?, created_at, updated_at, deleted_at, version | 任务/子任务(自引用) |
 | `tags` | id, user_id, name, color | 标签 |
 | `task_tags` | task_id, tag_id | 多对多 |
 | `attachments` | id, task_id, kind(image), url, size | 图片附件 |
@@ -219,12 +218,13 @@ POST   /auth/login
 POST   /auth/refresh
 POST   /auth/logout
 
-GET    /sync/pull?since=<cursor>          → { tasks[], lists[], folders[], tags[], reminders[], cursor }
+GET    /sync/pull?since=<cursor>          → { tasks[], lists[], tags[], task_tags[], cursor }
 POST   /sync/push                          ← { mutations: [{entity, op, payload, version}] }
-
+       两者都要求 X-Client-Version 头,低于门槛回 426(见 list-tree.md §5)
 
 CRUD   /tasks, /tasks/{id}, /tasks/{id}/subtasks, /tasks/{id}/complete
-CRUD   /lists, /folders, /tags
+CRUD   /tags
+       清单没有 REST 端点:local-first,读写一律走 /sync
 CRUD   /reminders
 POST   /attachments (multipart)
 GET    /search?q=&filters=

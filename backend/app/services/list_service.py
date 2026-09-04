@@ -1,8 +1,11 @@
-"""TaskList business logic + system list seeding."""
+"""System list seeding.
+
+清单的读写一律走 ``/sync``(客户端 local-first),这里只留启动期 / 登录期的
+系统清单幂等种入。
+"""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select, text
@@ -16,71 +19,6 @@ from app.core.system_lists import (
     system_list_id_for_user,
 )
 from app.models import Task, TaskList
-from app.schemas.task_list import TaskListCreate, TaskListUpdate
-
-
-async def list_task_lists(session: AsyncSession, user_id: UUID) -> list[TaskList]:
-    result = await session.execute(
-        select(TaskList)
-        .where(TaskList.user_id == user_id, TaskList.deleted_at.is_(None))
-        .order_by(TaskList.sort_order, TaskList.name)
-    )
-    return list(result.scalars().all())
-
-
-async def get_task_list(
-    session: AsyncSession,
-    user_id: UUID,
-    list_id: UUID,
-) -> TaskList | None:
-    result = await session.execute(
-        select(TaskList).where(
-            TaskList.id == list_id,
-            TaskList.user_id == user_id,
-            TaskList.deleted_at.is_(None),
-        )
-    )
-    return result.scalar_one_or_none()
-
-
-async def create_task_list(
-    session: AsyncSession,
-    user_id: UUID,
-    payload: TaskListCreate,
-) -> TaskList:
-    item = TaskList(
-        user_id=user_id,
-        name=payload.name,
-        folder_id=payload.folder_id,
-        color=payload.color,
-        icon=payload.icon,
-        sort_order=payload.sort_order,
-        is_system=False,
-    )
-    session.add(item)
-    await session.commit()
-    await session.refresh(item)
-    return item
-
-
-async def update_task_list(
-    session: AsyncSession,
-    item: TaskList,
-    payload: TaskListUpdate,
-) -> TaskList:
-    data = payload.model_dump(exclude_unset=True)
-    for key, value in data.items():
-        setattr(item, key, value)
-    await session.commit()
-    await session.refresh(item)
-    return item
-
-
-async def soft_delete_task_list(session: AsyncSession, item: TaskList) -> None:
-    if item.is_system:
-        raise ValueError("System lists cannot be deleted")
-    item.deleted_at = datetime.now(UTC)
-    await session.commit()
 
 
 async def ensure_system_lists(session: AsyncSession, user_id: UUID) -> None:
@@ -126,7 +64,7 @@ async def ensure_system_lists(session: AsyncSession, user_id: UUID) -> None:
                     id=desired_id,
                     user_id=user_id,
                     name=source.name,
-                    folder_id=source.folder_id,
+                    parent_id=source.parent_id,
                     color=source.color,
                     icon=source.icon,
                     sort_order=source.sort_order,

@@ -12,7 +12,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.schemas.folder import FolderRead
 from app.schemas.tag import TagRead
 from app.schemas.task import TaskRead
 from app.schemas.task_list import TaskListRead
@@ -38,7 +37,6 @@ class SyncPullResponse(BaseModel):
     """
 
     cursor: datetime
-    folders: list[FolderRead]
     lists: list[TaskListRead]
     tasks: list[TaskRead]
     tags: list[TagRead]
@@ -48,7 +46,8 @@ class SyncPullResponse(BaseModel):
 # ---- Push mutations(下个 commit 实装服务端;此处先定义契约,前后端可同时演进) ----
 
 
-MutationEntity = Literal["folder", "list", "task", "tag", "task_tag"]
+# 「文件夹」已并入清单树(见 alembic a1f4c7d92b30),不再是独立实体。
+MutationEntity = Literal["list", "task", "tag", "task_tag"]
 # upsert:创建或更新; delete:软删(移入回收站,可恢复); purge:永久删除(写墓碑)。
 MutationOp = Literal["upsert", "delete", "purge"]
 

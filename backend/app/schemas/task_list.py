@@ -1,34 +1,22 @@
-"""TaskList DTOs."""
+"""TaskList DTOs.
+
+清单是一棵自引用树(``parent_id``)。没有 REST 端点,这些 DTO 供 ``/sync``
+下发与冲突回包使用。
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class TaskListCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    folder_id: UUID | None = None
-    color: str | None = None
-    icon: str | None = None
-    sort_order: int = 0
-
-
-class TaskListUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=100)
-    folder_id: UUID | None = None
-    color: str | None = None
-    icon: str | None = None
-    sort_order: int | None = None
+from pydantic import BaseModel, ConfigDict
 
 
 class TaskListRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    folder_id: UUID | None
+    parent_id: UUID | None
     name: str
     color: str | None
     icon: str | None
@@ -38,5 +26,6 @@ class TaskListRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
+    trashed_with: UUID | None
     purged_at: datetime | None
     version: int
