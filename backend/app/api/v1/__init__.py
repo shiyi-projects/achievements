@@ -8,9 +8,7 @@ from app.api.v1 import (
     achievements,
     auth,
     focus_sessions,
-    folders,
     health,
-    lists,
     stats,
     sync,
     tags,
@@ -20,8 +18,7 @@ from app.api.v1 import (
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
-api_router.include_router(folders.router, prefix="/folders", tags=["folders"])
-api_router.include_router(lists.router, prefix="/lists", tags=["lists"])
+# 清单与文件夹没有 REST 端点:客户端 local-first,清单树的读写一律走 /sync。
 api_router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 api_router.include_router(tags.router, prefix="/tags", tags=["tags"])
 api_router.include_router(sync.router, prefix="/sync", tags=["sync"])

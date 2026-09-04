@@ -1,17 +1,16 @@
 import 'package:achievements/core/constants.dart';
-import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
+import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
-import 'package:achievements/data/repositories/folder_repository.dart';
+import 'package:achievements/data/models/list_tree.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/features/sidebar/widgets/brand_header.dart';
 import 'package:achievements/features/sidebar/widgets/create_tiles.dart';
-import 'package:achievements/features/sidebar/widgets/folder_group.dart';
+import 'package:achievements/features/sidebar/widgets/list_tree_tile.dart';
 import 'package:achievements/features/sidebar/widgets/sidebar_tile.dart';
 import 'package:achievements/features/sidebar/widgets/view_nav_tile.dart';
 import 'package:achievements/state/current_view.dart';
-import 'package:achievements/state/expanded_folders.dart';
-import 'package:achievements/state/selected_list.dart';
+import 'package:achievements/state/expanded_lists.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,24 +18,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// 段落:
 ///   1. 品牌 Header
-///   2. 顶部导航(7 个系统清单 + 3 个视图入口合并,按使用频次从高到低排列)
-///   3. Folders + 各文件夹下的清单(可折叠;长按文件夹改 / 删)
-///   4. 根目录用户清单(folder_id IS NULL)
-///   5. 末尾 "+ New list" 与 "+ New folder" 入口
-///   6. 底部设置占位
+///   2. 顶部导航(系统清单 + 视图入口合并,按使用频次从高到低排列)
+///   3. 清单树 —— 用户清单的一棵自引用树,任意一级都能装任务与子清单;
+///      行间的细落点用于排序,行本身是「成为子清单」的落点
+///   4. 末尾「+ 新建清单」入口
+///   5. 底部设置
 class Sidebar extends ConsumerWidget {
   const Sidebar({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final allLists = ref.watch(allListsProvider);
-    final allFolders = ref.watch(allFoldersProvider);
-    final currentAsync = ref.watch(currentListProvider);
-    final currentId = currentAsync.maybeWhen(
-      data: (list) => list?.id,
-      orElse: () => null,
-    );
-    final expanded = ref.watch(expandedFoldersProvider);
+    final expanded = ref.watch(expandedListsProvider);
     final currentView = ref.watch(currentViewNotifierProvider);
     final viewNotifier = ref.read(currentViewNotifierProvider.notifier);
     final theme = Theme.of(context);
@@ -50,45 +43,19 @@ class Sidebar extends ConsumerWidget {
           final systemByKind = <String, TaskList>{
             for (final l in lists.where((l) => l.isSystem)) l.systemKind!: l,
           };
-          final folders = allFolders.maybeWhen(
-            data: (data) => data,
-            orElse: () => const <Folder>[],
-          );
-          final folderIds = {for (final f in folders) f.id};
-          final byFolder = <String, List<TaskList>>{};
-          final rootLists = <TaskList>[];
-          for (final list in lists.where((l) => !l.isSystem)) {
-            final fid = list.folderId;
-            if (fid != null && folderIds.contains(fid)) {
-              byFolder.putIfAbsent(fid, () => []).add(list);
-            } else {
-              rootLists.add(list);
-            }
-          }
-          for (final bucket in byFolder.values) {
-            bucket.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-          }
-          rootLists.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+          final tree = buildListTree(lists);
+          final rows = flattenTree(tree, expanded);
 
           // ── 顶部导航:系统清单 + 视图入口合并,按使用频次从高到低排列 ──
           // 导航收敛(见 dev_docs/recurring-tasks.md §8.1):
-          // - 「计划」并入日历——日历虚拟展开重复任务,已完整覆盖「未来有排期」语义,
-          //   故从侧边栏隐藏 planned(DB/同步不动)。
-          // - 「重要」改为列表内 ⭐ 筛选开关(P5),亦从侧边栏隐藏。
+          // - 「计划」并入日历——日历虚拟展开重复任务,已完整覆盖「未来有排期」
+          //   语义,故从侧边栏隐藏 planned(DB/同步不动)。
+          // - 「重要」改为列表内 ⭐ 筛选开关,亦从侧边栏隐藏。
           // 系统清单相对顺序: 今天 > 收件箱 > 全部 > 已完成 > 回收站
-          // 视图入口插入位置: 日历(替代计划位置)、专注(居中)、成就(靠归档)
-          SidebarTile? systemTile(SystemListKind kind) {
+          SystemListTile? systemTile(SystemListKind kind) {
             final list = systemByKind[kind.value];
             if (list == null) return null;
-            return SidebarTile(
-              list: list,
-              icon: _systemIcon(kind),
-              displayName: displayNameOfList(
-                systemKind: list.systemKind,
-                fallback: list.name,
-              ),
-              selected: list.id == currentId,
-            );
+            return SystemListTile(list: list, icon: _systemIcon(kind));
           }
 
           final topNav = <Widget?>[
@@ -119,109 +86,38 @@ class Sidebar extends ConsumerWidget {
 
           return Column(
             children: [
-              // ── Brand Header ──
               const BrandHeader(),
               Divider(
                 height: 1,
                 color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
               ),
-              // ── Content ──
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
                   children: [
-                    // ── 顶部导航(系统清单 + 视图入口,按使用频次排序) ──
                     ...topNav,
+                    _SectionLabel(text: '清单'),
 
-                    // ── Separator ──
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        Spacing.lg,
-                        Spacing.base,
-                        Spacing.base,
-                        Spacing.sm,
+                    // ── 清单树 ──
+                    for (final row in rows) ...[
+                      // 拖到这条线上 = 插到该行之前的同级位置。
+                      ListInsertionSlot(
+                        parentId: row.parentId,
+                        index: row.siblingIndex,
+                        depth: row.depth - 1,
                       ),
-                      child: Text(
-                        '清单',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.outline,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
+                      ListTreeTile(row: row),
+                    ],
+                    // 顶层末尾落点(也承担「从子清单里拖出来」的去处)。
+                    ListInsertionSlot(
+                      parentId: null,
+                      index: tree.length,
+                      depth: 0,
                     ),
 
-                    // ── Folders ──
-                    for (final folder in folders)
-                      FolderGroup(
-                        folder: folder,
-                        lists: byFolder[folder.id] ?? const [],
-                        isExpanded: expanded.contains(folder.id),
-                        currentId: currentId,
-                      ),
+                    const NewListTile(),
 
-                    // ── Root lists — DragTarget 接收从文件夹拖出的清单 ──
-                    DragTarget<TaskList>(
-                      onWillAcceptWithDetails: (details) =>
-                          details.data.folderId != null,
-                      onAcceptWithDetails: (details) {
-                        ref
-                            .read(listRepositoryProvider)
-                            .setFolder(details.data.id, null);
-                      },
-                      builder: (ctx, candidateItems, _) {
-                        final over = candidateItems.isNotEmpty;
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          margin: over
-                              ? const EdgeInsets.symmetric(
-                                  horizontal: Spacing.sm,
-                                  vertical: Spacing.xs,
-                                )
-                              : EdgeInsets.zero,
-                          decoration: over
-                              ? BoxDecoration(
-                                  color: theme.colorScheme.secondaryContainer
-                                      .withValues(alpha: 0.35),
-                                  borderRadius: BorderRadius.circular(
-                                    Radii.input,
-                                  ),
-                                  border: Border.all(
-                                    color: theme.colorScheme.primary.withValues(
-                                      alpha: 0.4,
-                                    ),
-                                    width: 1.5,
-                                  ),
-                                )
-                              : null,
-                          child: Column(
-                            children: [
-                              for (final list in rootLists)
-                                SidebarTile(
-                                  list: list,
-                                  icon: AppIcons.svgIcon(AppIcons.list),
-                                  selected: list.id == currentId,
-                                ),
-                              if (over && rootLists.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.all(Spacing.sm),
-                                  child: Text(
-                                    '松开移出文件夹',
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-
-                    // ── Create actions ──
-                    const NewItemTile(),
-
-                    if (folders.isEmpty && rootLists.isEmpty)
+                    if (rows.isEmpty)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(
                           Spacing.lg,
@@ -239,7 +135,6 @@ class Sidebar extends ConsumerWidget {
                   ],
                 ),
               ),
-              // ── Bottom Settings ──
               Divider(
                 height: 1,
                 color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
@@ -264,5 +159,31 @@ class Sidebar extends ConsumerWidget {
       null => AppIcons.list,
     };
     return AppIcons.svgIcon(path);
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.base,
+        Spacing.base,
+        Spacing.sm,
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.outline,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
   }
 }

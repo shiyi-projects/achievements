@@ -6,7 +6,6 @@
 
 from app.models.achievement import Achievement, UserAchievement
 from app.models.focus_session import FocusSession
-from app.models.folder import Folder
 from app.models.tag import Tag
 from app.models.task import Task
 from app.models.task_list import TaskList
@@ -16,7 +15,6 @@ from app.models.user import User
 __all__ = [
     "Achievement",
     "FocusSession",
-    "Folder",
     "Tag",
     "Task",
     "TaskList",

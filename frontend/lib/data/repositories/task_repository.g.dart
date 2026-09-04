@@ -24,9 +24,9 @@ final taskRepositoryProvider = Provider<TaskRepository>.internal(
 // ignore: unused_element
 typedef TaskRepositoryRef = ProviderRef<TaskRepository>;
 String _$tasksForCurrentListHash() =>
-    r'c6dfecf1005754fd50eb49bfec435a34d114c292';
+    r'53cb7afe60ba69f28069f29f4cbc1a326ea026d2';
 
-/// 当前选中清单的任务流(主视图用)。
+/// 当前选中清单的任务流(主视图用)。父清单展示整棵子树的聚合。
 ///
 /// Copied from [tasksForCurrentList].
 @ProviderFor(tasksForCurrentList)
@@ -197,28 +197,28 @@ class _SubtasksOfProviderElement
 }
 
 String _$taskCountForListIdHash() =>
-    r'85dabc6956c7b391895123502d8b35e956de969d';
+    r'17f83574916ca7eef2a78071e19f85b7d23ad104';
 
 /// 某清单的任务数量(Sidebar 徽标)。家族参数用 listId 字符串避免在
-/// codegen 端引入 Drift 数据类的等值/哈希依赖。
+/// codegen 端引入 Drift 数据类的等值/哈希依赖。父清单计的是整棵子树。
 ///
 /// Copied from [taskCountForListId].
 @ProviderFor(taskCountForListId)
 const taskCountForListIdProvider = TaskCountForListIdFamily();
 
 /// 某清单的任务数量(Sidebar 徽标)。家族参数用 listId 字符串避免在
-/// codegen 端引入 Drift 数据类的等值/哈希依赖。
+/// codegen 端引入 Drift 数据类的等值/哈希依赖。父清单计的是整棵子树。
 ///
 /// Copied from [taskCountForListId].
 class TaskCountForListIdFamily extends Family<AsyncValue<int>> {
   /// 某清单的任务数量(Sidebar 徽标)。家族参数用 listId 字符串避免在
-  /// codegen 端引入 Drift 数据类的等值/哈希依赖。
+  /// codegen 端引入 Drift 数据类的等值/哈希依赖。父清单计的是整棵子树。
   ///
   /// Copied from [taskCountForListId].
   const TaskCountForListIdFamily();
 
   /// 某清单的任务数量(Sidebar 徽标)。家族参数用 listId 字符串避免在
-  /// codegen 端引入 Drift 数据类的等值/哈希依赖。
+  /// codegen 端引入 Drift 数据类的等值/哈希依赖。父清单计的是整棵子树。
   ///
   /// Copied from [taskCountForListId].
   TaskCountForListIdProvider call(String listId) {
@@ -248,12 +248,12 @@ class TaskCountForListIdFamily extends Family<AsyncValue<int>> {
 }
 
 /// 某清单的任务数量(Sidebar 徽标)。家族参数用 listId 字符串避免在
-/// codegen 端引入 Drift 数据类的等值/哈希依赖。
+/// codegen 端引入 Drift 数据类的等值/哈希依赖。父清单计的是整棵子树。
 ///
 /// Copied from [taskCountForListId].
 class TaskCountForListIdProvider extends AutoDisposeStreamProvider<int> {
   /// 某清单的任务数量(Sidebar 徽标)。家族参数用 listId 字符串避免在
-  /// codegen 端引入 Drift 数据类的等值/哈希依赖。
+  /// codegen 端引入 Drift 数据类的等值/哈希依赖。父清单计的是整棵子树。
   ///
   /// Copied from [taskCountForListId].
   TaskCountForListIdProvider(String listId)

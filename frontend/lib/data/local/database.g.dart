@@ -3,517 +3,6 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
-class $FoldersTable extends Folders with TableInfo<$FoldersTable, Folder> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $FoldersTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
-  @override
-  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
-    'user_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: false,
-    defaultValue: currentDateAndTime,
-  );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-    'updated_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: false,
-    defaultValue: currentDateAndTime,
-  );
-  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
-    'deletedAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
-    'deleted_at',
-    aliasedName,
-    true,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _versionMeta = const VerificationMeta(
-    'version',
-  );
-  @override
-  late final GeneratedColumn<int> version = GeneratedColumn<int>(
-    'version',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(1),
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 1,
-      maxTextLength: 100,
-    ),
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
-    'sortOrder',
-  );
-  @override
-  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
-    'sort_order',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(0),
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    userId,
-    createdAt,
-    updatedAt,
-    deletedAt,
-    version,
-    name,
-    sortOrder,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'folders';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<Folder> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('user_id')) {
-      context.handle(
-        _userIdMeta,
-        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_userIdMeta);
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
-    }
-    if (data.containsKey('updated_at')) {
-      context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
-      );
-    }
-    if (data.containsKey('deleted_at')) {
-      context.handle(
-        _deletedAtMeta,
-        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
-      );
-    }
-    if (data.containsKey('version')) {
-      context.handle(
-        _versionMeta,
-        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
-      );
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('sort_order')) {
-      context.handle(
-        _sortOrderMeta,
-        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  Folder map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Folder(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      userId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}user_id'],
-      )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}created_at'],
-      )!,
-      updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}updated_at'],
-      )!,
-      deletedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}deleted_at'],
-      ),
-      version: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}version'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      sortOrder: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}sort_order'],
-      )!,
-    );
-  }
-
-  @override
-  $FoldersTable createAlias(String alias) {
-    return $FoldersTable(attachedDatabase, alias);
-  }
-}
-
-class Folder extends DataClass implements Insertable<Folder> {
-  /// 客户端生成的 UUIDv7,字符串存储。
-  final String id;
-
-  /// Phase 0/1 固定为 LOCAL_USER_ID;启用真实账号后写入用户主键。
-  final String userId;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-
-  /// 软删时间戳。同步引擎据此向其他端广播删除。
-  final DateTime? deletedAt;
-
-  /// LWW 冲突解决用,服务端每次写入自增。
-  final int version;
-  final String name;
-  final int sortOrder;
-  const Folder({
-    required this.id,
-    required this.userId,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    required this.version,
-    required this.name,
-    required this.sortOrder,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['user_id'] = Variable<String>(userId);
-    map['created_at'] = Variable<DateTime>(createdAt);
-    map['updated_at'] = Variable<DateTime>(updatedAt);
-    if (!nullToAbsent || deletedAt != null) {
-      map['deleted_at'] = Variable<DateTime>(deletedAt);
-    }
-    map['version'] = Variable<int>(version);
-    map['name'] = Variable<String>(name);
-    map['sort_order'] = Variable<int>(sortOrder);
-    return map;
-  }
-
-  FoldersCompanion toCompanion(bool nullToAbsent) {
-    return FoldersCompanion(
-      id: Value(id),
-      userId: Value(userId),
-      createdAt: Value(createdAt),
-      updatedAt: Value(updatedAt),
-      deletedAt: deletedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(deletedAt),
-      version: Value(version),
-      name: Value(name),
-      sortOrder: Value(sortOrder),
-    );
-  }
-
-  factory Folder.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Folder(
-      id: serializer.fromJson<String>(json['id']),
-      userId: serializer.fromJson<String>(json['userId']),
-      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
-      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
-      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
-      version: serializer.fromJson<int>(json['version']),
-      name: serializer.fromJson<String>(json['name']),
-      sortOrder: serializer.fromJson<int>(json['sortOrder']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'userId': serializer.toJson<String>(userId),
-      'createdAt': serializer.toJson<DateTime>(createdAt),
-      'updatedAt': serializer.toJson<DateTime>(updatedAt),
-      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
-      'version': serializer.toJson<int>(version),
-      'name': serializer.toJson<String>(name),
-      'sortOrder': serializer.toJson<int>(sortOrder),
-    };
-  }
-
-  Folder copyWith({
-    String? id,
-    String? userId,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    Value<DateTime?> deletedAt = const Value.absent(),
-    int? version,
-    String? name,
-    int? sortOrder,
-  }) => Folder(
-    id: id ?? this.id,
-    userId: userId ?? this.userId,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
-    version: version ?? this.version,
-    name: name ?? this.name,
-    sortOrder: sortOrder ?? this.sortOrder,
-  );
-  Folder copyWithCompanion(FoldersCompanion data) {
-    return Folder(
-      id: data.id.present ? data.id.value : this.id,
-      userId: data.userId.present ? data.userId.value : this.userId,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
-      version: data.version.present ? data.version.value : this.version,
-      name: data.name.present ? data.name.value : this.name,
-      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('Folder(')
-          ..write('id: $id, ')
-          ..write('userId: $userId, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('deletedAt: $deletedAt, ')
-          ..write('version: $version, ')
-          ..write('name: $name, ')
-          ..write('sortOrder: $sortOrder')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    id,
-    userId,
-    createdAt,
-    updatedAt,
-    deletedAt,
-    version,
-    name,
-    sortOrder,
-  );
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is Folder &&
-          other.id == this.id &&
-          other.userId == this.userId &&
-          other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt &&
-          other.deletedAt == this.deletedAt &&
-          other.version == this.version &&
-          other.name == this.name &&
-          other.sortOrder == this.sortOrder);
-}
-
-class FoldersCompanion extends UpdateCompanion<Folder> {
-  final Value<String> id;
-  final Value<String> userId;
-  final Value<DateTime> createdAt;
-  final Value<DateTime> updatedAt;
-  final Value<DateTime?> deletedAt;
-  final Value<int> version;
-  final Value<String> name;
-  final Value<int> sortOrder;
-  final Value<int> rowid;
-  const FoldersCompanion({
-    this.id = const Value.absent(),
-    this.userId = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.updatedAt = const Value.absent(),
-    this.deletedAt = const Value.absent(),
-    this.version = const Value.absent(),
-    this.name = const Value.absent(),
-    this.sortOrder = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  FoldersCompanion.insert({
-    required String id,
-    required String userId,
-    this.createdAt = const Value.absent(),
-    this.updatedAt = const Value.absent(),
-    this.deletedAt = const Value.absent(),
-    this.version = const Value.absent(),
-    required String name,
-    this.sortOrder = const Value.absent(),
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       userId = Value(userId),
-       name = Value(name);
-  static Insertable<Folder> custom({
-    Expression<String>? id,
-    Expression<String>? userId,
-    Expression<DateTime>? createdAt,
-    Expression<DateTime>? updatedAt,
-    Expression<DateTime>? deletedAt,
-    Expression<int>? version,
-    Expression<String>? name,
-    Expression<int>? sortOrder,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (userId != null) 'user_id': userId,
-      if (createdAt != null) 'created_at': createdAt,
-      if (updatedAt != null) 'updated_at': updatedAt,
-      if (deletedAt != null) 'deleted_at': deletedAt,
-      if (version != null) 'version': version,
-      if (name != null) 'name': name,
-      if (sortOrder != null) 'sort_order': sortOrder,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  FoldersCompanion copyWith({
-    Value<String>? id,
-    Value<String>? userId,
-    Value<DateTime>? createdAt,
-    Value<DateTime>? updatedAt,
-    Value<DateTime?>? deletedAt,
-    Value<int>? version,
-    Value<String>? name,
-    Value<int>? sortOrder,
-    Value<int>? rowid,
-  }) {
-    return FoldersCompanion(
-      id: id ?? this.id,
-      userId: userId ?? this.userId,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      deletedAt: deletedAt ?? this.deletedAt,
-      version: version ?? this.version,
-      name: name ?? this.name,
-      sortOrder: sortOrder ?? this.sortOrder,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (userId.present) {
-      map['user_id'] = Variable<String>(userId.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
-    }
-    if (updatedAt.present) {
-      map['updated_at'] = Variable<DateTime>(updatedAt.value);
-    }
-    if (deletedAt.present) {
-      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
-    }
-    if (version.present) {
-      map['version'] = Variable<int>(version.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (sortOrder.present) {
-      map['sort_order'] = Variable<int>(sortOrder.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('FoldersCompanion(')
-          ..write('id: $id, ')
-          ..write('userId: $userId, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('deletedAt: $deletedAt, ')
-          ..write('version: $version, ')
-          ..write('name: $name, ')
-          ..write('sortOrder: $sortOrder, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
 class $TaskListsTable extends TaskLists
     with TableInfo<$TaskListsTable, TaskList> {
   @override
@@ -585,12 +74,12 @@ class $TaskListsTable extends TaskLists
     requiredDuringInsert: false,
     defaultValue: const Constant(1),
   );
-  static const VerificationMeta _folderIdMeta = const VerificationMeta(
-    'folderId',
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
   );
   @override
-  late final GeneratedColumn<String> folderId = GeneratedColumn<String>(
-    'folder_id',
+  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
+    'parent_id',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -665,6 +154,17 @@ class $TaskListsTable extends TaskLists
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _trashedWithMeta = const VerificationMeta(
+    'trashedWith',
+  );
+  @override
+  late final GeneratedColumn<String> trashedWith = GeneratedColumn<String>(
+    'trashed_with',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -673,13 +173,14 @@ class $TaskListsTable extends TaskLists
     updatedAt,
     deletedAt,
     version,
-    folderId,
+    parentId,
     name,
     color,
     icon,
     sortOrder,
     isSystem,
     systemKind,
+    trashedWith,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -730,10 +231,10 @@ class $TaskListsTable extends TaskLists
         version.isAcceptableOrUnknown(data['version']!, _versionMeta),
       );
     }
-    if (data.containsKey('folder_id')) {
+    if (data.containsKey('parent_id')) {
       context.handle(
-        _folderIdMeta,
-        folderId.isAcceptableOrUnknown(data['folder_id']!, _folderIdMeta),
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
       );
     }
     if (data.containsKey('name')) {
@@ -774,6 +275,15 @@ class $TaskListsTable extends TaskLists
         systemKind.isAcceptableOrUnknown(data['system_kind']!, _systemKindMeta),
       );
     }
+    if (data.containsKey('trashed_with')) {
+      context.handle(
+        _trashedWithMeta,
+        trashedWith.isAcceptableOrUnknown(
+          data['trashed_with']!,
+          _trashedWithMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -807,9 +317,9 @@ class $TaskListsTable extends TaskLists
         DriftSqlType.int,
         data['${effectivePrefix}version'],
       )!,
-      folderId: attachedDatabase.typeMapping.read(
+      parentId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}folder_id'],
+        data['${effectivePrefix}parent_id'],
       ),
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -835,6 +345,10 @@ class $TaskListsTable extends TaskLists
         DriftSqlType.string,
         data['${effectivePrefix}system_kind'],
       ),
+      trashedWith: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}trashed_with'],
+      ),
     );
   }
 
@@ -858,13 +372,18 @@ class TaskList extends DataClass implements Insertable<TaskList> {
 
   /// LWW 冲突解决用,服务端每次写入自增。
   final int version;
-  final String? folderId;
+
+  /// 父清单 id(自引用)。null 表示顶层。系统清单恒为 null。
+  final String? parentId;
   final String name;
   final String? color;
   final String? icon;
   final int sortOrder;
   final bool isSystem;
   final String? systemKind;
+
+  /// 级联删除的来源清单 id,见 [Tasks.trashedWith]。
+  final String? trashedWith;
   const TaskList({
     required this.id,
     required this.userId,
@@ -872,13 +391,14 @@ class TaskList extends DataClass implements Insertable<TaskList> {
     required this.updatedAt,
     this.deletedAt,
     required this.version,
-    this.folderId,
+    this.parentId,
     required this.name,
     this.color,
     this.icon,
     required this.sortOrder,
     required this.isSystem,
     this.systemKind,
+    this.trashedWith,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -891,8 +411,8 @@ class TaskList extends DataClass implements Insertable<TaskList> {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
     map['version'] = Variable<int>(version);
-    if (!nullToAbsent || folderId != null) {
-      map['folder_id'] = Variable<String>(folderId);
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<String>(parentId);
     }
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || color != null) {
@@ -905,6 +425,9 @@ class TaskList extends DataClass implements Insertable<TaskList> {
     map['is_system'] = Variable<bool>(isSystem);
     if (!nullToAbsent || systemKind != null) {
       map['system_kind'] = Variable<String>(systemKind);
+    }
+    if (!nullToAbsent || trashedWith != null) {
+      map['trashed_with'] = Variable<String>(trashedWith);
     }
     return map;
   }
@@ -919,9 +442,9 @@ class TaskList extends DataClass implements Insertable<TaskList> {
           ? const Value.absent()
           : Value(deletedAt),
       version: Value(version),
-      folderId: folderId == null && nullToAbsent
+      parentId: parentId == null && nullToAbsent
           ? const Value.absent()
-          : Value(folderId),
+          : Value(parentId),
       name: Value(name),
       color: color == null && nullToAbsent
           ? const Value.absent()
@@ -932,6 +455,9 @@ class TaskList extends DataClass implements Insertable<TaskList> {
       systemKind: systemKind == null && nullToAbsent
           ? const Value.absent()
           : Value(systemKind),
+      trashedWith: trashedWith == null && nullToAbsent
+          ? const Value.absent()
+          : Value(trashedWith),
     );
   }
 
@@ -947,13 +473,14 @@ class TaskList extends DataClass implements Insertable<TaskList> {
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       version: serializer.fromJson<int>(json['version']),
-      folderId: serializer.fromJson<String?>(json['folderId']),
+      parentId: serializer.fromJson<String?>(json['parentId']),
       name: serializer.fromJson<String>(json['name']),
       color: serializer.fromJson<String?>(json['color']),
       icon: serializer.fromJson<String?>(json['icon']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       isSystem: serializer.fromJson<bool>(json['isSystem']),
       systemKind: serializer.fromJson<String?>(json['systemKind']),
+      trashedWith: serializer.fromJson<String?>(json['trashedWith']),
     );
   }
   @override
@@ -966,13 +493,14 @@ class TaskList extends DataClass implements Insertable<TaskList> {
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'version': serializer.toJson<int>(version),
-      'folderId': serializer.toJson<String?>(folderId),
+      'parentId': serializer.toJson<String?>(parentId),
       'name': serializer.toJson<String>(name),
       'color': serializer.toJson<String?>(color),
       'icon': serializer.toJson<String?>(icon),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'isSystem': serializer.toJson<bool>(isSystem),
       'systemKind': serializer.toJson<String?>(systemKind),
+      'trashedWith': serializer.toJson<String?>(trashedWith),
     };
   }
 
@@ -983,13 +511,14 @@ class TaskList extends DataClass implements Insertable<TaskList> {
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     int? version,
-    Value<String?> folderId = const Value.absent(),
+    Value<String?> parentId = const Value.absent(),
     String? name,
     Value<String?> color = const Value.absent(),
     Value<String?> icon = const Value.absent(),
     int? sortOrder,
     bool? isSystem,
     Value<String?> systemKind = const Value.absent(),
+    Value<String?> trashedWith = const Value.absent(),
   }) => TaskList(
     id: id ?? this.id,
     userId: userId ?? this.userId,
@@ -997,13 +526,14 @@ class TaskList extends DataClass implements Insertable<TaskList> {
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     version: version ?? this.version,
-    folderId: folderId.present ? folderId.value : this.folderId,
+    parentId: parentId.present ? parentId.value : this.parentId,
     name: name ?? this.name,
     color: color.present ? color.value : this.color,
     icon: icon.present ? icon.value : this.icon,
     sortOrder: sortOrder ?? this.sortOrder,
     isSystem: isSystem ?? this.isSystem,
     systemKind: systemKind.present ? systemKind.value : this.systemKind,
+    trashedWith: trashedWith.present ? trashedWith.value : this.trashedWith,
   );
   TaskList copyWithCompanion(TaskListsCompanion data) {
     return TaskList(
@@ -1013,7 +543,7 @@ class TaskList extends DataClass implements Insertable<TaskList> {
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       version: data.version.present ? data.version.value : this.version,
-      folderId: data.folderId.present ? data.folderId.value : this.folderId,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
       name: data.name.present ? data.name.value : this.name,
       color: data.color.present ? data.color.value : this.color,
       icon: data.icon.present ? data.icon.value : this.icon,
@@ -1022,6 +552,9 @@ class TaskList extends DataClass implements Insertable<TaskList> {
       systemKind: data.systemKind.present
           ? data.systemKind.value
           : this.systemKind,
+      trashedWith: data.trashedWith.present
+          ? data.trashedWith.value
+          : this.trashedWith,
     );
   }
 
@@ -1034,13 +567,14 @@ class TaskList extends DataClass implements Insertable<TaskList> {
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('version: $version, ')
-          ..write('folderId: $folderId, ')
+          ..write('parentId: $parentId, ')
           ..write('name: $name, ')
           ..write('color: $color, ')
           ..write('icon: $icon, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('isSystem: $isSystem, ')
-          ..write('systemKind: $systemKind')
+          ..write('systemKind: $systemKind, ')
+          ..write('trashedWith: $trashedWith')
           ..write(')'))
         .toString();
   }
@@ -1053,13 +587,14 @@ class TaskList extends DataClass implements Insertable<TaskList> {
     updatedAt,
     deletedAt,
     version,
-    folderId,
+    parentId,
     name,
     color,
     icon,
     sortOrder,
     isSystem,
     systemKind,
+    trashedWith,
   );
   @override
   bool operator ==(Object other) =>
@@ -1071,13 +606,14 @@ class TaskList extends DataClass implements Insertable<TaskList> {
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
           other.version == this.version &&
-          other.folderId == this.folderId &&
+          other.parentId == this.parentId &&
           other.name == this.name &&
           other.color == this.color &&
           other.icon == this.icon &&
           other.sortOrder == this.sortOrder &&
           other.isSystem == this.isSystem &&
-          other.systemKind == this.systemKind);
+          other.systemKind == this.systemKind &&
+          other.trashedWith == this.trashedWith);
 }
 
 class TaskListsCompanion extends UpdateCompanion<TaskList> {
@@ -1087,13 +623,14 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> version;
-  final Value<String?> folderId;
+  final Value<String?> parentId;
   final Value<String> name;
   final Value<String?> color;
   final Value<String?> icon;
   final Value<int> sortOrder;
   final Value<bool> isSystem;
   final Value<String?> systemKind;
+  final Value<String?> trashedWith;
   final Value<int> rowid;
   const TaskListsCompanion({
     this.id = const Value.absent(),
@@ -1102,13 +639,14 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.version = const Value.absent(),
-    this.folderId = const Value.absent(),
+    this.parentId = const Value.absent(),
     this.name = const Value.absent(),
     this.color = const Value.absent(),
     this.icon = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.isSystem = const Value.absent(),
     this.systemKind = const Value.absent(),
+    this.trashedWith = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TaskListsCompanion.insert({
@@ -1118,13 +656,14 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.version = const Value.absent(),
-    this.folderId = const Value.absent(),
+    this.parentId = const Value.absent(),
     required String name,
     this.color = const Value.absent(),
     this.icon = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.isSystem = const Value.absent(),
     this.systemKind = const Value.absent(),
+    this.trashedWith = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        userId = Value(userId),
@@ -1136,13 +675,14 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? version,
-    Expression<String>? folderId,
+    Expression<String>? parentId,
     Expression<String>? name,
     Expression<String>? color,
     Expression<String>? icon,
     Expression<int>? sortOrder,
     Expression<bool>? isSystem,
     Expression<String>? systemKind,
+    Expression<String>? trashedWith,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1152,13 +692,14 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (version != null) 'version': version,
-      if (folderId != null) 'folder_id': folderId,
+      if (parentId != null) 'parent_id': parentId,
       if (name != null) 'name': name,
       if (color != null) 'color': color,
       if (icon != null) 'icon': icon,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (isSystem != null) 'is_system': isSystem,
       if (systemKind != null) 'system_kind': systemKind,
+      if (trashedWith != null) 'trashed_with': trashedWith,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1170,13 +711,14 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? version,
-    Value<String?>? folderId,
+    Value<String?>? parentId,
     Value<String>? name,
     Value<String?>? color,
     Value<String?>? icon,
     Value<int>? sortOrder,
     Value<bool>? isSystem,
     Value<String?>? systemKind,
+    Value<String?>? trashedWith,
     Value<int>? rowid,
   }) {
     return TaskListsCompanion(
@@ -1186,13 +728,14 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       version: version ?? this.version,
-      folderId: folderId ?? this.folderId,
+      parentId: parentId ?? this.parentId,
       name: name ?? this.name,
       color: color ?? this.color,
       icon: icon ?? this.icon,
       sortOrder: sortOrder ?? this.sortOrder,
       isSystem: isSystem ?? this.isSystem,
       systemKind: systemKind ?? this.systemKind,
+      trashedWith: trashedWith ?? this.trashedWith,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1218,8 +761,8 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
     if (version.present) {
       map['version'] = Variable<int>(version.value);
     }
-    if (folderId.present) {
-      map['folder_id'] = Variable<String>(folderId.value);
+    if (parentId.present) {
+      map['parent_id'] = Variable<String>(parentId.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -1239,6 +782,9 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
     if (systemKind.present) {
       map['system_kind'] = Variable<String>(systemKind.value);
     }
+    if (trashedWith.present) {
+      map['trashed_with'] = Variable<String>(trashedWith.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1254,13 +800,14 @@ class TaskListsCompanion extends UpdateCompanion<TaskList> {
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('version: $version, ')
-          ..write('folderId: $folderId, ')
+          ..write('parentId: $parentId, ')
           ..write('name: $name, ')
           ..write('color: $color, ')
           ..write('icon: $icon, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('isSystem: $isSystem, ')
           ..write('systemKind: $systemKind, ')
+          ..write('trashedWith: $trashedWith, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1526,6 +1073,17 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _trashedWithMeta = const VerificationMeta(
+    'trashedWith',
+  );
+  @override
+  late final GeneratedColumn<String> trashedWith = GeneratedColumn<String>(
+    'trashed_with',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1551,6 +1109,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     starred,
     estimatedMinutes,
     focusedSeconds,
+    trashedWith,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1722,6 +1281,15 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         ),
       );
     }
+    if (data.containsKey('trashed_with')) {
+      context.handle(
+        _trashedWithMeta,
+        trashedWith.isAcceptableOrUnknown(
+          data['trashed_with']!,
+          _trashedWithMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1823,6 +1391,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         DriftSqlType.int,
         data['${effectivePrefix}focused_seconds'],
       )!,
+      trashedWith: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}trashed_with'],
+      ),
     );
   }
 
@@ -1879,6 +1451,11 @@ class Task extends DataClass implements Insertable<Task> {
 
   /// 累计专注时长（秒）。每次专注结束后自动累加。
   final int focusedSeconds;
+
+  /// 级联删除的来源清单 id。删清单时,被连带软删的任务(以及后代清单)都记下
+  /// 发起删除的那个清单;用户单独删除的任务恒为 null。回收站据此把「一个清单
+  /// 连同它的全部内容」当作整体还原,不会顺带复活先前单独删掉的任务。
+  final String? trashedWith;
   const Task({
     required this.id,
     required this.userId,
@@ -1903,6 +1480,7 @@ class Task extends DataClass implements Insertable<Task> {
     required this.starred,
     this.estimatedMinutes,
     required this.focusedSeconds,
+    this.trashedWith,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1954,6 +1532,9 @@ class Task extends DataClass implements Insertable<Task> {
       map['estimated_minutes'] = Variable<int>(estimatedMinutes);
     }
     map['focused_seconds'] = Variable<int>(focusedSeconds);
+    if (!nullToAbsent || trashedWith != null) {
+      map['trashed_with'] = Variable<String>(trashedWith);
+    }
     return map;
   }
 
@@ -2006,6 +1587,9 @@ class Task extends DataClass implements Insertable<Task> {
           ? const Value.absent()
           : Value(estimatedMinutes),
       focusedSeconds: Value(focusedSeconds),
+      trashedWith: trashedWith == null && nullToAbsent
+          ? const Value.absent()
+          : Value(trashedWith),
     );
   }
 
@@ -2040,6 +1624,7 @@ class Task extends DataClass implements Insertable<Task> {
       starred: serializer.fromJson<bool>(json['starred']),
       estimatedMinutes: serializer.fromJson<int?>(json['estimatedMinutes']),
       focusedSeconds: serializer.fromJson<int>(json['focusedSeconds']),
+      trashedWith: serializer.fromJson<String?>(json['trashedWith']),
     );
   }
   @override
@@ -2069,6 +1654,7 @@ class Task extends DataClass implements Insertable<Task> {
       'starred': serializer.toJson<bool>(starred),
       'estimatedMinutes': serializer.toJson<int?>(estimatedMinutes),
       'focusedSeconds': serializer.toJson<int>(focusedSeconds),
+      'trashedWith': serializer.toJson<String?>(trashedWith),
     };
   }
 
@@ -2096,6 +1682,7 @@ class Task extends DataClass implements Insertable<Task> {
     bool? starred,
     Value<int?> estimatedMinutes = const Value.absent(),
     int? focusedSeconds,
+    Value<String?> trashedWith = const Value.absent(),
   }) => Task(
     id: id ?? this.id,
     userId: userId ?? this.userId,
@@ -2126,6 +1713,7 @@ class Task extends DataClass implements Insertable<Task> {
         ? estimatedMinutes.value
         : this.estimatedMinutes,
     focusedSeconds: focusedSeconds ?? this.focusedSeconds,
+    trashedWith: trashedWith.present ? trashedWith.value : this.trashedWith,
   );
   Task copyWithCompanion(TasksCompanion data) {
     return Task(
@@ -2166,6 +1754,9 @@ class Task extends DataClass implements Insertable<Task> {
       focusedSeconds: data.focusedSeconds.present
           ? data.focusedSeconds.value
           : this.focusedSeconds,
+      trashedWith: data.trashedWith.present
+          ? data.trashedWith.value
+          : this.trashedWith,
     );
   }
 
@@ -2194,7 +1785,8 @@ class Task extends DataClass implements Insertable<Task> {
           ..write('archivedAt: $archivedAt, ')
           ..write('starred: $starred, ')
           ..write('estimatedMinutes: $estimatedMinutes, ')
-          ..write('focusedSeconds: $focusedSeconds')
+          ..write('focusedSeconds: $focusedSeconds, ')
+          ..write('trashedWith: $trashedWith')
           ..write(')'))
         .toString();
   }
@@ -2224,6 +1816,7 @@ class Task extends DataClass implements Insertable<Task> {
     starred,
     estimatedMinutes,
     focusedSeconds,
+    trashedWith,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2251,7 +1844,8 @@ class Task extends DataClass implements Insertable<Task> {
           other.archivedAt == this.archivedAt &&
           other.starred == this.starred &&
           other.estimatedMinutes == this.estimatedMinutes &&
-          other.focusedSeconds == this.focusedSeconds);
+          other.focusedSeconds == this.focusedSeconds &&
+          other.trashedWith == this.trashedWith);
 }
 
 class TasksCompanion extends UpdateCompanion<Task> {
@@ -2278,6 +1872,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
   final Value<bool> starred;
   final Value<int?> estimatedMinutes;
   final Value<int> focusedSeconds;
+  final Value<String?> trashedWith;
   final Value<int> rowid;
   const TasksCompanion({
     this.id = const Value.absent(),
@@ -2303,6 +1898,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.starred = const Value.absent(),
     this.estimatedMinutes = const Value.absent(),
     this.focusedSeconds = const Value.absent(),
+    this.trashedWith = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TasksCompanion.insert({
@@ -2329,6 +1925,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.starred = const Value.absent(),
     this.estimatedMinutes = const Value.absent(),
     this.focusedSeconds = const Value.absent(),
+    this.trashedWith = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        userId = Value(userId),
@@ -2358,6 +1955,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Expression<bool>? starred,
     Expression<int>? estimatedMinutes,
     Expression<int>? focusedSeconds,
+    Expression<String>? trashedWith,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2385,6 +1983,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
       if (starred != null) 'starred': starred,
       if (estimatedMinutes != null) 'estimated_minutes': estimatedMinutes,
       if (focusedSeconds != null) 'focused_seconds': focusedSeconds,
+      if (trashedWith != null) 'trashed_with': trashedWith,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2413,6 +2012,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Value<bool>? starred,
     Value<int?>? estimatedMinutes,
     Value<int>? focusedSeconds,
+    Value<String?>? trashedWith,
     Value<int>? rowid,
   }) {
     return TasksCompanion(
@@ -2439,6 +2039,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
       starred: starred ?? this.starred,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
       focusedSeconds: focusedSeconds ?? this.focusedSeconds,
+      trashedWith: trashedWith ?? this.trashedWith,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2515,6 +2116,9 @@ class TasksCompanion extends UpdateCompanion<Task> {
     if (focusedSeconds.present) {
       map['focused_seconds'] = Variable<int>(focusedSeconds.value);
     }
+    if (trashedWith.present) {
+      map['trashed_with'] = Variable<String>(trashedWith.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2547,6 +2151,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
           ..write('starred: $starred, ')
           ..write('estimatedMinutes: $estimatedMinutes, ')
           ..write('focusedSeconds: $focusedSeconds, ')
+          ..write('trashedWith: $trashedWith, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3517,10 +3122,10 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
 class OutboxData extends DataClass implements Insertable<OutboxData> {
   final int id;
 
-  /// folder / list / task / tag / task_tag
+  /// list / task / tag / task_tag
   final String entity;
 
-  /// upsert / delete
+  /// upsert / delete / purge
   final String op;
 
   /// 业务实体的 UUID 主键(关联表用 ``${taskId}:${tagId}`` 占位)。
@@ -5703,7 +5308,6 @@ class FocusPlansCompanion extends UpdateCompanion<FocusPlan> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
-  late final $FoldersTable folders = $FoldersTable(this);
   late final $TaskListsTable taskLists = $TaskListsTable(this);
   late final $TasksTable tasks = $TasksTable(this);
   late final $TagsTable tags = $TagsTable(this);
@@ -5719,7 +5323,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
-    folders,
     taskLists,
     tasks,
     tags,
@@ -5733,257 +5336,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ];
 }
 
-typedef $$FoldersTableCreateCompanionBuilder =
-    FoldersCompanion Function({
-      required String id,
-      required String userId,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<DateTime?> deletedAt,
-      Value<int> version,
-      required String name,
-      Value<int> sortOrder,
-      Value<int> rowid,
-    });
-typedef $$FoldersTableUpdateCompanionBuilder =
-    FoldersCompanion Function({
-      Value<String> id,
-      Value<String> userId,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<DateTime?> deletedAt,
-      Value<int> version,
-      Value<String> name,
-      Value<int> sortOrder,
-      Value<int> rowid,
-    });
-
-class $$FoldersTableFilterComposer
-    extends Composer<_$AppDatabase, $FoldersTable> {
-  $$FoldersTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get userId => $composableBuilder(
-    column: $table.userId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
-    column: $table.deletedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get version => $composableBuilder(
-    column: $table.version,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get sortOrder => $composableBuilder(
-    column: $table.sortOrder,
-    builder: (column) => ColumnFilters(column),
-  );
-}
-
-class $$FoldersTableOrderingComposer
-    extends Composer<_$AppDatabase, $FoldersTable> {
-  $$FoldersTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get userId => $composableBuilder(
-    column: $table.userId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
-    column: $table.deletedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get version => $composableBuilder(
-    column: $table.version,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get sortOrder => $composableBuilder(
-    column: $table.sortOrder,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $$FoldersTableAnnotationComposer
-    extends Composer<_$AppDatabase, $FoldersTable> {
-  $$FoldersTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get userId =>
-      $composableBuilder(column: $table.userId, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get updatedAt =>
-      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get deletedAt =>
-      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
-
-  GeneratedColumn<int> get version =>
-      $composableBuilder(column: $table.version, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<int> get sortOrder =>
-      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
-}
-
-class $$FoldersTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $FoldersTable,
-          Folder,
-          $$FoldersTableFilterComposer,
-          $$FoldersTableOrderingComposer,
-          $$FoldersTableAnnotationComposer,
-          $$FoldersTableCreateCompanionBuilder,
-          $$FoldersTableUpdateCompanionBuilder,
-          (Folder, BaseReferences<_$AppDatabase, $FoldersTable, Folder>),
-          Folder,
-          PrefetchHooks Function()
-        > {
-  $$FoldersTableTableManager(_$AppDatabase db, $FoldersTable table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$FoldersTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$FoldersTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$FoldersTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> userId = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<DateTime> updatedAt = const Value.absent(),
-                Value<DateTime?> deletedAt = const Value.absent(),
-                Value<int> version = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<int> sortOrder = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => FoldersCompanion(
-                id: id,
-                userId: userId,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                deletedAt: deletedAt,
-                version: version,
-                name: name,
-                sortOrder: sortOrder,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String userId,
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<DateTime> updatedAt = const Value.absent(),
-                Value<DateTime?> deletedAt = const Value.absent(),
-                Value<int> version = const Value.absent(),
-                required String name,
-                Value<int> sortOrder = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => FoldersCompanion.insert(
-                id: id,
-                userId: userId,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                deletedAt: deletedAt,
-                version: version,
-                name: name,
-                sortOrder: sortOrder,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $$FoldersTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $FoldersTable,
-      Folder,
-      $$FoldersTableFilterComposer,
-      $$FoldersTableOrderingComposer,
-      $$FoldersTableAnnotationComposer,
-      $$FoldersTableCreateCompanionBuilder,
-      $$FoldersTableUpdateCompanionBuilder,
-      (Folder, BaseReferences<_$AppDatabase, $FoldersTable, Folder>),
-      Folder,
-      PrefetchHooks Function()
-    >;
 typedef $$TaskListsTableCreateCompanionBuilder =
     TaskListsCompanion Function({
       required String id,
@@ -5992,13 +5344,14 @@ typedef $$TaskListsTableCreateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> version,
-      Value<String?> folderId,
+      Value<String?> parentId,
       required String name,
       Value<String?> color,
       Value<String?> icon,
       Value<int> sortOrder,
       Value<bool> isSystem,
       Value<String?> systemKind,
+      Value<String?> trashedWith,
       Value<int> rowid,
     });
 typedef $$TaskListsTableUpdateCompanionBuilder =
@@ -6009,13 +5362,14 @@ typedef $$TaskListsTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> version,
-      Value<String?> folderId,
+      Value<String?> parentId,
       Value<String> name,
       Value<String?> color,
       Value<String?> icon,
       Value<int> sortOrder,
       Value<bool> isSystem,
       Value<String?> systemKind,
+      Value<String?> trashedWith,
       Value<int> rowid,
     });
 
@@ -6058,8 +5412,8 @@ class $$TaskListsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get folderId => $composableBuilder(
-    column: $table.folderId,
+  ColumnFilters<String> get parentId => $composableBuilder(
+    column: $table.parentId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6090,6 +5444,11 @@ class $$TaskListsTableFilterComposer
 
   ColumnFilters<String> get systemKind => $composableBuilder(
     column: $table.systemKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get trashedWith => $composableBuilder(
+    column: $table.trashedWith,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6133,8 +5492,8 @@ class $$TaskListsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get folderId => $composableBuilder(
-    column: $table.folderId,
+  ColumnOrderings<String> get parentId => $composableBuilder(
+    column: $table.parentId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -6167,6 +5526,11 @@ class $$TaskListsTableOrderingComposer
     column: $table.systemKind,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get trashedWith => $composableBuilder(
+    column: $table.trashedWith,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TaskListsTableAnnotationComposer
@@ -6196,8 +5560,8 @@ class $$TaskListsTableAnnotationComposer
   GeneratedColumn<int> get version =>
       $composableBuilder(column: $table.version, builder: (column) => column);
 
-  GeneratedColumn<String> get folderId =>
-      $composableBuilder(column: $table.folderId, builder: (column) => column);
+  GeneratedColumn<String> get parentId =>
+      $composableBuilder(column: $table.parentId, builder: (column) => column);
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
@@ -6216,6 +5580,11 @@ class $$TaskListsTableAnnotationComposer
 
   GeneratedColumn<String> get systemKind => $composableBuilder(
     column: $table.systemKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get trashedWith => $composableBuilder(
+    column: $table.trashedWith,
     builder: (column) => column,
   );
 }
@@ -6254,13 +5623,14 @@ class $$TaskListsTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> version = const Value.absent(),
-                Value<String?> folderId = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> color = const Value.absent(),
                 Value<String?> icon = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<bool> isSystem = const Value.absent(),
                 Value<String?> systemKind = const Value.absent(),
+                Value<String?> trashedWith = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TaskListsCompanion(
                 id: id,
@@ -6269,13 +5639,14 @@ class $$TaskListsTableTableManager
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 version: version,
-                folderId: folderId,
+                parentId: parentId,
                 name: name,
                 color: color,
                 icon: icon,
                 sortOrder: sortOrder,
                 isSystem: isSystem,
                 systemKind: systemKind,
+                trashedWith: trashedWith,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6286,13 +5657,14 @@ class $$TaskListsTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> version = const Value.absent(),
-                Value<String?> folderId = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
                 required String name,
                 Value<String?> color = const Value.absent(),
                 Value<String?> icon = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<bool> isSystem = const Value.absent(),
                 Value<String?> systemKind = const Value.absent(),
+                Value<String?> trashedWith = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TaskListsCompanion.insert(
                 id: id,
@@ -6301,13 +5673,14 @@ class $$TaskListsTableTableManager
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 version: version,
-                folderId: folderId,
+                parentId: parentId,
                 name: name,
                 color: color,
                 icon: icon,
                 sortOrder: sortOrder,
                 isSystem: isSystem,
                 systemKind: systemKind,
+                trashedWith: trashedWith,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -6357,6 +5730,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       Value<bool> starred,
       Value<int?> estimatedMinutes,
       Value<int> focusedSeconds,
+      Value<String?> trashedWith,
       Value<int> rowid,
     });
 typedef $$TasksTableUpdateCompanionBuilder =
@@ -6384,6 +5758,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<bool> starred,
       Value<int?> estimatedMinutes,
       Value<int> focusedSeconds,
+      Value<String?> trashedWith,
       Value<int> rowid,
     });
 
@@ -6507,6 +5882,11 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<int> get focusedSeconds => $composableBuilder(
     column: $table.focusedSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get trashedWith => $composableBuilder(
+    column: $table.trashedWith,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6634,6 +6014,11 @@ class $$TasksTableOrderingComposer
     column: $table.focusedSeconds,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get trashedWith => $composableBuilder(
+    column: $table.trashedWith,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TasksTableAnnotationComposer
@@ -6727,6 +6112,11 @@ class $$TasksTableAnnotationComposer
     column: $table.focusedSeconds,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get trashedWith => $composableBuilder(
+    column: $table.trashedWith,
+    builder: (column) => column,
+  );
 }
 
 class $$TasksTableTableManager
@@ -6780,6 +6170,7 @@ class $$TasksTableTableManager
                 Value<bool> starred = const Value.absent(),
                 Value<int?> estimatedMinutes = const Value.absent(),
                 Value<int> focusedSeconds = const Value.absent(),
+                Value<String?> trashedWith = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion(
                 id: id,
@@ -6805,6 +6196,7 @@ class $$TasksTableTableManager
                 starred: starred,
                 estimatedMinutes: estimatedMinutes,
                 focusedSeconds: focusedSeconds,
+                trashedWith: trashedWith,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6832,6 +6224,7 @@ class $$TasksTableTableManager
                 Value<bool> starred = const Value.absent(),
                 Value<int?> estimatedMinutes = const Value.absent(),
                 Value<int> focusedSeconds = const Value.absent(),
+                Value<String?> trashedWith = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion.insert(
                 id: id,
@@ -6857,6 +6250,7 @@ class $$TasksTableTableManager
                 starred: starred,
                 estimatedMinutes: estimatedMinutes,
                 focusedSeconds: focusedSeconds,
+                trashedWith: trashedWith,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -8549,8 +7943,6 @@ typedef $$FocusPlansTableProcessedTableManager =
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
-  $$FoldersTableTableManager get folders =>
-      $$FoldersTableTableManager(_db, _db.folders);
   $$TaskListsTableTableManager get taskLists =>
       $$TaskListsTableTableManager(_db, _db.taskLists);
   $$TasksTableTableManager get tasks =>

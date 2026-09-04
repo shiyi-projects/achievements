@@ -2,16 +2,10 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 import pytest
 from httpx import AsyncClient
 
-
-async def _create_list(client: AsyncClient, name: str = "Inbox") -> UUID:
-    resp = await client.post("/api/v1/lists", json={"name": name})
-    assert resp.status_code == 201
-    return UUID(resp.json()["id"])
+from tests.helpers import create_list as _create_list
 
 
 @pytest.mark.asyncio

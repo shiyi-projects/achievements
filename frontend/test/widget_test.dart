@@ -2,7 +2,6 @@ import 'package:achievements/app/app.dart';
 import 'package:achievements/app/router.dart';
 import 'package:achievements/data/local/database.dart';
 import 'package:achievements/data/repositories/bootstrap_provider.dart';
-import 'package:achievements/data/repositories/folder_repository.dart';
 import 'package:achievements/features/auth/auth_controller.dart';
 import 'package:achievements/features/auth/auth_session.dart';
 import 'package:achievements/data/repositories/list_repository.dart';
@@ -38,9 +37,6 @@ void main() {
           ),
           allListsProvider.overrideWith(
             (ref) => Stream<List<TaskList>>.value([]),
-          ),
-          allFoldersProvider.overrideWith(
-            (ref) => Stream<List<Folder>>.value([]),
           ),
         ],
         child: const AchievementsApp(),

@@ -8,12 +8,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.client_version import require_supported_client
 from app.core.deps import CurrentUserId
 from app.db.session import get_session
 from app.schemas.sync import SyncPullResponse, SyncPushRequest, SyncPushResponse
 from app.services import sync_service
 
-router = APIRouter()
+# 两个端点都挡旧客户端:pull 下发的清单树旧端同样解释不了。
+router = APIRouter(dependencies=[Depends(require_supported_client)])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 

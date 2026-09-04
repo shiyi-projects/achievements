@@ -86,9 +86,6 @@ class LegacyImportService {
   Future<Set<String>> _legacyOwnerIds(AppDatabase legacy) async {
     final ids = <String>{};
     ids.addAll(
-      (await legacy.select(legacy.folders).get()).map((row) => row.userId),
-    );
-    ids.addAll(
       (await legacy.select(legacy.taskLists).get()).map((row) => row.userId),
     );
     ids.addAll(
@@ -111,7 +108,8 @@ class LegacyImportService {
     try {
       await _lists.ensureSystemLists();
       await _target.transaction(() async {
-        await _copyFolders(legacy);
+        // 旧库在这里被打开时已跑过 schema v12 迁移(folders 并入 task_lists),
+        // 所以只需要照搬清单树。
         await _copyLists(legacy);
         await _copyTags(legacy);
         await _copyTasks(legacy);
@@ -122,35 +120,6 @@ class LegacyImportService {
       });
     } finally {
       await legacy.close();
-    }
-  }
-
-  Future<void> _copyFolders(AppDatabase legacy) async {
-    final rows = await legacy.select(legacy.folders).get();
-    for (final row in rows) {
-      await _target
-          .into(_target.folders)
-          .insertOnConflictUpdate(
-            FoldersCompanion(
-              id: Value(row.id),
-              userId: Value(_userId),
-              name: Value(row.name),
-              sortOrder: Value(row.sortOrder),
-              createdAt: Value(row.createdAt),
-              updatedAt: Value(row.updatedAt),
-              deletedAt: Value(row.deletedAt),
-              version: Value(row.version),
-            ),
-          );
-      await _outbox.enqueue(
-        entity: 'folder',
-        op: row.deletedAt == null ? 'upsert' : 'delete',
-        entityId: row.id,
-        baseVersion: 0,
-        payload: row.deletedAt == null
-            ? {'name': row.name, 'sort_order': row.sortOrder}
-            : const {},
-      );
     }
   }
 
@@ -166,7 +135,7 @@ class LegacyImportService {
             TaskListsCompanion(
               id: Value(id),
               userId: Value(_userId),
-              folderId: Value(row.folderId),
+              parentId: Value(row.parentId),
               name: Value(row.name),
               color: Value(row.color),
               icon: Value(row.icon),
@@ -176,6 +145,7 @@ class LegacyImportService {
               createdAt: Value(row.createdAt),
               updatedAt: Value(row.updatedAt),
               deletedAt: Value(row.deletedAt),
+              trashedWith: Value(row.trashedWith),
               version: Value(row.version),
             ),
           );
@@ -187,11 +157,12 @@ class LegacyImportService {
         payload: row.deletedAt == null
             ? {
                 'name': row.name,
-                'folder_id': row.folderId,
+                'parent_id': row.parentId,
                 'color': row.color,
                 'icon': row.icon,
                 'sort_order': row.sortOrder,
                 'is_system': false,
+                'trashed_with': row.trashedWith,
               }
             : const {},
       );
@@ -255,6 +226,7 @@ class LegacyImportService {
               createdAt: Value(row.createdAt),
               updatedAt: Value(row.updatedAt),
               deletedAt: Value(row.deletedAt),
+              trashedWith: Value(row.trashedWith),
               version: Value(row.version),
             ),
           );

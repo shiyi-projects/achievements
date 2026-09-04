@@ -3,6 +3,7 @@ import 'package:achievements/core/sync/sync_coordinator.dart';
 import 'package:achievements/core/theme/app_dimensions.dart';
 import 'package:achievements/core/theme/app_icons.dart';
 import 'package:achievements/data/local/database.dart';
+import 'package:achievements/data/repositories/list_repository.dart';
 import 'package:achievements/data/repositories/task_repository.dart';
 import 'package:achievements/shared/widgets/empty_state.dart';
 import 'package:achievements/shared/widgets/pending_completed_list.dart';
@@ -145,11 +146,18 @@ class _StarFilterBar extends ConsumerWidget {
 
 class _TrashList extends ConsumerWidget {
   const _TrashList({required this.tasks});
+
+  /// 用户单独删除的任务。随清单级联删除的任务不在此列——它们跟着清单条目
+  /// 整体还原,不单独露出。
   final List<Task> tasks;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (tasks.isEmpty) {
+    final lists = ref
+        .watch(trashedListsProvider)
+        .maybeWhen(data: (d) => d, orElse: () => const <TaskList>[]);
+
+    if (tasks.isEmpty && lists.isEmpty) {
       // 同 PendingCompletedList:让外层 RefreshIndicator 在空清单也能拉。
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -160,7 +168,7 @@ class _TrashList extends ConsumerWidget {
               child: EmptyState(
                 icon: AppIcons.svgIcon(AppIcons.delete, size: 36),
                 title: '回收站是空的',
-                subtitle: '被删除的任务会出现在这里。',
+                subtitle: '被删除的任务与清单会出现在这里。',
               ),
             ),
           ),
@@ -171,72 +179,186 @@ class _TrashList extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
+    // 清单在前、任务在后。清单条目代表「一整个清单连同它的内容」,还原它
+    // 会把当初随它一起删掉的子清单与任务一并带回来。
+    final items = <Widget>[
+      if (lists.isNotEmpty) ...[
+        _TrashSectionHeader(text: '已删除的清单 (${lists.length})'),
+        for (final list in lists) _TrashedListTile(list: list),
+      ],
+      if (tasks.isNotEmpty) ...[
+        _TrashSectionHeader(text: '已删除的任务 (${tasks.length})'),
+        for (final task in tasks) _trashedTaskTile(ref, scheme, task),
+      ],
+    ];
+
     return ListView.builder(
       padding: const EdgeInsets.only(top: Spacing.sm, bottom: Spacing.sm),
-      itemCount: tasks.length + 1, // +1 for header
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(
-              Spacing.xl,
-              Spacing.sm,
-              Spacing.base,
-              Spacing.xs,
-            ),
-            child: Text(
-              '已删除 (${tasks.length})',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: scheme.outline,
-                letterSpacing: 0.5,
-              ),
-            ),
-          );
-        }
-        final task = tasks[index - 1];
-        return Dismissible(
-          key: ValueKey('trash-${task.id}'),
-          // 右滑: 恢复
-          background: Container(
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
-            color: scheme.primaryContainer,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppIcons.svgIcon(AppIcons.undo, size: 20),
-                const SizedBox(width: Spacing.xs),
-                Text('恢复', style: TextStyle(color: scheme.onPrimaryContainer)),
-              ],
-            ),
-          ),
-          // 左滑: 永久删除
-          secondaryBackground: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
-            color: scheme.errorContainer,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('永久删除', style: TextStyle(color: scheme.onErrorContainer)),
-                const SizedBox(width: Spacing.xs),
-                AppIcons.svgIcon(AppIcons.delete, size: 20),
-              ],
-            ),
-          ),
-          confirmDismiss: (direction) async {
-            if (direction == DismissDirection.startToEnd) {
-              // 恢复
-              await ref.read(taskRepositoryProvider).restore(task.id);
-              return false; // 流会自动更新列表
-            } else {
-              // 永久删除
-              await ref.read(taskRepositoryProvider).hardDelete(task.id);
-              return false;
-            }
-          },
-          child: TaskTile(task: task),
-        );
-      },
+      itemCount: items.length,
+      itemBuilder: (context, index) => items[index],
     );
+  }
+
+  Widget _trashedTaskTile(WidgetRef ref, ColorScheme scheme, Task task) {
+    return Dismissible(
+      key: ValueKey('trash-${task.id}'),
+      // 右滑: 恢复
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
+        color: scheme.primaryContainer,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcons.svgIcon(AppIcons.undo, size: 20),
+            const SizedBox(width: Spacing.xs),
+            Text('恢复', style: TextStyle(color: scheme.onPrimaryContainer)),
+          ],
+        ),
+      ),
+      // 左滑: 永久删除
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
+        color: scheme.errorContainer,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('永久删除', style: TextStyle(color: scheme.onErrorContainer)),
+            const SizedBox(width: Spacing.xs),
+            AppIcons.svgIcon(AppIcons.delete, size: 20),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          // 恢复
+          await ref.read(taskRepositoryProvider).restore(task.id);
+          return false; // 流会自动更新列表
+        } else {
+          // 永久删除
+          await ref.read(taskRepositoryProvider).hardDelete(task.id);
+          return false;
+        }
+      },
+      child: TaskTile(task: task),
+    );
+  }
+}
+
+class _TrashSectionHeader extends StatelessWidget {
+  const _TrashSectionHeader({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.xl,
+        Spacing.sm,
+        Spacing.base,
+        Spacing.xs,
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.outline,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// 回收站里的一条清单。右滑还原(连同随它一起删掉的子清单与任务),
+/// 左滑永久删除(不可逆,单独确认)。
+class _TrashedListTile extends ConsumerWidget {
+  const _TrashedListTile({required this.list});
+
+  final TaskList list;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Dismissible(
+      key: ValueKey('trash-list-${list.id}'),
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
+        color: scheme.primaryContainer,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcons.svgIcon(AppIcons.undo, size: 20),
+            const SizedBox(width: Spacing.xs),
+            Text('恢复', style: TextStyle(color: scheme.onPrimaryContainer)),
+          ],
+        ),
+      ),
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
+        color: scheme.errorContainer,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('永久删除', style: TextStyle(color: scheme.onErrorContainer)),
+            const SizedBox(width: Spacing.xs),
+            AppIcons.svgIcon(AppIcons.delete, size: 20),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        final repo = ref.read(listRepositoryProvider);
+        if (direction == DismissDirection.startToEnd) {
+          await repo.restore(list);
+          return false; // 流会自动更新列表
+        }
+        final confirmed = await _confirmPurge(context);
+        if (confirmed) await repo.hardDelete(list);
+        return false;
+      },
+      child: ListTile(
+        leading: AppIcons.svgIcon(AppIcons.list),
+        title: Text(list.name, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          '清单 · 其中的任务会一起还原',
+          style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmPurge(BuildContext context) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: Icon(
+              Icons.warning_amber_rounded,
+              color: Theme.of(ctx).colorScheme.error,
+              size: 32,
+            ),
+            title: const Text('永久删除清单?'),
+            content: Text('「${list.name}」及其中的所有任务将被彻底删除,无法恢复。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  foregroundColor: Theme.of(ctx).colorScheme.onError,
+                  backgroundColor: Theme.of(ctx).colorScheme.error,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('永久删除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 }

@@ -6,11 +6,13 @@ part of 'selected_list.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$currentListHash() => r'2dadc51aaa4cacc4070f0d1916273088b0dfea1a';
+String _$currentListHash() => r'24474ed4b748008ac835d5adf899a32f73d5b4d4';
 
-/// 已解析的当前清单(从 [SelectedListId] 拉真实 [TaskList] 行)。
+/// 已解析的当前清单。
 ///
-/// 若 [SelectedListId] 为 null,回退到 SystemListKind.today。
+/// 直接从清单流里取,而不是按 id 单独查库:清单被删除 / 移动后本 provider
+/// 会立刻重算。选中的清单不存在或已进回收站时回退到 Today —— 否则主视图会
+/// 继续渲染一个已删除的清单,新建的任务还会落进去。
 ///
 /// Copied from [currentList].
 @ProviderFor(currentList)
@@ -27,7 +29,7 @@ final currentListProvider = FutureProvider<TaskList?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentListRef = FutureProviderRef<TaskList?>;
-String _$selectedListIdHash() => r'b4537635e436348218a3a312be77dee29213abb7';
+String _$selectedListIdHash() => r'2549263769af58213b94af558a0dd87d5448e1bc';
 
 /// 当前 Sidebar 选中的清单 ID。
 ///

@@ -24,6 +24,7 @@ from sqlalchemy.pool import StaticPool
 # 必须先导入 app.models,触发所有 ORM 模型注册到 Base.metadata,
 # 之后 Base.metadata.create_all 才能建出表。
 import app.models  # noqa: F401  (side effect: register models)
+from app.core.client_version import MIN_CLIENT_VERSION
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app as fastapi_app
@@ -67,7 +68,12 @@ async def client(engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
     fastapi_app.dependency_overrides[get_session] = override_get_session
     transport = ASGITransport(app=fastapi_app)
     try:
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # /sync 有客户端版本门槛,测试客户端一律自称当前支持的最低版本。
+        async with AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            headers={"X-Client-Version": ".".join(str(p) for p in MIN_CLIENT_VERSION)},
+        ) as ac:
             yield ac
     finally:
         fastapi_app.dependency_overrides.clear()
