@@ -62,9 +62,8 @@ class _TestAuthController extends StateNotifier<AuthState>
         const AuthAuthenticated(
           AuthSession(
             token: 'test-token',
-            olibUserId: 1,
             appUserId: '00000000-0000-0000-0000-000000000001',
-            profile: AuthProfile(id: 1, role: 'authorized'),
+            profile: AuthProfile(id: 1),
           ),
         ),
       );

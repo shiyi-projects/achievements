@@ -66,6 +66,9 @@ Future<void> appBootstrap(Ref ref) async {
       // 这里直接 await pullOnce(),失败就抛错让 UI 拦住,不进入正常自动同步循环。
       final outbox = ref.read(outboxRepositoryProvider);
       final statusController = ref.read(syncStatusControllerProvider.notifier);
+
+      await _repairStaleSyncState(outbox);
+
       final firstSyncDone =
           (await outbox.getCursor(SyncCursorKey.firstSyncDone)) == 'true';
 
@@ -85,4 +88,22 @@ Future<void> appBootstrap(Ref ref) async {
       unawaited(coord.runFullSync());
     },
   );
+}
+
+/// 一次性修复升级前遗留的两种坏状态,每台设备只跑一次。
+///
+/// 1. **本地 version 落后**:旧版 `applied` 分支只在 upsert 时回写 version,
+///    做过软删/永久删除的行从此永久落后一格,之后每次操作都必然冲突并被 LWW
+///    赌时间戳(典型症状:回收站恢复被静默丢弃)。清掉 `last_pulled_at` 强制
+///    一次全量 pull,让服务端的权威 version 覆盖回来。
+/// 2. **死信行冻结实体**:旧版 `pendingEntityKeys()` 含死信行,该实体既推不
+///    上去也拒绝服务端下发。把重试计数清零,让新的原因分类重新判定它们。
+///
+/// 注意顺序:必须在首次同步门之前跑完,否则那次 pull 还带着旧游标。
+Future<void> _repairStaleSyncState(OutboxRepository outbox) async {
+  if ((await outbox.getCursor(SyncCursorKey.repairV1)) == 'true') return;
+
+  await outbox.retryDeadLettered();
+  await outbox.deleteCursor(SyncCursorKey.lastPulledAt);
+  await outbox.setCursor(SyncCursorKey.repairV1, 'true');
 }
