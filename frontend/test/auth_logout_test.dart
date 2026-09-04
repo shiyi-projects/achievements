@@ -11,9 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 const _session = AuthSession(
   token: 't',
-  olibUserId: 1,
   appUserId: 'user-a',
-  profile: AuthProfile(id: 1, role: 'authorized'),
+  profile: AuthProfile(id: 1),
 );
 
 class _FakeAuthRepository extends AuthRepository {
