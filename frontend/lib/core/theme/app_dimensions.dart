@@ -31,4 +31,17 @@ abstract final class Radii {
 
   /// 头像 / FAB
   static const double circle = 999;
+
+  /// ── 极简风格(设置页) ──
+  /// Material 默认的大圆角在信息密集、以排版分层的界面里显得过于圆润,
+  /// 这两个 token 把圆角收在 6–10px。
+
+  /// 控件:分段选择器、小按钮、色卡
+  static const double control = 8;
+
+  /// 面板:设置弹窗等大块容器
+  static const double panel = 10;
+
+  /// 分段选择器内部选中块(比外框小 2px,视觉上同心)
+  static const double controlInner = 6;
 }

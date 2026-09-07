@@ -32,9 +32,21 @@ class _FakeAuthRepository extends AuthRepository {
       await Completer<void>().future; // 永不完成
     }
   }
+
+  /// AuthController 载入会话后会尝试滑动续期;这里断掉,免得单测走真实网络。
+  @override
+  Future<String> renew(String token) async {
+    throw DioException.connectionError(
+      requestOptions: RequestOptions(),
+      reason: 'offline in tests',
+    );
+  }
 }
 
 void main() {
+  // AuthController 用 AppLifecycleListener 监听前台恢复,需要 binding 就绪。
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('登出正常清理后进入未认证态', () {
     fakeAsync((async) {
       final container = ProviderContainer(

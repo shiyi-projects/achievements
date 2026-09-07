@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:achievements/data/remote/api_client.dart';
 import 'package:achievements/features/auth/account_operation_gate.dart';
 import 'package:achievements/features/auth/auth_repository.dart';
 import 'package:achievements/features/auth/auth_session.dart';
+import 'package:achievements/features/auth/token_expiry.dart';
 import 'package:achievements/state/current_view.dart';
 import 'package:achievements/state/expanded_lists.dart';
 import 'package:achievements/state/selected_list.dart';
 import 'package:achievements/state/selected_task.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -31,21 +35,96 @@ final currentUserIdProvider = Provider<String>((ref) {
 
 class AuthController extends StateNotifier<AuthState> {
   AuthController(this._repository, this._ref) : super(const AuthLoading()) {
+    // 用 AppLifecycleListener 而不是 mixin WidgetsBindingObserver:后者会把
+    // 18 个生命周期回调并进本类的接口面,implements AuthController 的测试替身
+    // 全得跟着实现一遍。
+    _lifecycle = AppLifecycleListener(
+      // 进程被挂起时周期计时器不一定还在走(移动端尤其),恢复前台补检一次,
+      // 否则可能整段后台时间都没续上,回来正好撞过期。
+      onResume: () => unawaited(_maybeRenewToken()),
+    );
     _load();
   }
 
   final AuthRepository _repository;
   final Ref _ref;
   Future<void>? _authBoundaryOperation;
+  Timer? _renewTimer;
+  Future<void>? _renewInFlight;
+  late final AppLifecycleListener _lifecycle;
+
+  /// 长时间挂着不关的桌面端也要能续上,所以除了启动时那次还得周期性检查。
+  /// 线上 TTL 只有 8h,间隔取 1h 留足重试余量(单次失败还有 7 次机会)。
+  static const _renewCheckInterval = Duration(hours: 1);
 
   Future<void> _load() async {
     final session = await _repository.loadSession();
-    state = session == null
-        ? const AuthUnauthenticated()
-        : AuthAuthenticated(session);
+    if (session == null) {
+      state = const AuthUnauthenticated();
+      return;
+    }
+    if (isTokenExpired(session.token)) {
+      // 已过期的 token 续不回来了(SCC 续期端点同样回 401),直接清掉进登录页,
+      // 免得带着死 token 跑一轮业务请求、再被 401 拦截器绕路登出。
+      await _repository.clearSession();
+      state = const AuthUnauthenticated();
+      return;
+    }
+    state = AuthAuthenticated(session);
+    _ensureRenewTimer();
+    unawaited(_maybeRenewToken());
+  }
+
+  /// 续期检查是全局单例的:启动时带着会话进来、或扫码登录后,都从这里起一次。
+  void _ensureRenewTimer() {
+    _renewTimer ??= Timer.periodic(
+      _renewCheckInterval,
+      (_) => unawaited(_maybeRenewToken()),
+    );
+  }
+
+  /// token 进入续期窗口时换发新的;失败静默沿用旧 token,不打断使用。
+  ///
+  /// 公众号扫码没法静默重复,不续期的话线上 8h TTL 一到就得重新扫码。
+  Future<void> _maybeRenewToken() {
+    return _renewInFlight ??= _renewToken().whenComplete(() {
+      _renewInFlight = null;
+    });
+  }
+
+  Future<void> _renewToken() async {
+    final session = switch (state) {
+      AuthAuthenticated(:final session) => session,
+      _ => null,
+    };
+    // 切换账号 / 登出过程中不续期:此时会话正在变更,续完也会被覆盖。
+    if (session == null) return;
+    if (!shouldRenew(session.token)) return;
+    try {
+      final token = await _repository.renew(session.token);
+      // 续期期间用户可能已经登出或切了账号,只有会话没变才写回。
+      final current = switch (state) {
+        AuthAuthenticated(:final session) => session,
+        _ => null,
+      };
+      if (current == null || current.token != session.token) return;
+      final renewed = current.withToken(token);
+      await _repository.saveSession(renewed);
+      state = AuthAuthenticated(renewed);
+    } catch (_) {
+      // 网络不通 / SCC 暂时不可用:沿用旧 token 到期,下次检查再试。
+    }
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    _renewTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> setSession(AuthSession session) {
+    _ensureRenewTimer();
     final currentSession = switch (state) {
       AuthAuthenticated(:final session) => session,
       AuthSwitching(:final previousSession) => previousSession,
