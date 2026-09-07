@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -19,6 +20,7 @@ from app.schemas.auth import (
     AuthStatusResponse,
     LogoutResponse,
     QrCodeResponse,
+    RenewResponse,
     UserProfile,
 )
 from app.services.list_service import ensure_system_lists
@@ -29,6 +31,9 @@ router = APIRouter()
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+
+_security = HTTPBearer(auto_error=False)
+CredentialsDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_security)]
 
 
 @router.get("/qrcode", response_model=QrCodeResponse)
@@ -81,6 +86,46 @@ async def auth_status(
             unionid=claims.unionid,
             in_wecom=claims.in_wecom,
         ),
+    )
+
+
+@router.post("/renew", response_model=RenewResponse)
+async def renew(
+    credentials: CredentialsDep,
+    settings: SettingsDep,
+    session: SessionDep,
+) -> RenewResponse:
+    """滑动续期当前 client token,免去 8h 到期后重新扫码。
+
+    公众号扫码登录无法静默重复,所以长期使用只能在 token 过期前换发新的。
+    这里先本地验签(过期/伪造直接 401,不白跑一趟 SCC),再代理 SCC 换发,
+    并用新 claims 回写本地身份映射(``unionid`` 补绑、``in_wecom`` 变更)。
+    """
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Bearer token required",
+        )
+
+    # 本地先验一遍:token 已过期时 SCC 也只会回 401,没必要往上游发请求。
+    decode_client_token(credentials.credentials, settings)
+
+    data = await SccClient(settings).renew_client_token(credentials.credentials)
+    token = data.get("token")
+    if not isinstance(token, str):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="SCC renew response missing token",
+        )
+
+    # 新 token 的 claims 是重算的,回写一次让本地 unionid / 昵称跟上 SCC。
+    claims = decode_client_token(token, settings)
+    await upsert_scc_user(session, claims)
+
+    expires_in = data.get("expires_in")
+    return RenewResponse(
+        token=token,
+        expires_in=expires_in if isinstance(expires_in, int) else 0,
     )
 
 

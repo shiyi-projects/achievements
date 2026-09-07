@@ -35,16 +35,31 @@ class SccClient:
             f"/api/v1/client/auth/wechat-qr/status/{scene_id}",
         )
 
+    async def renew_client_token(self, token: str) -> dict[str, Any]:
+        """滑动续期:拿未过期的 client token 换发新 token → {token, expires_in}。
+
+        公众号扫码无法静默重复,长期使用只能靠本端点续期(SCC
+        ``client_integration_guide.md`` §3.3.2)。SCC 侧会重算 claims
+        (``in_wecom`` 实时重查、``unionid`` 取当前值),故新 token 可能与旧的不等价。
+        旧 token 已过期时 SCC 回 401,原样透传给客户端让其重新扫码。
+        """
+        return await self._request(
+            "POST",
+            "/api/v1/client/auth/renew",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
     async def _request(
         self,
         method: str,
         path: str,
         *,
         params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         try:
             async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
-                response = await client.request(method, path, params=params)
+                response = await client.request(method, path, params=params, headers=headers)
         except httpx.TimeoutException as exc:
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,

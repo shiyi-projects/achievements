@@ -3,7 +3,7 @@
 > 被引用项目：`D:\SoftwareData\platform\software_control_center`（🏛️ 平台身份+支付底座）
 > 用途：Achievements 的**登录身份与访问门禁收口到 SCC**（替换原 OLib/wxauth 方案）。
 > 权威契约：SCC `dev_docs/client_integration_guide.md`、`dev_docs/jwt_contract.md`、`dev_docs/platform_overview.md`。
-> 最后更新：2026-07-07
+> 最后更新：2026-09-06
 
 ## 一、接入范围（本期）
 
@@ -21,9 +21,23 @@
 |------|------|------|------|
 | GET | `/auth/wechat-qr?app_id=` | 生成公众号登录二维码 → `{scene_id, qrcode_url, expire_seconds}` | Achievements 后端代理 |
 | GET | `/auth/wechat-qr/status/{scene_id}` | 轮询扫码状态；`confirmed` 时返回 `{status, user_id, nickname, token, unionid?, in_wecom}` | Achievements 后端代理 |
+| POST | `/auth/renew` | 滑动续期：带未过期 client token → `{token, expires_in}` | Achievements 后端代理 |
 
 - 登录经**后端代理**（`app/services/scc_client.py`），对 Flutter 屏蔽 SCC 地址与 `app_id`。
-- Flutter 只调 Achievements 自己的 `/api/v1/auth/qrcode`、`/api/v1/auth/status?scene_id=`（形状不变，去掉了原 register/anon_token 环节）。
+- Flutter 只调 Achievements 自己的 `/api/v1/auth/qrcode`、`/api/v1/auth/status?scene_id=`、`/api/v1/auth/renew`（形状不变，去掉了原 register/anon_token 环节）。
+
+### 2.1 滑动续期（免每 8h 重扫码）
+
+公众号扫码**无法静默重复**，token 一过期就只能让用户重新扫，所以长期使用必须在过期前换发新 token
+（SCC `client_integration_guide.md` §3.3.2）。
+
+- 后端 `POST /api/v1/auth/renew`（`api/v1/auth.py::renew`）：先本地验签（已过期直接 401，不白跑一趟 SCC）→ 代理 SCC `/auth/renew` → 用新 claims 回写身份映射（`unionid` 补绑、`in_wecom` 变更都在这时跟上）。
+- 前端（`features/auth/auth_controller.dart`）：启动、每 1h、以及前台恢复时检查本地 token 的 `exp`（`features/auth/token_expiry.dart` 解 payload，不验签），**剩余不足 48h 就续**；续期失败静默沿用旧 token，不打断使用。
+- 启动时 token 已过期则直接清会话进登录页——续不回来了，也免得带着死 token 跑一轮业务请求再被 401 拦截器绕路登出。
+- ⚠️ **续期救不了「隔夜」**：TTL 由 SCC 侧 `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` 决定，线上当前为 `480`（8h）。
+  只要用户连续 8h 不开 App，回来仍需重扫。要真正消除这个体感，需把线上调到 `10080`（7 天）——
+  OlibTauri 遇到同样问题时就是这么处理的（见 SCC `dev_docs/req_OlibTauri.md`），零代码改动，重启生效。
+  客户端的 48h 阈值对 8h / 7 天两种配置都成立：前者等价于每次检查都续，后者退化为低频续期。
 
 ## 三、Token 契约（HS256 对称，离线验签）
 
@@ -66,6 +80,7 @@ SCC_JWT_ALG=HS256
 | 登录代理 | `backend/app/services/scc_client.py` |
 | 身份收口 | `backend/app/core/deps.py`（`get_current_user_id`） |
 | 身份映射 | `backend/app/services/user_service.py`（`upsert_scc_user`） |
-| 路由 | `backend/app/api/v1/auth.py`（qrcode/status/logout） |
+| 路由 | `backend/app/api/v1/auth.py`（qrcode/status/renew/logout） |
+| 续期判定 | `frontend/lib/features/auth/token_expiry.dart` |
 | 迁移 | `backend/alembic/versions/f1e2d3c4b5a6_add_unionid_to_users.py` |
 | 前端 | `frontend/lib/features/auth/`（repository/session/qr_login_page） |
