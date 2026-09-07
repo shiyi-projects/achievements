@@ -34,5 +34,12 @@ class AuthStatusResponse(BaseModel):
     profile: UserProfile | None = None
 
 
+class RenewResponse(BaseModel):
+    """滑动续期结果:新 client token 与其有效期(秒)。"""
+
+    token: str
+    expires_in: int
+
+
 class LogoutResponse(BaseModel):
     success: bool = True
