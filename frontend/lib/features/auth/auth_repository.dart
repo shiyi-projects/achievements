@@ -59,6 +59,19 @@ class AuthRepository {
     if (data['status'] != 'authorized') return null;
     return AuthSession.fromJson(data);
   }
+
+  /// 滑动续期:用未过期的 token 换新的,身份与 appUserId 不变。
+  ///
+  /// 走的是不带鉴权拦截器的 dio,故手动带 Authorization——续期本身回 401 时
+  /// 不该触发全局登出,交由调用方决定(见 AuthController.maybeRenewToken)。
+  Future<String> renew(String token) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/auth/renew',
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+    final data = response.data ?? <String, dynamic>{};
+    return data['token'] as String;
+  }
 }
 
 class QrCodeResult {

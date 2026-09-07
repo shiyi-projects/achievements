@@ -57,6 +57,11 @@ class AuthSession {
   final String appUserId;
   final AuthProfile profile;
 
+  /// 续期后只换 token,身份(appUserId / profile)不变。
+  AuthSession withToken(String newToken) {
+    return AuthSession(token: newToken, appUserId: appUserId, profile: profile);
+  }
+
   Map<String, dynamic> toJson() => {
     'token': token,
     'app_user_id': appUserId,

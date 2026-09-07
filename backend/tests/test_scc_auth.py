@@ -13,6 +13,7 @@ from httpx import AsyncClient
 from app.core.config import Settings, get_settings
 from app.core.scc_auth import decode_client_token
 from app.main import app as fastapi_app
+from app.services.scc_client import SccClient
 
 SECRET = "test-shared-secret"
 
@@ -114,3 +115,56 @@ async def test_protected_route_accepts_valid_scc_token(client: AsyncClient) -> N
     )
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
+
+
+# ── 滑动续期(免每 8h 重扫码) ──
+
+
+@pytest.mark.asyncio
+async def test_renew_returns_new_token(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fastapi_app.dependency_overrides[get_settings] = _auth_settings
+    fresh = _token(exp_delta=timedelta(days=7), unionid="oUnion_late_bind")
+
+    async def _fake_renew(self: SccClient, token: str) -> dict[str, Any]:
+        return {"token": fresh, "expires_in": 604800}
+
+    monkeypatch.setattr(SccClient, "renew_client_token", _fake_renew)
+
+    resp = await client.post(
+        "/api/v1/auth/renew",
+        headers={"Authorization": f"Bearer {_token()}"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["token"] == fresh
+    assert body["expires_in"] == 604800
+
+
+@pytest.mark.asyncio
+async def test_renew_requires_token(client: AsyncClient) -> None:
+    fastapi_app.dependency_overrides[get_settings] = _auth_settings
+    resp = await client.post("/api/v1/auth/renew")
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_renew_rejects_expired_token_without_calling_scc(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """已过期的 token 本地就该拦下,不白跑一趟 SCC。"""
+    fastapi_app.dependency_overrides[get_settings] = _auth_settings
+
+    async def _must_not_call(self: SccClient, token: str) -> dict[str, Any]:
+        raise AssertionError("expired token should not reach SCC")
+
+    monkeypatch.setattr(SccClient, "renew_client_token", _must_not_call)
+
+    resp = await client.post(
+        "/api/v1/auth/renew",
+        headers={"Authorization": f"Bearer {_token(exp_delta=timedelta(hours=-2))}"},
+    )
+    assert resp.status_code == 401
